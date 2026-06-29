@@ -20,13 +20,16 @@ type
     cbCaseSensitive: TCheckBox;
     edtPattern: TEdit;
     edtSearchPath: TEdit;
+    lblActivity: TLabel;
     lblPattern: TLabel;
     lblSearchIn: TLabel;
     lblFolders: TLabel;
     lvResults: TListView;
     pnlTop: TPanel;
+    pnlProgress: TPanel;
     pnlLeft: TPanel;
     pnlRight: TPanel;
+    ProgressBar1: TProgressBar;
     ShellTreeView1: TShellTreeView;
     splMain: TSplitter;
     StatusBar1: TStatusBar;
@@ -46,6 +49,7 @@ type
     procedure DoSearch(const APath, APattern: string; ARecursive, ACaseSensitive: Boolean);
     procedure AddResult(const AFileName, AFolder: string; ASize: Int64; ADate: TDateTime);
     procedure SetStatus(const AMsg: string);
+    procedure SetActivity(const AMsg: string);
     procedure SetCounts;
     procedure SetSearching(AValue: Boolean);
     function MatchesPattern(const AFileName, APattern: string; ACaseSensitive: Boolean): Boolean;
@@ -75,9 +79,12 @@ begin
   FSelectedPath := 'C:\';
 
   // Default status
-  StatusBar1.Panels[0].Text := ' Ready. Select a folder and enter a search pattern.';
-  StatusBar1.Panels[1].Text := 'Files: 0';
-  StatusBar1.Panels[2].Text := 'Dirs: 0';
+  ProgressBar1.Style := pbstMarquee;
+  ProgressBar1.Visible := False;
+  lblActivity.Caption := 'Ready.';
+  StatusBar1.Panels[0].Text := ' Select a folder from the tree and enter a search pattern.';
+  StatusBar1.Panels[1].Text := '';
+  StatusBar1.Panels[2].Text := '';
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -102,12 +109,15 @@ begin
   Pattern := Trim(edtPattern.Text);
   if Pattern = '' then
   begin
-    MessageDlg('Enter a search pattern', 'Please enter a search pattern (e.g. *.png or readme*)',
+    MessageDlg('Please enter a search pattern (e.g. *.png or readme*)',
       mtWarning, [mbOK], 0);
     Exit;
   end;
 
-  SearchPath := FSelectedPath;
+  // Use the path from the edit box (user may have typed one directly)
+  SearchPath := Trim(edtSearchPath.Text);
+  if SearchPath = '' then
+    SearchPath := FSelectedPath;
   if SearchPath = '' then
     SearchPath := 'C:\';
 
@@ -116,7 +126,7 @@ begin
 
   if not DirectoryExists(SearchPath) then
   begin
-    MessageDlg('Folder not found', 'Directory does not exist: ' + SearchPath,
+    MessageDlg('Directory does not exist: ' + SearchPath,
       mtError, [mbOK], 0);
     Exit;
   end;
@@ -133,7 +143,9 @@ begin
   FDirCount := 0;
   FStopSearch := False;
   SetSearching(True);
-  SetStatus(' Searching in: ' + SearchPath + '  for: ' + Pattern);
+  SetActivity('Starting search for "' + Pattern + '" in ' + SearchPath + ' ...');
+  SetStatus(' Searching...');
+  Application.ProcessMessages;  // Force UI to paint immediately
 
   try
     DoSearch(SearchPath, Pattern, cbSubfolders.Checked, cbCaseSensitive.Checked);
@@ -141,15 +153,25 @@ begin
     SetSearching(False);
     SetCounts;
     if FStopSearch then
-      SetStatus(Format(' Search stopped. Found %d file(s) across %d folder(s).', [FFileCount, FDirCount]))
+    begin
+      SetActivity(Format('Search stopped. Found %d file(s) in %d folder(s).', [FFileCount, FDirCount]));
+      SetStatus(Format(' Stopped. %d file(s), %d folder(s) scanned.', [FFileCount, FDirCount]));
+    end
     else
-      SetStatus(Format(' Search complete. Found %d file(s) across %d folder(s).', [FFileCount, FDirCount]));
+    begin
+      if FFileCount = 0 then
+        SetActivity(Format('Search complete. No matches found for "%s" in %d folder(s).', [Pattern, FDirCount]))
+      else
+        SetActivity(Format('Search complete. Found %d file(s) in %d folder(s).', [FFileCount, FDirCount]));
+      SetStatus(Format(' Done. %d file(s), %d folder(s) scanned.', [FFileCount, FDirCount]));
+    end;
   end;
 end;
 
 procedure TfrmMain.btnStopClick(Sender: TObject);
 begin
   FStopSearch := True;
+  SetActivity('Stopping...');
 end;
 
 procedure TfrmMain.btnClearClick(Sender: TObject);
@@ -163,6 +185,7 @@ begin
   FFileCount := 0;
   FDirCount := 0;
   SetCounts;
+  SetActivity('Ready.');
   SetStatus(' Results cleared.');
 end;
 
@@ -189,7 +212,10 @@ end;
   Uses iterative BFS (breadth-first) with a TStringList as a queue
   for directory traversal. This avoids deep recursion stack overflows
   on large directory trees and is very fast.
-  Pattern matching uses an optimized wildcard matcher. }
+  Pattern matching uses an optimized wildcard matcher.
+
+  UI is updated every single directory so the user always sees
+  what folder is currently being scanned. }
 
 procedure TfrmMain.DoSearch(const APath, APattern: string;
   ARecursive, ACaseSensitive: Boolean);
@@ -198,19 +224,30 @@ var
   SR: TSearchRec;
   CurrentDir: string;
   QueueIndex: Integer;
-  BatchCount: Integer;
+  TickCount: QWord;
+  LastTick: QWord;
 begin
   DirQueue := TStringList.Create;
   try
     DirQueue.Add(APath);
     QueueIndex := 0;
+    LastTick := GetTickCount64;
 
     while (QueueIndex < DirQueue.Count) and (not FStopSearch) do
     begin
       CurrentDir := IncludeTrailingPathDelimiter(DirQueue[QueueIndex]);
       Inc(QueueIndex);
       Inc(FDirCount);
-      BatchCount := 0;
+
+      // Update UI every ~100ms so it stays responsive without slowing search
+      TickCount := GetTickCount64;
+      if (TickCount - LastTick) >= 100 then
+      begin
+        LastTick := TickCount;
+        SetActivity('Scanning: ' + CurrentDir);
+        SetCounts;
+        Application.ProcessMessages;
+      end;
 
       // Scan current directory
       if FindFirst(CurrentDir + '*', faAnyFile, SR) = 0 then
@@ -237,17 +274,17 @@ begin
                 AddResult(SR.Name, CurrentDir, SR.Size,
                   FileDateToDateTime(SR.Time));
                 Inc(FFileCount);
-              end;
-            end;
 
-            // Process messages periodically to keep UI responsive
-            Inc(BatchCount);
-            if BatchCount >= 200 then
-            begin
-              BatchCount := 0;
-              SetCounts;
-              SetStatus(' Searching: ' + CurrentDir);
-              Application.ProcessMessages;
+                // Update immediately when a match is found so user sees results appear
+                TickCount := GetTickCount64;
+                if (TickCount - LastTick) >= 100 then
+                begin
+                  LastTick := TickCount;
+                  SetActivity('Scanning: ' + CurrentDir + '  (found ' + IntToStr(FFileCount) + ' so far)');
+                  SetCounts;
+                  Application.ProcessMessages;
+                end;
+              end;
             end;
 
           until FindNext(SR) <> 0;
@@ -294,6 +331,11 @@ begin
   StatusBar1.Panels[0].Text := AMsg;
 end;
 
+procedure TfrmMain.SetActivity(const AMsg: string);
+begin
+  lblActivity.Caption := AMsg;
+end;
+
 procedure TfrmMain.SetCounts;
 begin
   StatusBar1.Panels[1].Text := Format('Files: %d', [FFileCount]);
@@ -307,7 +349,9 @@ begin
   btnStop.Enabled := AValue;
   btnClear.Enabled := not AValue;
   edtPattern.Enabled := not AValue;
+  edtSearchPath.Enabled := not AValue;
   ShellTreeView1.Enabled := not AValue;
+  ProgressBar1.Visible := AValue;
   if AValue then
     Screen.Cursor := crHourGlass
   else

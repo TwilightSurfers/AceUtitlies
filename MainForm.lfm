@@ -31,28 +31,27 @@ object frmMain: TfrmMain
       Left = 12
       Height = 23
       Top = 28
-      Width = 280
+      Width = 220
       TabOrder = 0
       Text = '*.png'
     end
     object lblSearchIn: TLabel
-      Left = 308
+      Left = 248
       Height = 15
       Top = 8
       Width = 56
       Caption = 'Search in:'
     end
     object edtSearchPath: TEdit
-      Left = 308
+      Left = 248
       Height = 23
       Top = 28
-      Width = 280
-      ReadOnly = True
+      Width = 310
       TabOrder = 1
       Text = 'C:\'
     end
     object cbSubfolders: TCheckBox
-      Left = 604
+      Left = 575
       Height = 19
       Top = 8
       Width = 113
@@ -62,7 +61,7 @@ object frmMain: TfrmMain
       TabOrder = 2
     end
     object cbCaseSensitive: TCheckBox
-      Left = 604
+      Left = 575
       Height = 19
       Top = 32
       Width = 97
@@ -70,7 +69,7 @@ object frmMain: TfrmMain
       TabOrder = 3
     end
     object btnSearch: TButton
-      Left = 740
+      Left = 720
       Height = 30
       Top = 20
       Width = 90
@@ -80,7 +79,7 @@ object frmMain: TfrmMain
       OnClick = btnSearchClick
     end
     object btnStop: TButton
-      Left = 838
+      Left = 818
       Height = 30
       Top = 20
       Width = 75
@@ -90,7 +89,7 @@ object frmMain: TfrmMain
       OnClick = btnStopClick
     end
     object btnClear: TButton
-      Left = 920
+      Left = 900
       Height = 30
       Top = 20
       Width = 75
@@ -99,14 +98,42 @@ object frmMain: TfrmMain
       OnClick = btnClearClick
     end
   end
+  object pnlProgress: TPanel
+    Left = 0
+    Height = 38
+    Top = 70
+    Width = 1050
+    Align = alTop
+    BevelOuter = bvNone
+    ClientHeight = 38
+    ClientWidth = 1050
+    TabOrder = 7
+    object lblActivity: TLabel
+      Left = 8
+      Height = 15
+      Top = 2
+      Width = 1034
+      Anchors = [akTop, akLeft, akRight]
+      Caption = 'Ready.'
+    end
+    object ProgressBar1: TProgressBar
+      Left = 8
+      Height = 14
+      Top = 20
+      Width = 1034
+      Anchors = [akTop, akLeft, akRight]
+      Smooth = True
+      TabOrder = 0
+    end
+  end
   object pnlLeft: TPanel
     Left = 0
-    Height = 555
-    Top = 70
+    Height = 517
+    Top = 108
     Width = 280
     Align = alLeft
     BevelOuter = bvNone
-    ClientHeight = 555
+    ClientHeight = 517
     ClientWidth = 280
     TabOrder = 1
     object lblFolders: TLabel
@@ -115,13 +142,14 @@ object frmMain: TfrmMain
       Top = 0
       Width = 280
       Align = alTop
-      Alignment = taCenter
-      Caption = 'Select Start Folder'
+      Caption = ' Folders'
+      Font.Style = [fsBold]
       Layout = tlCenter
+      ParentFont = False
     end
     object ShellTreeView1: TShellTreeView
       Left = 0
-      Height = 535
+      Height = 497
       Top = 20
       Width = 280
       Align = alClient
@@ -129,28 +157,28 @@ object frmMain: TfrmMain
       ObjectTypes = [otFolders]
       TabOrder = 0
       OnSelectionChanged = ShellTreeView1SelectionChanged
-      Options = [tvoAutoItemHeight, tvoHideSelection, tvoKeepCollapsedNodes, tvoReadOnly, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
+      Options = [tvoAutoItemHeight, tvoKeepCollapsedNodes, tvoReadOnly, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
     end
   end
   object splMain: TSplitter
     Left = 280
-    Height = 555
-    Top = 70
+    Height = 517
+    Top = 108
     Width = 5
   end
   object pnlRight: TPanel
     Left = 285
-    Height = 555
-    Top = 70
+    Height = 517
+    Top = 108
     Width = 765
     Align = alClient
     BevelOuter = bvNone
-    ClientHeight = 555
+    ClientHeight = 517
     ClientWidth = 765
     TabOrder = 3
     object lvResults: TListView
       Left = 0
-      Height = 555
+      Height = 517
       Top = 0
       Width = 765
       Align = alClient
