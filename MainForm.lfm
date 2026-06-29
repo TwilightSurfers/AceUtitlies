@@ -1,0 +1,13 @@
+object frmMain: TfrmMain
+  Left = 200
+  Height = 700
+  Top = 100
+  Width = 1100
+  Caption = 'Ace File Search'
+  ClientHeight = 700
+  ClientWidth = 1100
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  Position = poScreenCenter
+  LCLVersion = '3.6.0.0'
+end

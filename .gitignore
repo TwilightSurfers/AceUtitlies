@@ -1,0 +1,16 @@
+# Lazarus build artifacts
+*.o
+*.ppu
+*.compiled
+*.bak
+*.lps
+*.dbg
+lib/
+backup/
+
+# Compiled binary
+AceFileSearch.exe
+AceFileSearch
+
+# IDE session
+*.lps
