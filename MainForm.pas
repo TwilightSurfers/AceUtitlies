@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls,
-  ComCtrls, ShellCtrls, Menus, LCLType, FileUtil, LazFileUtils;
+  ComCtrls, ShellCtrls, FileUtil, LazFileUtils;
 
 type
 
@@ -19,17 +19,17 @@ type
     cbSubfolders: TCheckBox;
     cbCaseSensitive: TCheckBox;
     edtPattern: TEdit;
+    edtSearchPath: TEdit;
     lblPattern: TLabel;
-    lblStatus: TLabel;
-    lblResults: TLabel;
+    lblSearchIn: TLabel;
+    lblFolders: TLabel;
     lvResults: TListView;
     pnlTop: TPanel;
     pnlLeft: TPanel;
     pnlRight: TPanel;
-    pnlSearch: TPanel;
-    pnlStatus: TPanel;
     ShellTreeView1: TShellTreeView;
     splMain: TSplitter;
+    StatusBar1: TStatusBar;
     procedure btnClearClick(Sender: TObject);
     procedure btnSearchClick(Sender: TObject);
     procedure btnStopClick(Sender: TObject);
@@ -44,8 +44,9 @@ type
     FSearching: Boolean;
     FSelectedPath: string;
     procedure DoSearch(const APath, APattern: string; ARecursive, ACaseSensitive: Boolean);
-    procedure AddResult(const AFileName, APath: string; ASize: Int64; ADate: TDateTime);
-    procedure UpdateStatus(const AMsg: string);
+    procedure AddResult(const AFileName, AFolder: string; ASize: Int64; ADate: TDateTime);
+    procedure SetStatus(const AMsg: string);
+    procedure SetCounts;
     procedure SetSearching(AValue: Boolean);
     function MatchesPattern(const AFileName, APattern: string; ACaseSensitive: Boolean): Boolean;
     function MatchWildcard(const AStr, APattern: string): Boolean;
@@ -63,7 +64,7 @@ uses
   {$IFDEF WINDOWS}
   Windows, ShellAPI,
   {$ENDIF}
-  DateUtils, Math;
+  DateUtils;
 
 { TfrmMain }
 
@@ -73,182 +74,10 @@ begin
   FSearching := False;
   FSelectedPath := 'C:\';
 
-  // Style the form
-  Self.Caption := 'Ace File Search';
-  Self.Color := clWhite;
-  Self.Width := 1100;
-  Self.Height := 700;
-  Self.Position := poScreenCenter;
-  Self.Font.Name := 'Segoe UI';
-  Self.Font.Size := 9;
-
-  // --- Top Panel (Search Controls) ---
-  pnlTop := TPanel.Create(Self);
-  pnlTop.Parent := Self;
-  pnlTop.Align := alTop;
-  pnlTop.Height := 75;
-  pnlTop.BevelOuter := bvNone;
-  pnlTop.Color := $00493A28;  // Dark brown/charcoal
-  pnlTop.ParentBackground := False;
-
-  lblPattern := TLabel.Create(Self);
-  lblPattern.Parent := pnlTop;
-  lblPattern.Left := 16;
-  lblPattern.Top := 10;
-  lblPattern.Caption := 'SEARCH PATTERN';
-  lblPattern.Font.Color := clWhite;
-  lblPattern.Font.Size := 8;
-  lblPattern.Font.Style := [fsBold];
-
-  edtPattern := TEdit.Create(Self);
-  edtPattern.Parent := pnlTop;
-  edtPattern.Left := 16;
-  edtPattern.Top := 30;
-  edtPattern.Width := 300;
-  edtPattern.Height := 28;
-  edtPattern.Text := '*.png';
-  edtPattern.Font.Size := 10;
-
-  cbSubfolders := TCheckBox.Create(Self);
-  cbSubfolders.Parent := pnlTop;
-  cbSubfolders.Left := 340;
-  cbSubfolders.Top := 12;
-  cbSubfolders.Caption := 'Include Subfolders';
-  cbSubfolders.Checked := True;
-  cbSubfolders.Font.Color := clWhite;
-  cbSubfolders.Font.Size := 9;
-
-  cbCaseSensitive := TCheckBox.Create(Self);
-  cbCaseSensitive.Parent := pnlTop;
-  cbCaseSensitive.Left := 340;
-  cbCaseSensitive.Top := 38;
-  cbCaseSensitive.Caption := 'Case Sensitive';
-  cbCaseSensitive.Checked := False;
-  cbCaseSensitive.Font.Color := clWhite;
-  cbCaseSensitive.Font.Size := 9;
-
-  btnSearch := TButton.Create(Self);
-  btnSearch.Parent := pnlTop;
-  btnSearch.Left := 520;
-  btnSearch.Top := 22;
-  btnSearch.Width := 110;
-  btnSearch.Height := 36;
-  btnSearch.Caption := '🔍  Search';
-  btnSearch.Font.Size := 10;
-  btnSearch.Font.Style := [fsBold];
-  btnSearch.OnClick := @btnSearchClick;
-
-  btnStop := TButton.Create(Self);
-  btnStop.Parent := pnlTop;
-  btnStop.Left := 640;
-  btnStop.Top := 22;
-  btnStop.Width := 90;
-  btnStop.Height := 36;
-  btnStop.Caption := '⏹  Stop';
-  btnStop.Font.Size := 10;
-  btnStop.Enabled := False;
-  btnStop.OnClick := @btnStopClick;
-
-  btnClear := TButton.Create(Self);
-  btnClear.Parent := pnlTop;
-  btnClear.Left := 740;
-  btnClear.Top := 22;
-  btnClear.Width := 90;
-  btnClear.Height := 36;
-  btnClear.Caption := '🗑  Clear';
-  btnClear.Font.Size := 10;
-  btnClear.OnClick := @btnClearClick;
-
-  // --- Left Panel (ShellTreeView) ---
-  pnlLeft := TPanel.Create(Self);
-  pnlLeft.Parent := Self;
-  pnlLeft.Align := alLeft;
-  pnlLeft.Width := 280;
-  pnlLeft.BevelOuter := bvNone;
-  pnlLeft.Color := $00F5F5F0;
-  pnlLeft.ParentBackground := False;
-
-  ShellTreeView1 := TShellTreeView.Create(Self);
-  ShellTreeView1.Parent := pnlLeft;
-  ShellTreeView1.Align := alClient;
-  ShellTreeView1.Root := '';
-  ShellTreeView1.Font.Size := 9;
-  ShellTreeView1.OnSelectionChanged := @ShellTreeView1SelectionChanged;
-  ShellTreeView1.BorderStyle := bsNone;
-
-  // --- Splitter ---
-  splMain := TSplitter.Create(Self);
-  splMain.Parent := Self;
-  splMain.Left := pnlLeft.Width;
-  splMain.Width := 5;
-  splMain.Color := $00D0D0D0;
-
-  // --- Right Panel (Results) ---
-  pnlRight := TPanel.Create(Self);
-  pnlRight.Parent := Self;
-  pnlRight.Align := alClient;
-  pnlRight.BevelOuter := bvNone;
-  pnlRight.Color := clWhite;
-  pnlRight.ParentBackground := False;
-
-  lblResults := TLabel.Create(Self);
-  lblResults.Parent := pnlRight;
-  lblResults.Align := alTop;
-  lblResults.Height := 28;
-  lblResults.Caption := '  Results';
-  lblResults.Font.Size := 10;
-  lblResults.Font.Style := [fsBold];
-  lblResults.Font.Color := $00493A28;
-  lblResults.Layout := tlCenter;
-  lblResults.Color := $00F0EDE8;
-  lblResults.ParentColor := False;
-
-  lvResults := TListView.Create(Self);
-  lvResults.Parent := pnlRight;
-  lvResults.Align := alClient;
-  lvResults.ViewStyle := vsReport;
-  lvResults.RowSelect := True;
-  lvResults.ReadOnly := True;
-  lvResults.GridLines := True;
-  lvResults.Font.Size := 9;
-  lvResults.BorderStyle := bsNone;
-  lvResults.OnDblClick := @lvResultsDblClick;
-
-  // Add columns
-  with lvResults.Columns.Add do begin
-    Caption := 'File Name';
-    Width := 280;
-  end;
-  with lvResults.Columns.Add do begin
-    Caption := 'Path';
-    Width := 380;
-  end;
-  with lvResults.Columns.Add do begin
-    Caption := 'Size';
-    Width := 100;
-    Alignment := taRightJustify;
-  end;
-  with lvResults.Columns.Add do begin
-    Caption := 'Modified';
-    Width := 160;
-  end;
-
-  // --- Status Bar ---
-  pnlStatus := TPanel.Create(Self);
-  pnlStatus.Parent := Self;
-  pnlStatus.Align := alBottom;
-  pnlStatus.Height := 28;
-  pnlStatus.BevelOuter := bvNone;
-  pnlStatus.Color := $00493A28;
-  pnlStatus.ParentBackground := False;
-
-  lblStatus := TLabel.Create(Self);
-  lblStatus.Parent := pnlStatus;
-  lblStatus.Align := alClient;
-  lblStatus.Caption := '  Ready — Select a folder and enter a search pattern.';
-  lblStatus.Font.Color := clWhite;
-  lblStatus.Font.Size := 9;
-  lblStatus.Layout := tlCenter;
+  // Default status
+  StatusBar1.Panels[0].Text := ' Ready. Select a folder and enter a search pattern.';
+  StatusBar1.Panels[1].Text := 'Files: 0';
+  StatusBar1.Panels[2].Text := 'Dirs: 0';
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -261,7 +90,8 @@ begin
   if ShellTreeView1.Selected <> nil then
   begin
     FSelectedPath := ShellTreeView1.GetPathFromNode(ShellTreeView1.Selected);
-    UpdateStatus('  Selected: ' + FSelectedPath);
+    edtSearchPath.Text := FSelectedPath;
+    SetStatus(' Selected: ' + FSelectedPath);
   end;
 end;
 
@@ -272,7 +102,8 @@ begin
   Pattern := Trim(edtPattern.Text);
   if Pattern = '' then
   begin
-    MessageDlg('Please enter a search pattern (e.g. *.png or readme*)', mtWarning, [mbOK], 0);
+    MessageDlg('Enter a search pattern', 'Please enter a search pattern (e.g. *.png or readme*)',
+      mtWarning, [mbOK], 0);
     Exit;
   end;
 
@@ -285,7 +116,8 @@ begin
 
   if not DirectoryExists(SearchPath) then
   begin
-    MessageDlg('Directory does not exist: ' + SearchPath, mtError, [mbOK], 0);
+    MessageDlg('Folder not found', 'Directory does not exist: ' + SearchPath,
+      mtError, [mbOK], 0);
     Exit;
   end;
 
@@ -301,15 +133,17 @@ begin
   FDirCount := 0;
   FStopSearch := False;
   SetSearching(True);
+  SetStatus(' Searching in: ' + SearchPath + '  for: ' + Pattern);
 
   try
     DoSearch(SearchPath, Pattern, cbSubfolders.Checked, cbCaseSensitive.Checked);
   finally
     SetSearching(False);
+    SetCounts;
     if FStopSearch then
-      UpdateStatus(Format('  Search stopped. Found %d files in %d directories.', [FFileCount, FDirCount]))
+      SetStatus(Format(' Search stopped. Found %d file(s) across %d folder(s).', [FFileCount, FDirCount]))
     else
-      UpdateStatus(Format('  Search complete. Found %d files in %d directories.', [FFileCount, FDirCount]));
+      SetStatus(Format(' Search complete. Found %d file(s) across %d folder(s).', [FFileCount, FDirCount]));
   end;
 end;
 
@@ -328,7 +162,8 @@ begin
   end;
   FFileCount := 0;
   FDirCount := 0;
-  UpdateStatus('  Results cleared.');
+  SetCounts;
+  SetStatus(' Results cleared.');
 end;
 
 procedure TfrmMain.lvResultsDblClick(Sender: TObject);
@@ -340,8 +175,10 @@ begin
   {$IFDEF WINDOWS}
   if lvResults.Selected <> nil then
   begin
-    FullPath := lvResults.Selected.SubItems[0];
-    // Open the containing folder with the file selected
+    // Build full path from folder + filename
+    FullPath := IncludeTrailingPathDelimiter(lvResults.Selected.SubItems[0])
+                + lvResults.Selected.Caption;
+    // Open Explorer with the file selected
     ShellExecute(0, 'open', 'explorer.exe',
       PChar('/select,"' + FullPath + '"'), nil, SW_SHOWNORMAL);
   end;
@@ -397,19 +234,19 @@ begin
               // Check if file matches pattern
               if MatchesPattern(SR.Name, APattern, ACaseSensitive) then
               begin
-                AddResult(SR.Name, CurrentDir + SR.Name, SR.Size,
+                AddResult(SR.Name, CurrentDir, SR.Size,
                   FileDateToDateTime(SR.Time));
                 Inc(FFileCount);
               end;
             end;
 
-            // Process messages every 100 files to keep UI responsive
+            // Process messages periodically to keep UI responsive
             Inc(BatchCount);
-            if BatchCount >= 100 then
+            if BatchCount >= 200 then
             begin
               BatchCount := 0;
-              UpdateStatus(Format('  Searching: %s  |  Found: %d files  |  Scanned: %d dirs',
-                [CurrentDir, FFileCount, FDirCount]));
+              SetCounts;
+              SetStatus(' Searching: ' + CurrentDir);
               Application.ProcessMessages;
             end;
 
@@ -424,7 +261,7 @@ begin
   end;
 end;
 
-procedure TfrmMain.AddResult(const AFileName, APath: string;
+procedure TfrmMain.AddResult(const AFileName, AFolder: string;
   ASize: Int64; ADate: TDateTime);
 var
   Item: TListItem;
@@ -444,7 +281,7 @@ begin
   try
     Item := lvResults.Items.Add;
     Item.Caption := AFileName;
-    Item.SubItems.Add(APath);
+    Item.SubItems.Add(ExcludeTrailingPathDelimiter(AFolder));
     Item.SubItems.Add(SizeStr);
     Item.SubItems.Add(FormatDateTime('yyyy-mm-dd hh:nn:ss', ADate));
   finally
@@ -452,9 +289,15 @@ begin
   end;
 end;
 
-procedure TfrmMain.UpdateStatus(const AMsg: string);
+procedure TfrmMain.SetStatus(const AMsg: string);
 begin
-  lblStatus.Caption := AMsg;
+  StatusBar1.Panels[0].Text := AMsg;
+end;
+
+procedure TfrmMain.SetCounts;
+begin
+  StatusBar1.Panels[1].Text := Format('Files: %d', [FFileCount]);
+  StatusBar1.Panels[2].Text := Format('Dirs: %d', [FDirCount]);
 end;
 
 procedure TfrmMain.SetSearching(AValue: Boolean);
@@ -462,6 +305,7 @@ begin
   FSearching := AValue;
   btnSearch.Enabled := not AValue;
   btnStop.Enabled := AValue;
+  btnClear.Enabled := not AValue;
   edtPattern.Enabled := not AValue;
   ShellTreeView1.Enabled := not AValue;
   if AValue then
@@ -470,7 +314,7 @@ begin
     Screen.Cursor := crDefault;
 end;
 
-{ Pattern matching: supports multiple patterns separated by semicolon.
+{ Pattern matching: supports multiple patterns separated by semicolons.
   e.g. "*.png;*.jpg;*.bmp" }
 function TfrmMain.MatchesPattern(const AFileName, APattern: string;
   ACaseSensitive: Boolean): Boolean;
@@ -512,13 +356,12 @@ begin
 end;
 
 { Optimized wildcard matching using a two-pointer / backtracking algorithm.
-  Supports * (any sequence) and ? (any single char).
-  Time complexity: O(n*m) worst case, but typically linear.
-  This is the same algorithm used in many high-performance file managers. }
+  Supports * (any sequence of chars) and ? (any single char).
+  Time complexity: O(n*m) worst case, typically linear. }
 function TfrmMain.MatchWildcard(const AStr, APattern: string): Boolean;
 var
-  SP, PP: Integer;      // String pointer, Pattern pointer
-  StarP, MatchP: Integer; // Star position backup, match position backup
+  SP, PP: Integer;         // String pointer, Pattern pointer
+  StarP, MatchP: Integer;  // Star position backup, match position backup
 begin
   SP := 1;
   PP := 1;
@@ -527,14 +370,14 @@ begin
 
   while SP <= Length(AStr) do
   begin
-    // Advancing both pointers when chars match or ? found
+    // Chars match or ? wildcard
     if (PP <= Length(APattern)) and
        ((APattern[PP] = '?') or (APattern[PP] = AStr[SP])) then
     begin
       Inc(SP);
       Inc(PP);
     end
-    // * found: record position and advance pattern pointer
+    // * wildcard: record position and advance pattern pointer
     else if (PP <= Length(APattern)) and (APattern[PP] = '*') then
     begin
       StarP := PP;
@@ -555,7 +398,7 @@ begin
     end;
   end;
 
-  // Consume remaining * in pattern
+  // Consume any remaining * in pattern
   while (PP <= Length(APattern)) and (APattern[PP] = '*') do
     Inc(PP);
 
