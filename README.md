@@ -2,11 +2,11 @@
 
 > *"A Windows application that actually search Windows for files! What an idea? Also a Windows 11 Notepad replacement and a few other miscellaneous utilites."*
 
-[![Platform](https://img.shields.io/badge/platform-Windows%2011%20%7C%2010-blue)](https://github.com/TwilightSurfers/AceUtitlies)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)](https://github.com/TwilightSurfers/AceUtitlies)
 [![Framework](https://img.shields.io/badge/built%20with-Lazarus%20%2F%20Free%20Pascal-orange)](https://www.lazarus-ide.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Ace's Utilities** (`AceUtils.exe`) is a high-performance, lightweight Windows desktop application written in Object Pascal using the Free Pascal Compiler (FPC) and Lazarus LCL. It replaces bloated, unresponsive system tools with lightning-fast, native utilities designed specifically for modern Windows 11 workflows.
+**Ace's Utilities** (`AceUtils`) is a high-performance, lightweight desktop application written in Object Pascal using the Free Pascal Compiler (FPC) and Lazarus LCL. While tailored for modern Windows workflows, the entire codebase is written using portable LCL components and clean conditional directives, allowing it to be **compiled and run on Linux very easily**.
 
 ---
 
@@ -68,6 +68,40 @@ Both forms are standard Lazarus Component Library (LCL) visual forms:
 
 Every component, panel, gutter, and event handler is declared with standard published properties. **You can open, visually modify, and save both forms directly in the Lazarus IDE Form Designer without errors.**
 
+## 🐧 Linux Compilation & Cross-Platform Support
+
+Ace's Utilities is designed from the ground up to be **compiled and run on Linux very easily**:
+
+- **Conditional Code Separation**: All Windows-specific operations (such as Windows DWM dark titlebar composition via `dwmapi.dll`, Windows Shell file icons via `SHGetFileInfo`, and Explorer context menu registry integration) are strictly isolated with `{$IFDEF WINDOWS}` compiler directives.
+- **Pure LCL & FPC**: The file search engine, breadth-first directory walker, text encoding conversion (`LazUTF8` / `LConvEncoding`), syntax highlighters, and GUI interfaces rely exclusively on the cross-platform Lazarus Component Library (LCL).
+- **Multiple Linux Widgetsets**: Compiles cleanly against **GTK2**, **GTK3**, **Qt5**, or **Qt6** without requiring changes to source code.
+
+### Compiling on Linux in 3 Easy Steps
+
+1. **Install Lazarus and FPC**:
+   ```bash
+   # Debian / Ubuntu / Linux Mint
+   sudo apt update && sudo apt install lazarus fpc
+
+   # Fedora / RHEL
+   sudo dnf install lazarus fpc
+
+   # Arch Linux / Manjaro
+   sudo pacman -S lazarus fpc
+   ```
+
+2. **Compile with `lazbuild`**:
+   ```bash
+   lazbuild AceUtils.lpi
+   ```
+
+3. **Run**:
+   ```bash
+   ./AceUtils
+   ```
+
+You can also open `AceUtils.lpi` in the Lazarus IDE on Linux and press **F9** to compile and run immediately.
+
 ---
 
 ## 🚀 Building from Source
@@ -77,16 +111,22 @@ Every component, panel, gutter, and event handler is declared with standard publ
 2. **SynEdit Package**: Standard package bundled with Lazarus (located in `lazarus/components/synedit`).
 
 ### Compile via Command Line
-Run `lazbuild` from the project directory:
+
+**Windows (PowerShell / Command Prompt):**
 ```powershell
 lazbuild AceUtils.lpi
 ```
 
-### Compile via Lazarus IDE
+**Linux (Bash / Zsh):**
+```bash
+lazbuild AceUtils.lpi
+```
+
+### Compile via Lazarus IDE (Windows or Linux)
 1. Open Lazarus.
 2. Select **Project** -> **Open Project...** and choose `AceUtils.lpi`.
 3. Press **F9** (or select **Run** -> **Build**).
-4. The compiled executable `AceUtils.exe` will be generated in the project root.
+4. The compiled executable (`AceUtils.exe` on Windows, `AceUtils` on Linux) will be generated in the project root.
 
 ---
 
