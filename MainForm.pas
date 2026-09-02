@@ -215,6 +215,8 @@ type
     function FileContainsText(const AFilePath, AText: string; ACaseSensitive: Boolean): Boolean;
     function SafeFileDateToDateTime(ATime: LongInt): TDateTime;
     function FormatFileSize(ASize: Int64): string;
+    function IsImageFile(const APath: string): Boolean;
+    function IsTextFile(const APath: string): Boolean;
     function IsPreviewableFile(const APath: string): Boolean;
     procedure TriggerFilePreview(Item: TListItem);
 
@@ -870,36 +872,41 @@ begin
   miOpenInNotepadClick(Sender);
 end;
 
-function TfrmMain.IsPreviewableFile(const APath: string): Boolean;
+function TfrmMain.IsImageFile(const APath: string): Boolean;
 var
   Ext: string;
 begin
   if (APath = '') or DirectoryExists(APath) then Exit(False);
   Ext := LowerCase(ExtractFileExt(APath));
+  Result := (Ext = '.png') or (Ext = '.jpg') or (Ext = '.jpeg') or (Ext = '.bmp') or
+            (Ext = '.ico') or (Ext = '.gif') or (Ext = '.jfif') or (Ext = '.tif') or
+            (Ext = '.tiff') or (Ext = '.xpm');
+end;
 
-  // Images
-  if (Ext = '.png') or (Ext = '.jpg') or (Ext = '.jpeg') or (Ext = '.bmp') or
-     (Ext = '.ico') or (Ext = '.gif') or (Ext = '.jfif') or (Ext = '.tif') or
-     (Ext = '.tiff') or (Ext = '.xpm') then
-    Exit(True);
+function TfrmMain.IsTextFile(const APath: string): Boolean;
+var
+  Ext: string;
+begin
+  if (APath = '') or DirectoryExists(APath) then Exit(False);
+  Ext := LowerCase(ExtractFileExt(APath));
+  Result := (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
+            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
+            (Ext = '.py') or (Ext = '.pyw') or
+            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
+            (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
+            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
+            (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
+            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
+            (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
+            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
+            (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
+            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
+            (Ext = '.toml');
+end;
 
-  // Text, source code, web, config, markdown
-  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
-     (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
-     (Ext = '.py') or (Ext = '.pyw') or
-     (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
-     (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
-     (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
-     (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
-     (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
-     (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
-     (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
-     (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
-     (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
-     (Ext = '.toml') then
-    Exit(True);
-
-  Result := False;
+function TfrmMain.IsPreviewableFile(const APath: string): Boolean;
+begin
+  Result := IsImageFile(APath) or IsTextFile(APath);
 end;
 
 procedure TfrmMain.TriggerFilePreview(Item: TListItem);
@@ -973,8 +980,22 @@ begin
 end;
 
 procedure TfrmMain.lvResultsDblClick(Sender: TObject);
+var
+  FullPath: string;
 begin
-  miOpenInNotepadClick(Sender);
+  if lvResults.Selected <> nil then
+  begin
+    FullPath := IncludeTrailingPathDelimiter(lvResults.Selected.SubItems[0]) + lvResults.Selected.Caption;
+    if IsTextFile(FullPath) then
+      miOpenInNotepadClick(Sender)
+    else if FileExists(FullPath) then
+      miOpenFileClick(Sender)
+    else if DirectoryExists(FullPath) then
+    begin
+      edtSearchPath.Text := FullPath;
+      PageControl1.ActivePage := tabSearch;
+    end;
+  end;
 end;
 
 procedure TfrmMain.lvResultsSelectItem(Sender: TObject; Item: TListItem;
@@ -1093,6 +1114,14 @@ begin
     FullPath := IncludeTrailingPathDelimiter(lvResults.Selected.SubItems[0]) + lvResults.Selected.Caption;
     if FileExists(FullPath) then
     begin
+      if not IsTextFile(FullPath) then
+      begin
+        MessageDlg('Notepad',
+          'Only text-based and source code files can be opened in Notepad.' + sLineBreak + sLineBreak +
+          'Selected file: ' + ExtractFileName(FullPath) + ' (' + UpperCase(ExtractFileExt(FullPath)) + ')',
+          mtInformation, [mbOK], 0);
+        Exit;
+      end;
       OpenFileInNotepad(FullPath);
       PageControl1.ActivePage := tabNotepad;
     end

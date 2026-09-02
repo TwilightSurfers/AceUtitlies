@@ -60,6 +60,7 @@ type
     procedure LoadPreviewLines(const AFilePath: string; Lines: TStrings; MaxLines: Integer);
     procedure ShowInfoCard(const AFilePath, AName, ASizeStr, ADateStr, ATypeStr: string; ASizeBytes: Int64);
     procedure SetWindowsTitleBarDark(AForm: TForm; ADark: Boolean);
+    function IsTextFile(const APath: string): Boolean;
 
   public
     destructor Destroy; override;
@@ -119,9 +120,30 @@ begin
   Close;
 end;
 
+function TfrmPreview.IsTextFile(const APath: string): Boolean;
+var
+  Ext: string;
+begin
+  if (APath = '') or DirectoryExists(APath) then Exit(False);
+  Ext := LowerCase(ExtractFileExt(APath));
+  Result := (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
+            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
+            (Ext = '.py') or (Ext = '.pyw') or
+            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
+            (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
+            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
+            (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
+            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
+            (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
+            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
+            (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
+            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
+            (Ext = '.toml');
+end;
+
 procedure TfrmPreview.btnOpenInNotepadClick(Sender: TObject);
 begin
-  if (FCurrentPath <> '') and FileExists(FCurrentPath) then
+  if (FCurrentPath <> '') and FileExists(FCurrentPath) and IsTextFile(FCurrentPath) then
   begin
     if Assigned(frmMain) then
     begin
@@ -313,6 +335,10 @@ begin
   lblFileName.Caption := AName;
   lblFileMeta.Caption := Format('%s | %s | %s', [ATypeStr, ASizeStr, ADateStr]);
   Caption := 'Preview - ' + AName;
+
+  // Only allow opening in Notepad if the file is text-based
+  btnOpenInNotepad.Visible := IsTextFile(APath);
+  btnOpenInNotepad.Enabled := btnOpenInNotepad.Visible;
 
   if not FileExists(APath) then
   begin
