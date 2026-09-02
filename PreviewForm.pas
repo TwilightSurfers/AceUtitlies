@@ -106,6 +106,9 @@ begin
   FHighlighterBat := TSynBatSyn.Create(Self);
   FHighlighterIni := TSynIniSyn.Create(Self);
 
+  FormStyle := fsStayOnTop;
+  Position := poMainFormCenter;
+
   FWrapPlugin := TLazSynEditLineWrapPlugin.Create(synPreview);
   synPreview.ScrollBars := ssVertical;
 end;
@@ -335,6 +338,16 @@ begin
   lblFileName.Caption := AName;
   lblFileMeta.Caption := Format('%s | %s | %s', [ATypeStr, ASizeStr, ADateStr]);
   Caption := 'Preview - ' + AName;
+
+  // Center on main form if not already visible
+  if not Visible then
+  begin
+    if Assigned(frmMain) and frmMain.Visible then
+    begin
+      Left := frmMain.Left + (frmMain.Width - Width) div 2;
+      Top := frmMain.Top + (frmMain.Height - Height) div 2;
+    end;
+  end;
 
   // Only allow opening in Notepad if the file is text-based
   btnOpenInNotepad.Visible := IsTextFile(APath);

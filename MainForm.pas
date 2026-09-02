@@ -1094,6 +1094,7 @@ begin
     frmPreview.ShowFile(FullPath, Item.Caption, SizeStr, DateStr, TypeStr, SizeBytes, FDarkMode);
     if not frmPreview.Visible then
       frmPreview.Show;
+    frmPreview.BringToFront;
   end;
 end;
 

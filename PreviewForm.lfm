@@ -6,9 +6,10 @@ object frmPreview: TfrmPreview
   Caption = 'File Preview'
   ClientHeight = 600
   ClientWidth = 560
+  FormStyle = fsStayOnTop
   OnClose = FormClose
   OnCreate = FormCreate
-  Position = poDesigned
+  Position = poMainFormCenter
   LCLVersion = '3.6.0.0'
   object pnlTop: TPanel
     Left = 0
