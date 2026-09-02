@@ -146,6 +146,7 @@ type
     procedure btnDesktopClick(Sender: TObject);
     procedure ShellTreeView1SelectionChanged(Sender: TObject);
     procedure cbEnablePreviewChange(Sender: TObject);
+    procedure lvResultsClick(Sender: TObject);
     procedure lvResultsDblClick(Sender: TObject);
     procedure lvResultsSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure lvResultsColumnClick(Sender: TObject; Column: TListColumn);
@@ -214,6 +215,8 @@ type
     function FileContainsText(const AFilePath, AText: string; ACaseSensitive: Boolean): Boolean;
     function SafeFileDateToDateTime(ATime: LongInt): TDateTime;
     function FormatFileSize(ASize: Int64): string;
+    function IsPreviewableFile(const APath: string): Boolean;
+    procedure TriggerFilePreview(Item: TListItem);
 
     // Application & Tray State
     procedure AppMinimize(Sender: TObject);
@@ -867,6 +870,89 @@ begin
   miOpenInNotepadClick(Sender);
 end;
 
+function TfrmMain.IsPreviewableFile(const APath: string): Boolean;
+var
+  Ext: string;
+begin
+  if (APath = '') or DirectoryExists(APath) then Exit(False);
+  Ext := LowerCase(ExtractFileExt(APath));
+
+  // Images
+  if (Ext = '.png') or (Ext = '.jpg') or (Ext = '.jpeg') or (Ext = '.bmp') or
+     (Ext = '.ico') or (Ext = '.gif') or (Ext = '.jfif') or (Ext = '.tif') or
+     (Ext = '.tiff') or (Ext = '.xpm') then
+    Exit(True);
+
+  // Text, source code, web, config, markdown
+  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
+     (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
+     (Ext = '.py') or (Ext = '.pyw') or
+     (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
+     (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
+     (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
+     (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
+     (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
+     (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
+     (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
+     (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
+     (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
+     (Ext = '.toml') then
+    Exit(True);
+
+  Result := False;
+end;
+
+procedure TfrmMain.TriggerFilePreview(Item: TListItem);
+var
+  FullPath, SizeStr, DateStr, TypeStr: string;
+  SizeBytes: Int64;
+  Info: PResultInfo;
+begin
+  if not cbEnablePreview.Checked then Exit;
+  if Item = nil then
+    Item := lvResults.Selected;
+  if Item = nil then Exit;
+
+  // Do not preview folders
+  if (Item.SubItems.Count > 3) and (Item.SubItems[3] = 'Folder') then
+    Exit;
+
+  FullPath := IncludeTrailingPathDelimiter(Item.SubItems[0]) + Item.Caption;
+  if not FileExists(FullPath) then Exit;
+
+  // STRICTLY only preview files it knows how to preview
+  if not IsPreviewableFile(FullPath) then
+    Exit;
+
+  Info := PResultInfo(Item.Data);
+  if Info <> nil then
+    SizeBytes := Info^.Size
+  else
+    SizeBytes := 0;
+
+  if Item.SubItems.Count > 1 then
+    SizeStr := Item.SubItems[1]
+  else
+    SizeStr := '';
+
+  if Item.SubItems.Count > 2 then
+    DateStr := Item.SubItems[2]
+  else
+    DateStr := '';
+
+  if Item.SubItems.Count > 3 then
+    TypeStr := Item.SubItems[3]
+  else
+    TypeStr := 'File';
+
+  if Assigned(frmPreview) then
+  begin
+    frmPreview.ShowFile(FullPath, Item.Caption, SizeStr, DateStr, TypeStr, SizeBytes, FDarkMode);
+    if not frmPreview.Visible then
+      frmPreview.Show;
+  end;
+end;
+
 procedure TfrmMain.cbEnablePreviewChange(Sender: TObject);
 begin
   if not cbEnablePreview.Checked then
@@ -877,8 +963,13 @@ begin
   else
   begin
     if lvResults.Selected <> nil then
-      lvResultsSelectItem(lvResults, lvResults.Selected, True);
+      TriggerFilePreview(lvResults.Selected);
   end;
+end;
+
+procedure TfrmMain.lvResultsClick(Sender: TObject);
+begin
+  TriggerFilePreview(lvResults.Selected);
 end;
 
 procedure TfrmMain.lvResultsDblClick(Sender: TObject);
@@ -888,42 +979,9 @@ end;
 
 procedure TfrmMain.lvResultsSelectItem(Sender: TObject; Item: TListItem;
   Selected: Boolean);
-var
-  FullPath, SizeStr, DateStr, TypeStr: string;
-  SizeBytes: Int64;
-  Info: PResultInfo;
 begin
-  if Selected and (Item <> nil) and cbEnablePreview.Checked then
-  begin
-    FullPath := IncludeTrailingPathDelimiter(Item.SubItems[0]) + Item.Caption;
-    Info := PResultInfo(Item.Data);
-    if Info <> nil then
-      SizeBytes := Info^.Size
-    else
-      SizeBytes := 0;
-
-    if Item.SubItems.Count > 1 then
-      SizeStr := Item.SubItems[1]
-    else
-      SizeStr := '';
-
-    if Item.SubItems.Count > 2 then
-      DateStr := Item.SubItems[2]
-    else
-      DateStr := '';
-
-    if Item.SubItems.Count > 3 then
-      TypeStr := Item.SubItems[3]
-    else
-      TypeStr := 'File';
-
-    if Assigned(frmPreview) then
-    begin
-      frmPreview.ShowFile(FullPath, Item.Caption, SizeStr, DateStr, TypeStr, SizeBytes, FDarkMode);
-      if not frmPreview.Visible then
-        frmPreview.Show;
-    end;
-  end;
+  if Selected and (Item <> nil) then
+    TriggerFilePreview(Item);
 end;
 
 procedure TfrmMain.lvResultsColumnClick(Sender: TObject; Column: TListColumn);

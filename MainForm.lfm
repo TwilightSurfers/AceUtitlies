@@ -373,6 +373,7 @@ object frmMain: TfrmMain
             RowSelect = True
             TabOrder = 0
             ViewStyle = vsReport
+            OnClick = lvResultsClick
             OnColumnClick = lvResultsColumnClick
             OnCompare = lvResultsCompare
             OnDblClick = lvResultsDblClick

@@ -112,8 +112,6 @@ end;
 procedure TfrmPreview.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   CloseAction := caHide;
-  if Assigned(frmMain) and Assigned(frmMain.cbEnablePreview) then
-    frmMain.cbEnablePreview.Checked := False;
 end;
 
 procedure TfrmPreview.btnCloseClick(Sender: TObject);
@@ -248,25 +246,28 @@ end;
 
 procedure TfrmPreview.LoadPreviewLines(const AFilePath: string; Lines: TStrings; MaxLines: Integer);
 var
-  F: TextFile;
-  S: string;
-  Count: Integer;
+  FS: TFileStream;
+  SL: TStringList;
+  i: Integer;
 begin
   Lines.BeginUpdate;
   try
     Lines.Clear;
-    AssignFile(F, AFilePath);
-    Reset(F);
+    SL := TStringList.Create;
     try
-      Count := 0;
-      while (not Eof(F)) and (Count < MaxLines) do
+      FS := TFileStream.Create(AFilePath, fmOpenRead or fmShareDenyNone);
+      try
+        SL.LoadFromStream(FS);
+      finally
+        FS.Free;
+      end;
+      for i := 0 to SL.Count - 1 do
       begin
-        ReadLn(F, S);
-        Lines.Add(S);
-        Inc(Count);
+        if i >= MaxLines then Break;
+        Lines.Add(SL[i]);
       end;
     finally
-      CloseFile(F);
+      SL.Free;
     end;
   finally
     Lines.EndUpdate;
@@ -275,10 +276,6 @@ end;
 
 procedure TfrmPreview.ShowInfoCard(const AFilePath, AName, ASizeStr, ADateStr, ATypeStr: string; ASizeBytes: Int64);
 var
-  FS: TFileStream;
-  Buf: array[0..255] of Byte;
-  ReadBytes, i, j: Integer;
-  HexLine, AscLine, HexDump: string;
   {$IFDEF WINDOWS}
   ShInfo: TSHFileInfo;
   {$ENDIF}
@@ -301,41 +298,8 @@ begin
   end;
   {$ENDIF}
 
-  // Hex Peek
-  HexDump := '';
-  try
-    FS := TFileStream.Create(AFilePath, fmOpenRead or fmShareDenyNone);
-    try
-      ReadBytes := FS.Read(Buf, SizeOf(Buf));
-      i := 0;
-      while i < ReadBytes do
-      begin
-        HexLine := IntToHex(i, 4) + ': ';
-        AscLine := ' ';
-        for j := 0 to 15 do
-        begin
-          if (i + j) < ReadBytes then
-          begin
-            HexLine := HexLine + IntToHex(Buf[i + j], 2) + ' ';
-            if Buf[i + j] in [32..126] then
-              AscLine := AscLine + Chr(Buf[i + j])
-            else
-              AscLine := AscLine + '.';
-          end
-          else
-            HexLine := HexLine + '   ';
-        end;
-        HexDump := HexDump + HexLine + AscLine + sLineBreak;
-        Inc(i, 16);
-      end;
-    finally
-      FS.Free;
-    end;
-  except
-    HexDump := 'Could not read file for preview.';
-  end;
-
-  memHex.Text := HexDump;
+  lblHexTitle.Caption := 'No preview available for this file type.';
+  memHex.Text := '';
 end;
 
 procedure TfrmPreview.ShowFile(const APath: string; const AName, ASizeStr, ADateStr, ATypeStr: string;
@@ -356,9 +320,10 @@ begin
     synPreview.Visible := False;
     pnlInfo.Visible := True;
     lblInfoName.Caption := AName;
-    lblInfoType.Caption := 'Folder or Missing File';
+    lblInfoType.Caption := 'File not found';
     lblInfoSize.Caption := '';
     lblInfoModified.Caption := '';
+    lblHexTitle.Caption := '';
     memHex.Text := '';
     Exit;
   end;
@@ -367,9 +332,11 @@ begin
 
   // 1. Image Preview
   if (Ext = '.png') or (Ext = '.jpg') or (Ext = '.jpeg') or (Ext = '.bmp') or
-     (Ext = '.ico') or (Ext = '.gif') then
+     (Ext = '.ico') or (Ext = '.gif') or (Ext = '.jfif') or (Ext = '.tif') or
+     (Ext = '.tiff') or (Ext = '.xpm') then
   begin
     try
+      imgPreview.Picture.Clear;
       imgPreview.Picture.LoadFromFile(APath);
       lblImageDetails.Caption := Format('%d x %d pixels | %s', [
         imgPreview.Picture.Width, imgPreview.Picture.Height, ASizeStr]);
@@ -387,13 +354,19 @@ begin
   end;
 
   // 2. Text, Code, Scripts, Markdown Preview
-  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.pas') or (Ext = '.pp') or
-     (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or (Ext = '.py') or
-     (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.css') or
-     (Ext = '.js') or (Ext = '.json') or (Ext = '.ts') or (Ext = '.sql') or
-     (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ini') or (Ext = '.cfg') or
-     (Ext = '.log') or (Ext = '.csv') or (Ext = '.diff') or (Ext = '.c') or
-     (Ext = '.cpp') or (Ext = '.h') or (Ext = '.java') then
+  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
+     (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
+     (Ext = '.py') or (Ext = '.pyw') or
+     (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
+     (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
+     (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
+     (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
+     (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
+     (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
+     (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
+     (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
+     (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
+     (Ext = '.toml') then
   begin
     try
       LoadPreviewLines(APath, synPreview.Lines, 300);
@@ -407,7 +380,7 @@ begin
     Exit;
   end;
 
-  // 3. Binary / Shell card
+  // 3. Fallback for any unknown format
   ShowInfoCard(APath, AName, ASizeStr, ADateStr, ATypeStr, ASizeBytes);
 end;
 
