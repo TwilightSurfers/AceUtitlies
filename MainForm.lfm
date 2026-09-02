@@ -497,11 +497,20 @@ object frmMain: TfrmMain
           TabOrder = 8
           OnChange = cmbSyntaxChange
         end
+        object btnFontColor: TButton
+          Left = 693
+          Height = 26
+          Top = 5
+          Width = 80
+          Caption = 'Font Color...'
+          TabOrder = 9
+          OnClick = btnFontColorClick
+        end
         object lblCurrentFile: TLabel
-          Left = 698
+          Left = 780
           Height = 15
           Top = 10
-          Width = 336
+          Width = 254
           Anchors = [akTop, akLeft, akRight]
           Caption = 'Untitled'
           Font.Style = [fsBold]
@@ -668,6 +677,10 @@ object frmMain: TfrmMain
   end
   object SelectDirectoryDialog1: TSelectDirectoryDialog
     Left = 184
+    Top = 560
+  end
+  object ColorDialog1: TColorDialog
+    Left = 224
     Top = 560
   end
   object pmResults: TPopupMenu

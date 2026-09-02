@@ -81,6 +81,7 @@ type
     cbWordWrap: TCheckBox;
     lblSyntax: TLabel;
     cmbSyntax: TComboBox;
+    btnFontColor: TButton;
     lblCurrentFile: TLabel;
 
     pnlFindReplace: TPanel;
@@ -107,6 +108,7 @@ type
     OpenDialog1: TOpenDialog;
     SaveDialog1: TSaveDialog;
     SelectDirectoryDialog1: TSelectDirectoryDialog;
+    ColorDialog1: TColorDialog;
     pmResults: TPopupMenu;
     miOpenInNotepad: TMenuItem;
     miRevealInExplorer: TMenuItem;
@@ -166,6 +168,7 @@ type
     procedure btnRedoClick(Sender: TObject);
     procedure btnFindDialogClick(Sender: TObject);
     procedure cbWordWrapClick(Sender: TObject);
+    procedure btnFontColorClick(Sender: TObject);
     procedure cmbSyntaxChange(Sender: TObject);
     procedure btnFindNextClick(Sender: TObject);
     procedure btnReplaceNextClick(Sender: TObject);
@@ -188,6 +191,7 @@ type
     FCurrentFileName: string;
     FIsModified: Boolean;
     FWrapPlugin: TLazSynEditLineWrapPlugin;
+    FCustomFontColor: TColor;
 
     // Dark Mode State
     FDarkMode: Boolean;
@@ -237,6 +241,9 @@ type
 
     // Config & Shell Helpers
     function GetIniPath: string;
+    procedure LoadAllOptions;
+    procedure SaveAllOptions;
+    procedure EnsureTrayIconLoaded;
     procedure CheckAndPromptFileAssociation;
     procedure RegisterFileAssociations(ARegister: Boolean);
   public
@@ -266,10 +273,159 @@ type
   Lifecycle & Initialization
   ---------------------------------------------------------------------------- }
 
-procedure TfrmMain.FormCreate(Sender: TObject);
+procedure TfrmMain.EnsureTrayIconLoaded;
+var
+  IcoPath: string;
+  {$IFDEF WINDOWS}
+  H: HICON;
+  {$ENDIF}
+  Bmp: Graphics.TBitmap;
+begin
+  IcoPath := ExtractFilePath(Application.ExeName) + 'aceutils.ico';
+  if FileExists(IcoPath) then
+  begin
+    try
+      TrayIcon1.Icon.LoadFromFile(IcoPath);
+      Application.Icon.LoadFromFile(IcoPath);
+      Self.Icon.LoadFromFile(IcoPath);
+    except
+      // Continue to fallbacks if file fails to load
+    end;
+  end;
+
+  // Fallback 1: Windows API LoadIcon
+  {$IFDEF WINDOWS}
+  if TrayIcon1.Icon.Empty then
+  begin
+    H := LoadIcon(MainInstance, 'MAINICON');
+    if H = 0 then
+      H := LoadIcon(0, IDI_APPLICATION);
+    if H <> 0 then
+    begin
+      TrayIcon1.Icon.Handle := H;
+      if Application.Icon.Empty then
+        Application.Icon.Handle := H;
+      if Self.Icon.Empty then
+        Self.Icon.Handle := H;
+    end;
+  end;
+  {$ENDIF}
+
+  // Fallback 2: Generate sharp in-memory icon
+  if TrayIcon1.Icon.Empty then
+  begin
+    Bmp := Graphics.TBitmap.Create;
+    try
+      Bmp.SetSize(32, 32);
+      Bmp.Canvas.Brush.Color := $000F172A; // Deep Slate
+      Bmp.Canvas.FillRect(0, 0, 32, 32);
+      Bmp.Canvas.Pen.Color := $00E9A50E;   // Electric Blue border
+      Bmp.Canvas.Pen.Width := 2;
+      Bmp.Canvas.Ellipse(2, 2, 30, 30);
+      Bmp.Canvas.Font.Color := clWhite;
+      Bmp.Canvas.Font.Name := 'Segoe UI';
+      Bmp.Canvas.Font.Size := 13;
+      Bmp.Canvas.Font.Style := [fsBold];
+      Bmp.Canvas.TextOut(8, 5, 'A');
+      TrayIcon1.Icon.Assign(Bmp);
+      if Application.Icon.Empty then
+        Application.Icon.Assign(Bmp);
+    finally
+      Bmp.Free;
+    end;
+  end;
+end;
+
+procedure TfrmMain.LoadAllOptions;
 var
   Ini: TIniFile;
   UserPrefersDark: Boolean;
+  ColorStr: string;
+begin
+  Ini := TIniFile.Create(GetIniPath);
+  try
+    // General Options
+    UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
+    cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
+
+    // Search Options
+    cbSubfolders.Checked := Ini.ReadBool('Search', 'Subfolders', True);
+    cbCaseSensitive.Checked := Ini.ReadBool('Search', 'CaseSensitive', False);
+    cbIncludeFolders.Checked := Ini.ReadBool('Search', 'IncludeFolders', False);
+    cbEnablePreview.Checked := Ini.ReadBool('Search', 'EnablePreview', True);
+    FSelectedPath := Ini.ReadString('Search', 'LastSearchPath', 'C:\');
+    if DirectoryExists(FSelectedPath) then
+      edtSearchPath.Text := FSelectedPath
+    else
+      edtSearchPath.Text := 'C:\';
+
+    // Notepad Options
+    cbWordWrap.Checked := Ini.ReadBool('Notepad', 'WordWrap', False);
+    ColorStr := Ini.ReadString('Notepad', 'FontColor', '');
+    if ColorStr <> '' then
+    begin
+      try
+        FCustomFontColor := StringToColor(ColorStr);
+      except
+        FCustomFontColor := clNone;
+      end;
+    end
+    else
+      FCustomFontColor := clNone;
+
+  finally
+    Ini.Free;
+  end;
+
+  // Apply WordWrap
+  if cbWordWrap.Checked then
+  begin
+    if FWrapPlugin = nil then
+      FWrapPlugin := TLazSynEditLineWrapPlugin.Create(SynEdit1);
+    SynEdit1.ScrollBars := ssVertical;
+  end
+  else
+  begin
+    FreeAndNil(FWrapPlugin);
+    SynEdit1.ScrollBars := ssBoth;
+  end;
+
+  // Apply Tray & Theme
+  EnsureTrayIconLoaded;
+  TrayIcon1.Visible := cbRunInTray.Checked;
+  ApplyTheme(UserPrefersDark);
+end;
+
+procedure TfrmMain.SaveAllOptions;
+var
+  Ini: TIniFile;
+begin
+  Ini := TIniFile.Create(GetIniPath);
+  try
+    // General Options
+    Ini.WriteBool('General', 'DarkMode', FDarkMode);
+    Ini.WriteBool('General', 'RunInTray', cbRunInTray.Checked);
+
+    // Search Options
+    Ini.WriteBool('Search', 'Subfolders', cbSubfolders.Checked);
+    Ini.WriteBool('Search', 'CaseSensitive', cbCaseSensitive.Checked);
+    Ini.WriteBool('Search', 'IncludeFolders', cbIncludeFolders.Checked);
+    Ini.WriteBool('Search', 'EnablePreview', cbEnablePreview.Checked);
+    if (edtSearchPath.Text <> '') and DirectoryExists(edtSearchPath.Text) then
+      Ini.WriteString('Search', 'LastSearchPath', edtSearchPath.Text);
+
+    // Notepad Options
+    Ini.WriteBool('Notepad', 'WordWrap', cbWordWrap.Checked);
+    if FCustomFontColor <> clNone then
+      Ini.WriteString('Notepad', 'FontColor', ColorToString(FCustomFontColor))
+    else
+      Ini.DeleteKey('Notepad', 'FontColor');
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FStopSearch := False;
   FSearching := False;
@@ -278,6 +434,8 @@ begin
   FIsModified := False;
   FSortColumn := -1;
   FSortAscending := True;
+  FCustomFontColor := clNone;
+  FWrapPlugin := nil;
 
   // Setup Highlighters
   FHighlighterPas := TSynPasSyn.Create(Self);
@@ -292,9 +450,6 @@ begin
   cmbSyntax.ItemIndex := 0;
   SynEdit1.Highlighter := nil;
   SynEdit1.ScrollBars := ssBoth;
-  FWrapPlugin := nil;
-  if cbWordWrap.Checked then
-    cbWordWrapClick(nil);
 
   // Default Search Status
   ProgressBar1.Style := pbstMarquee;
@@ -305,21 +460,11 @@ begin
   StatusBar1.Panels[2].Text := 'Dirs: 0';
   UpdateNotepadStatus;
 
-  // Load Settings from INI
-  Ini := TIniFile.Create(GetIniPath);
-  try
-    UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
-    cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
-  finally
-    Ini.Free;
-  end;
-
   FAllowClose := False;
-  TrayIcon1.Icon.Assign(Application.Icon);
-  TrayIcon1.Visible := cbRunInTray.Checked;
   Application.OnMinimize := @AppMinimize;
 
-  ApplyTheme(UserPrefersDark);
+  // Load and apply all saved settings
+  LoadAllOptions;
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
@@ -339,17 +484,9 @@ begin
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
-var
-  Ini: TIniFile;
 begin
   FreeAndNil(FWrapPlugin);
-  Ini := TIniFile.Create(GetIniPath);
-  try
-    Ini.WriteBool('General', 'DarkMode', FDarkMode);
-    Ini.WriteBool('General', 'RunInTray', cbRunInTray.Checked);
-  finally
-    Ini.Free;
-  end;
+  SaveAllOptions;
 end;
 
 procedure TfrmMain.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -357,6 +494,7 @@ begin
   if cbRunInTray.Checked and (not FAllowClose) then
   begin
     CanClose := False;
+    EnsureTrayIconLoaded;
     Hide;
     TrayIcon1.Show;
     Exit;
@@ -368,22 +506,17 @@ procedure TfrmMain.AppMinimize(Sender: TObject);
 begin
   if cbRunInTray.Checked then
   begin
+    EnsureTrayIconLoaded;
     Hide;
     TrayIcon1.Show;
   end;
 end;
 
 procedure TfrmMain.cbRunInTrayChange(Sender: TObject);
-var
-  Ini: TIniFile;
 begin
+  EnsureTrayIconLoaded;
   TrayIcon1.Visible := cbRunInTray.Checked;
-  Ini := TIniFile.Create(GetIniPath);
-  try
-    Ini.WriteBool('General', 'RunInTray', cbRunInTray.Checked);
-  finally
-    Ini.Free;
-  end;
+  SaveAllOptions;
 end;
 
 procedure TfrmMain.TrayIcon1Click(Sender: TObject);
@@ -694,7 +827,10 @@ begin
 
   // SynEdit
   SynEdit1.Color := EditBg;
-  SynEdit1.Font.Color := TextColor;
+  if FCustomFontColor <> clNone then
+    SynEdit1.Font.Color := FCustomFontColor
+  else
+    SynEdit1.Font.Color := TextColor;
   SynEdit1.Gutter.Color := GutterBg;
   SynEdit1.SelectedColor.Background := $006B4D2B;
   SynEdit1.SelectedColor.Foreground := clWhite;
@@ -716,6 +852,7 @@ end;
 procedure TfrmMain.btnToggleDarkModeClick(Sender: TObject);
 begin
   ApplyTheme(not FDarkMode);
+  SaveAllOptions;
 end;
 
 { ----------------------------------------------------------------------------
@@ -1681,6 +1818,22 @@ begin
   begin
     FreeAndNil(FWrapPlugin);
     SynEdit1.ScrollBars := ssBoth;
+  end;
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.btnFontColorClick(Sender: TObject);
+begin
+  if FCustomFontColor <> clNone then
+    ColorDialog1.Color := FCustomFontColor
+  else
+    ColorDialog1.Color := SynEdit1.Font.Color;
+
+  if ColorDialog1.Execute then
+  begin
+    FCustomFontColor := ColorDialog1.Color;
+    SynEdit1.Font.Color := FCustomFontColor;
+    SaveAllOptions;
   end;
 end;
 
