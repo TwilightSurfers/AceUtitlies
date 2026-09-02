@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls,
   ComCtrls, ShellCtrls, Menus, IniFiles, Registry, Clipbrd,
-  SynEdit, SynEditTypes,
+  SynEdit, SynEditTypes, SynEditWrappedView,
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterCSS,
   SynHighlighterJScript, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni;
 
@@ -186,6 +186,7 @@ type
     // Notepad State
     FCurrentFileName: string;
     FIsModified: Boolean;
+    FWrapPlugin: TLazSynEditLineWrapPlugin;
 
     // Dark Mode State
     FDarkMode: Boolean;
@@ -286,6 +287,9 @@ begin
   cmbSyntax.ItemIndex := 0;
   SynEdit1.Highlighter := nil;
   SynEdit1.ScrollBars := ssBoth;
+  FWrapPlugin := nil;
+  if cbWordWrap.Checked then
+    cbWordWrapClick(nil);
 
   // Default Search Status
   ProgressBar1.Style := pbstMarquee;
@@ -333,6 +337,7 @@ procedure TfrmMain.FormDestroy(Sender: TObject);
 var
   Ini: TIniFile;
 begin
+  FreeAndNil(FWrapPlugin);
   Ini := TIniFile.Create(GetIniPath);
   try
     Ini.WriteBool('General', 'DarkMode', FDarkMode);
@@ -1580,9 +1585,16 @@ end;
 procedure TfrmMain.cbWordWrapClick(Sender: TObject);
 begin
   if cbWordWrap.Checked then
-    SynEdit1.ScrollBars := ssVertical
+  begin
+    if FWrapPlugin = nil then
+      FWrapPlugin := TLazSynEditLineWrapPlugin.Create(SynEdit1);
+    SynEdit1.ScrollBars := ssVertical;
+  end
   else
+  begin
+    FreeAndNil(FWrapPlugin);
     SynEdit1.ScrollBars := ssBoth;
+  end;
 end;
 
 procedure TfrmMain.btnFindDialogClick(Sender: TObject);

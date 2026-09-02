@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
-  SynEdit,
+  SynEdit, SynEditWrappedView,
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterCSS,
   SynHighlighterJScript, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni;
 
@@ -45,6 +45,7 @@ type
   private
     FCurrentPath: string;
     FDarkMode: Boolean;
+    FWrapPlugin: TLazSynEditLineWrapPlugin;
 
     FHighlighterPas: TSynPasSyn;
     FHighlighterPython: TSynPythonSyn;
@@ -61,6 +62,7 @@ type
     procedure SetWindowsTitleBarDark(AForm: TForm; ADark: Boolean);
 
   public
+    destructor Destroy; override;
     procedure ShowFile(const APath: string; const AName, ASizeStr, ADateStr, ATypeStr: string;
       ASizeBytes: Int64; ADarkMode: Boolean);
     procedure ApplyTheme(ADark: Boolean);
@@ -82,6 +84,12 @@ uses
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
 
+destructor TfrmPreview.Destroy;
+begin
+  FreeAndNil(FWrapPlugin);
+  inherited Destroy;
+end;
+
 procedure TfrmPreview.FormCreate(Sender: TObject);
 begin
   FCurrentPath := '';
@@ -97,7 +105,8 @@ begin
   FHighlighterBat := TSynBatSyn.Create(Self);
   FHighlighterIni := TSynIniSyn.Create(Self);
 
-  synPreview.ScrollBars := ssBoth;
+  FWrapPlugin := TLazSynEditLineWrapPlugin.Create(synPreview);
+  synPreview.ScrollBars := ssVertical;
 end;
 
 procedure TfrmPreview.FormClose(Sender: TObject; var CloseAction: TCloseAction);
