@@ -492,6 +492,11 @@ object frmMain: TfrmMain
             'SQL'
             'Batch'
             'INI'
+            'PHP'
+            'C / C++'
+            'Java'
+            'Diff'
+            'Shell Script'
           )
           Style = csDropDownList
           TabOrder = 8

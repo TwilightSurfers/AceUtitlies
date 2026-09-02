@@ -10,7 +10,8 @@ uses
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterHTML,
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
-  SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB;
+  SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
+  LConvEncoding;
 
 type
 
@@ -67,6 +68,8 @@ type
     FHighlighterVB: TSynVBSyn;
 
     procedure AutoDetectHighlighter(const AFileName: string);
+    procedure ApplyHighlighterTheme(ADark: Boolean);
+    function ConvertToUTF8(const S: string): string;
     procedure LoadPreviewLines(const AFilePath: string; Lines: TStrings; MaxLines: Integer);
     procedure ShowInfoCard(const AFilePath, AName, ASizeStr, ADateStr, ATypeStr: string; ASizeBytes: Int64);
     procedure SetWindowsTitleBarDark(AForm: TForm; ADark: Boolean);
@@ -262,30 +265,147 @@ begin
   synPreview.SelectedColor.Background := $006B4D2B;
   synPreview.SelectedColor.Foreground := clWhite;
 
+  ApplyHighlighterTheme(ADark);
+end;
+
+function TfrmPreview.ConvertToUTF8(const S: string): string;
+var
+  Enc: string;
+  Dummy: Boolean;
+begin
+  if S = '' then Exit('');
+  // Check for UTF-8 BOM
+  if (Length(S) >= 3) and (S[1] = #$EF) and (S[2] = #$BB) and (S[3] = #$BF) then
+    Exit(Copy(S, 4, Length(S) - 3));
+
+  // Check for UTF-16 LE BOM
+  if (Length(S) >= 2) and (S[1] = #$FF) and (S[2] = #$FE) then
+    Exit(ConvertEncodingToUTF8(S, 'ucs-2le', Dummy));
+
+  // Check for UTF-16 BE BOM
+  if (Length(S) >= 2) and (S[1] = #$FE) and (S[2] = #$FF) then
+    Exit(ConvertEncodingToUTF8(S, 'ucs-2be', Dummy));
+
+  Enc := GuessEncoding(S);
+  if (Enc = '') or (SameText(Enc, 'utf-8')) or (SameText(Enc, 'utf8')) then
+    Result := UTF8BOMToUTF8(S)
+  else
+    Result := ConvertEncodingToUTF8(S, Enc, Dummy);
+end;
+
+procedure TfrmPreview.ApplyHighlighterTheme(ADark: Boolean);
+var
+  CommentCol, KeyCol, StringCol, NumberCol, SymbolCol, TagCol, AttrCol, ValCol: TColor;
+begin
   if ADark then
   begin
-    FHighlighterPas.CommentAttri.Foreground := $0068AA68;
-    FHighlighterPas.KeyAttri.Foreground := $00E08050;
-    FHighlighterPas.StringAttri.Foreground := $0080B0FF;
-
-    FHighlighterPython.CommentAttri.Foreground := $0068AA68;
-    FHighlighterPython.KeyAttri.Foreground := $00E08050;
-
-    FHighlighterCpp.CommentAttri.Foreground := $0068AA68;
-    FHighlighterCpp.KeyAttri.Foreground := $00E08050;
-
-    FHighlighterJava.CommentAttri.Foreground := $0068AA68;
-    FHighlighterJava.KeyAttri.Foreground := $00E08050;
-
-    FHighlighterPHP.CommentAttri.Foreground := $0068AA68;
-    FHighlighterPHP.KeyAttri.Foreground := $00E08050;
-
-    FHighlighterSQL.CommentAttri.Foreground := $0068AA68;
-    FHighlighterSQL.KeyAttri.Foreground := $00E08050;
-
-    FHighlighterJS.CommentAttri.Foreground := $0068AA68;
-    FHighlighterJS.KeyAttri.Foreground := $00E08050;
+    CommentCol := $0068AA68;  // Soft Sage Green
+    KeyCol     := $00569CD6;  // Vibrant Blue / Amber ($00E08050)
+    StringCol  := $0080B0FF;  // Light Peach / Sky Blue
+    NumberCol  := $0070DF90;  // Emerald Green
+    SymbolCol  := $00D4D4D4;  // Crisp light gray
+    TagCol     := $004EC9B0;  // Teal / Cyan
+    AttrCol    := $009CDCFE;  // Sky blue
+    ValCol     := $00CE9178;  // Warm peach
+  end
+  else
+  begin
+    CommentCol := $00008000;  // Forest green
+    KeyCol     := $00B00000;  // Royal blue / Navy
+    StringCol  := $00000099;  // Deep maroon / crimson
+    NumberCol  := $000060A0;  // Deep teal/amber
+    SymbolCol  := $00333333;  // Dark charcoal
+    TagCol     := $00800000;  // Navy
+    AttrCol    := $00804000;  // Dark cyan
+    ValCol     := $00000080;  // Maroon
   end;
+
+  // 1. Pascal
+  FHighlighterPas.CommentAttri.Foreground := CommentCol;
+  FHighlighterPas.KeyAttri.Foreground := KeyCol;
+  FHighlighterPas.StringAttri.Foreground := StringCol;
+  FHighlighterPas.NumberAttri.Foreground := NumberCol;
+  FHighlighterPas.SymbolAttri.Foreground := SymbolCol;
+
+  // 2. Python
+  FHighlighterPython.CommentAttri.Foreground := CommentCol;
+  FHighlighterPython.KeyAttri.Foreground := KeyCol;
+  FHighlighterPython.StringAttri.Foreground := StringCol;
+  FHighlighterPython.NumberAttri.Foreground := NumberCol;
+
+  // 3. JavaScript / JSON / TypeScript
+  FHighlighterJS.CommentAttri.Foreground := CommentCol;
+  FHighlighterJS.KeyAttri.Foreground := KeyCol;
+  FHighlighterJS.StringAttri.Foreground := StringCol;
+  FHighlighterJS.NumberAttri.Foreground := NumberCol;
+  FHighlighterJS.SymbolAttri.Foreground := SymbolCol;
+  FHighlighterJS.BracketAttri.Foreground := TagCol;
+
+  // 4. HTML
+  FHighlighterHTML.CommentAttri.Foreground := CommentCol;
+  FHighlighterHTML.KeyAttri.Foreground := TagCol;
+  FHighlighterHTML.ValueAttri.Foreground := ValCol;
+  FHighlighterHTML.TextAttri.Foreground := AttrCol;
+
+  // 5. XML / SVG
+  FHighlighterXML.CommentAttri.Foreground := CommentCol;
+  FHighlighterXML.ElementAttri.Foreground := TagCol;
+  FHighlighterXML.AttributeAttri.Foreground := AttrCol;
+  FHighlighterXML.AttributeValueAttri.Foreground := ValCol;
+  FHighlighterXML.TextAttri.Foreground := StringCol;
+
+  // 6. CSS
+  FHighlighterCSS.CommentAttri.Foreground := CommentCol;
+  FHighlighterCSS.SelectorAttri.Foreground := TagCol;
+  FHighlighterCSS.KeyAttri.Foreground := KeyCol;
+  FHighlighterCSS.StringAttri.Foreground := StringCol;
+  FHighlighterCSS.NumberAttri.Foreground := NumberCol;
+  FHighlighterCSS.SymbolAttri.Foreground := SymbolCol;
+
+  // 7. C / C++ / C#
+  FHighlighterCpp.CommentAttri.Foreground := CommentCol;
+  FHighlighterCpp.KeyAttri.Foreground := KeyCol;
+  FHighlighterCpp.StringAttri.Foreground := StringCol;
+  FHighlighterCpp.NumberAttri.Foreground := NumberCol;
+  FHighlighterCpp.DirecAttri.Foreground := TagCol;
+  FHighlighterCpp.SymbolAttri.Foreground := SymbolCol;
+
+  // 8. Java
+  FHighlighterJava.CommentAttri.Foreground := CommentCol;
+  FHighlighterJava.KeyAttri.Foreground := KeyCol;
+  FHighlighterJava.StringAttri.Foreground := StringCol;
+  FHighlighterJava.NumberAttri.Foreground := NumberCol;
+  FHighlighterJava.SymbolAttri.Foreground := SymbolCol;
+
+  // 9. PHP
+  FHighlighterPHP.CommentAttri.Foreground := CommentCol;
+  FHighlighterPHP.KeyAttri.Foreground := KeyCol;
+  FHighlighterPHP.VariableAttri.Foreground := AttrCol;
+  FHighlighterPHP.StringAttri.Foreground := StringCol;
+  FHighlighterPHP.NumberAttri.Foreground := NumberCol;
+  FHighlighterPHP.SymbolAttri.Foreground := SymbolCol;
+
+  // 10. SQL
+  FHighlighterSQL.CommentAttri.Foreground := CommentCol;
+  FHighlighterSQL.KeyAttri.Foreground := KeyCol;
+  FHighlighterSQL.TableNameAttri.Foreground := TagCol;
+  FHighlighterSQL.StringAttri.Foreground := StringCol;
+  FHighlighterSQL.NumberAttri.Foreground := NumberCol;
+  FHighlighterSQL.SymbolAttri.Foreground := SymbolCol;
+
+  // 11. Batch
+  FHighlighterBat.CommentAttri.Foreground := CommentCol;
+  FHighlighterBat.KeyAttri.Foreground := KeyCol;
+  FHighlighterBat.VariableAttri.Foreground := AttrCol;
+  FHighlighterBat.NumberAttri.Foreground := NumberCol;
+
+  // 12. INI / Config
+  FHighlighterIni.CommentAttri.Foreground := CommentCol;
+  FHighlighterIni.SectionAttri.Foreground := TagCol;
+  FHighlighterIni.KeyAttri.Foreground := AttrCol;
+  FHighlighterIni.StringAttri.Foreground := StringCol;
+  FHighlighterIni.NumberAttri.Foreground := NumberCol;
+  FHighlighterIni.SymbolAttri.Foreground := SymbolCol;
 end;
 
 procedure TfrmPreview.AutoDetectHighlighter(const AFileName: string);
@@ -368,6 +488,7 @@ procedure TfrmPreview.LoadPreviewLines(const AFilePath: string; Lines: TStrings;
 var
   FS: TFileStream;
   SL: TStringList;
+  RawBytes, CleanStr: string;
   i: Integer;
 begin
   Lines.BeginUpdate;
@@ -377,10 +498,16 @@ begin
     try
       FS := TFileStream.Create(AFilePath, fmOpenRead or fmShareDenyNone);
       try
-        SL.LoadFromStream(FS);
+        SetLength(RawBytes, FS.Size);
+        if FS.Size > 0 then
+          FS.ReadBuffer(RawBytes[1], FS.Size);
       finally
         FS.Free;
       end;
+
+      CleanStr := ConvertToUTF8(RawBytes);
+      SL.Text := CleanStr;
+
       for i := 0 to SL.Count - 1 do
       begin
         if i >= MaxLines then Break;
@@ -498,8 +625,9 @@ begin
   if IsTextFile(APath) then
   begin
     try
-      LoadPreviewLines(APath, synPreview.Lines, 300);
       AutoDetectHighlighter(APath);
+      LoadPreviewLines(APath, synPreview.Lines, 300);
+      synPreview.Invalidate;
       pnlImage.Visible := False;
       synPreview.Visible := True;
       pnlInfo.Visible := False;
