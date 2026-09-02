@@ -6,6 +6,7 @@ object frmPreview: TfrmPreview
   Caption = 'File Preview'
   ClientHeight = 600
   ClientWidth = 560
+  DoubleBuffered = True
   FormStyle = fsStayOnTop
   OnClose = FormClose
   OnCreate = FormCreate

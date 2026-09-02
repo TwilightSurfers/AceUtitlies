@@ -1068,6 +1068,10 @@ begin
   if not IsPreviewableFile(FullPath) then
     Exit;
 
+  // Deduplication guard: if already visible and displaying this file, avoid duplicate reload
+  if Assigned(frmPreview) and frmPreview.Visible and (frmPreview.CurrentPath = FullPath) then
+    Exit;
+
   Info := PResultInfo(Item.Data);
   if Info <> nil then
     SizeBytes := Info^.Size

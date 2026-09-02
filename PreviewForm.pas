@@ -67,6 +67,7 @@ type
     procedure ShowFile(const APath: string; const AName, ASizeStr, ADateStr, ATypeStr: string;
       ASizeBytes: Int64; ADarkMode: Boolean);
     procedure ApplyTheme(ADark: Boolean);
+    property CurrentPath: string read FCurrentPath;
   end;
 
 var
@@ -109,6 +110,10 @@ begin
   FormStyle := fsStayOnTop;
   Position := poMainFormCenter;
 
+  DoubleBuffered := True;
+  pnlContent.DoubleBuffered := True;
+  synPreview.DoubleBuffered := True;
+
   FWrapPlugin := TLazSynEditLineWrapPlugin.Create(synPreview);
   synPreview.ScrollBars := ssVertical;
 end;
@@ -116,6 +121,7 @@ end;
 procedure TfrmPreview.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   CloseAction := caHide;
+  FCurrentPath := '';
 end;
 
 procedure TfrmPreview.btnCloseClick(Sender: TObject);
@@ -332,8 +338,15 @@ procedure TfrmPreview.ShowFile(const APath: string; const AName, ASizeStr, ADate
 var
   Ext: string;
 begin
+  // Guard against duplicate loads if this file is already displayed
+  if (FCurrentPath = APath) and Visible then
+    Exit;
+
   FCurrentPath := APath;
-  ApplyTheme(ADarkMode);
+
+  // Only re-apply DWM / colors if the theme actually changed
+  if FDarkMode <> ADarkMode then
+    ApplyTheme(ADarkMode);
 
   lblFileName.Caption := AName;
   lblFileMeta.Caption := Format('%s | %s | %s', [ATypeStr, ASizeStr, ADateStr]);
