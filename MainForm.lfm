@@ -3,209 +3,638 @@ object frmMain: TfrmMain
   Height = 650
   Top = 100
   Width = 1050
-  Caption = 'Ace File Search'
+  Caption = 'Ace''s Utilities'
   ClientHeight = 650
   ClientWidth = 1050
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnShow = FormShow
   Position = poScreenCenter
   LCLVersion = '3.6.0.0'
-  object pnlTop: TPanel
+  object pnlHeader: TPanel
     Left = 0
-    Height = 70
+    Height = 36
     Top = 0
     Width = 1050
     Align = alTop
     BevelOuter = bvNone
-    ClientHeight = 70
+    ClientHeight = 36
     ClientWidth = 1050
     TabOrder = 0
-    object lblPattern: TLabel
+    object lblAppTitle: TLabel
       Left = 12
-      Height = 15
-      Top = 8
-      Width = 85
-      Caption = 'Search Pattern:'
-    end
-    object edtPattern: TEdit
-      Left = 12
-      Height = 23
-      Top = 28
-      Width = 220
-      TabOrder = 0
-      Text = '*.png'
-    end
-    object lblSearchIn: TLabel
-      Left = 248
-      Height = 15
-      Top = 8
-      Width = 56
-      Caption = 'Search in:'
-    end
-    object edtSearchPath: TEdit
-      Left = 248
-      Height = 23
-      Top = 28
-      Width = 310
-      TabOrder = 1
-      Text = 'C:\'
-    end
-    object cbSubfolders: TCheckBox
-      Left = 575
-      Height = 19
-      Top = 8
-      Width = 113
-      Caption = 'Include Subfolders'
-      Checked = True
-      State = cbChecked
-      TabOrder = 2
-    end
-    object cbCaseSensitive: TCheckBox
-      Left = 575
-      Height = 19
-      Top = 32
-      Width = 97
-      Caption = 'Case Sensitive'
-      TabOrder = 3
-    end
-    object btnSearch: TButton
-      Left = 720
-      Height = 30
-      Top = 20
-      Width = 90
-      Caption = 'Search'
-      Default = True
-      TabOrder = 4
-      OnClick = btnSearchClick
-    end
-    object btnStop: TButton
-      Left = 818
-      Height = 30
-      Top = 20
-      Width = 75
-      Caption = 'Stop'
-      Enabled = False
-      TabOrder = 5
-      OnClick = btnStopClick
-    end
-    object btnClear: TButton
-      Left = 900
-      Height = 30
-      Top = 20
-      Width = 75
-      Caption = 'Clear'
-      TabOrder = 6
-      OnClick = btnClearClick
-    end
-  end
-  object pnlProgress: TPanel
-    Left = 0
-    Height = 38
-    Top = 70
-    Width = 1050
-    Align = alTop
-    BevelOuter = bvNone
-    ClientHeight = 38
-    ClientWidth = 1050
-    TabOrder = 7
-    object lblActivity: TLabel
-      Left = 8
-      Height = 15
-      Top = 2
-      Width = 1034
-      Anchors = [akTop, akLeft, akRight]
-      Caption = 'Ready.'
-    end
-    object ProgressBar1: TProgressBar
-      Left = 8
-      Height = 14
-      Top = 20
-      Width = 1034
-      Anchors = [akTop, akLeft, akRight]
-      Smooth = True
-      TabOrder = 0
-    end
-  end
-  object pnlLeft: TPanel
-    Left = 0
-    Height = 517
-    Top = 108
-    Width = 280
-    Align = alLeft
-    BevelOuter = bvNone
-    ClientHeight = 517
-    ClientWidth = 280
-    TabOrder = 1
-    object lblFolders: TLabel
-      Left = 0
-      Height = 20
-      Top = 0
-      Width = 280
-      Align = alTop
-      Caption = ' Folders'
+      Height = 17
+      Top = 9
+      Width = 120
+      Caption = 'Ace''s Utilities'
+      Font.Height = -13
       Font.Style = [fsBold]
-      Layout = tlCenter
       ParentFont = False
     end
-    object ShellTreeView1: TShellTreeView
-      Left = 0
-      Height = 497
-      Top = 20
-      Width = 280
-      Align = alClient
-      FileSortType = fstFoldersFirst
-      ObjectTypes = [otFolders]
+    object cbRunInTray: TCheckBox
+      Left = 580
+      Height = 19
+      Top = 9
+      Width = 125
+      Anchors = [akTop, akRight]
+      Caption = 'Run in System Tray'
       TabOrder = 0
-      OnSelectionChanged = ShellTreeView1SelectionChanged
-      Options = [tvoAutoItemHeight, tvoKeepCollapsedNodes, tvoReadOnly, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
+      OnChange = cbRunInTrayChange
+    end
+    object btnRegisterAssoc: TButton
+      Left = 715
+      Height = 26
+      Top = 5
+      Width = 160
+      Anchors = [akTop, akRight]
+      Caption = 'Associate .txt / .md'
+      TabOrder = 1
+      OnClick = btnRegisterAssocClick
+    end
+    object btnToggleDarkMode: TButton
+      Left = 885
+      Height = 26
+      Top = 5
+      Width = 153
+      Anchors = [akTop, akRight]
+      Caption = '🌙 Dark Mode: ON'
+      TabOrder = 2
+      OnClick = btnToggleDarkModeClick
     end
   end
-  object splMain: TSplitter
-    Left = 280
-    Height = 517
-    Top = 108
-    Width = 5
-  end
-  object pnlRight: TPanel
-    Left = 285
-    Height = 517
-    Top = 108
-    Width = 765
+  object PageControl1: TPageControl
+    Left = 0
+    Height = 589
+    Top = 36
+    Width = 1050
+    ActivePage = tabSearch
     Align = alClient
-    BevelOuter = bvNone
-    ClientHeight = 517
-    ClientWidth = 765
-    TabOrder = 3
-    object lvResults: TListView
-      Left = 0
-      Height = 517
-      Top = 0
-      Width = 765
-      Align = alClient
-      Columns = <
-        item
-          Caption = 'File Name'
-          Width = 220
+    TabIndex = 0
+    TabOrder = 1
+    object tabSearch: TTabSheet
+      Caption = 'File Search'
+      ClientHeight = 561
+      ClientWidth = 1042
+      object pnlSearchTop: TPanel
+        Left = 0
+        Height = 76
+        Top = 0
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 76
+        ClientWidth = 1042
+        TabOrder = 0
+        object lblPattern: TLabel
+          Left = 12
+          Height = 15
+          Top = 6
+          Width = 79
+          Caption = 'Search Pattern:'
         end
-        item
-          Caption = 'Folder'
-          Width = 300
+        object edtPattern: TEdit
+          Left = 12
+          Height = 23
+          Top = 24
+          Width = 160
+          TabOrder = 0
+          Text = '*.*'
         end
-        item
-          Alignment = taRightJustify
-          Caption = 'Size'
-          Width = 90
+        object lblSearchIn: TLabel
+          Left = 180
+          Height = 15
+          Top = 6
+          Width = 51
+          Caption = 'Search in:'
         end
-        item
-          Caption = 'Modified'
+        object edtSearchPath: TEdit
+          Left = 180
+          Height = 23
+          Top = 24
+          Width = 190
+          TabOrder = 1
+          Text = 'C:\'
+        end
+        object btnBrowse: TButton
+          Left = 373
+          Height = 23
+          Top = 24
+          Width = 28
+          Caption = '...'
+          TabOrder = 2
+          OnClick = btnBrowseClick
+        end
+        object lblContent: TLabel
+          Left = 410
+          Height = 15
+          Top = 6
+          Width = 126
+          Caption = 'Containing text (optional):'
+        end
+        object edtContent: TEdit
+          Left = 410
+          Height = 23
+          Top = 24
+          Width = 160
+          TabOrder = 3
+        end
+        object btnSearch: TButton
+          Left = 580
+          Height = 27
+          Top = 22
+          Width = 75
+          Caption = 'Search'
+          Default = True
+          TabOrder = 4
+          OnClick = btnSearchClick
+        end
+        object btnStop: TButton
+          Left = 660
+          Height = 27
+          Top = 22
+          Width = 65
+          Caption = 'Stop'
+          Enabled = False
+          TabOrder = 5
+          OnClick = btnStopClick
+        end
+        object btnClear: TButton
+          Left = 730
+          Height = 27
+          Top = 22
+          Width = 65
+          Caption = 'Clear'
+          TabOrder = 6
+          OnClick = btnClearClick
+        end
+        object btnOpenInNotepad: TButton
+          Left = 802
+          Height = 27
+          Top = 22
+          Width = 120
+          Caption = 'Open in Notepad'
+          TabOrder = 7
+          OnClick = btnOpenInNotepadClick
+        end
+        object cbSubfolders: TCheckBox
+          Left = 12
+          Height = 19
+          Top = 52
+          Width = 113
+          Caption = 'Include Subfolders'
+          Checked = True
+          State = cbChecked
+          TabOrder = 8
+        end
+        object cbCaseSensitive: TCheckBox
+          Left = 140
+          Height = 19
+          Top = 52
+          Width = 97
+          Caption = 'Case Sensitive'
+          TabOrder = 9
+        end
+        object cbIncludeFolders: TCheckBox
+          Left = 250
+          Height = 19
+          Top = 52
+          Width = 103
+          Caption = 'Include Folders'
+          TabOrder = 10
+        end
+        object cbEnablePreview: TCheckBox
+          Left = 368
+          Height = 19
+          Top = 52
+          Width = 104
+          Caption = 'Enable Preview'
+          Checked = True
+          State = cbChecked
+          TabOrder = 11
+          OnChange = cbEnablePreviewChange
+        end
+      end
+      object pnlSearchProgress: TPanel
+        Left = 0
+        Height = 34
+        Top = 76
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 34
+        ClientWidth = 1042
+        TabOrder = 1
+        object lblActivity: TLabel
+          Left = 8
+          Height = 15
+          Top = 2
+          Width = 1026
+          Anchors = [akTop, akLeft, akRight]
+          Caption = 'Ready.'
+        end
+        object ProgressBar1: TProgressBar
+          Left = 8
+          Height = 12
+          Top = 18
+          Width = 1026
+          Anchors = [akTop, akLeft, akRight]
+          Smooth = True
+          TabOrder = 0
+        end
+      end
+      object pnlSearchBody: TPanel
+        Left = 0
+        Height = 451
+        Top = 110
+        Width = 1042
+        Align = alClient
+        BevelOuter = bvNone
+        ClientHeight = 451
+        ClientWidth = 1042
+        TabOrder = 2
+        object pnlLeft: TPanel
+          Left = 0
+          Height = 451
+          Top = 0
+          Width = 260
+          Align = alLeft
+          BevelOuter = bvNone
+          ClientHeight = 451
+          ClientWidth = 260
+          TabOrder = 0
+          object pnlLeftHeader: TPanel
+            Left = 0
+            Height = 28
+            Top = 0
+            Width = 260
+            Align = alTop
+            BevelOuter = bvNone
+            ClientHeight = 28
+            ClientWidth = 260
+            TabOrder = 0
+            object lblFolders: TLabel
+              Left = 6
+              Height = 15
+              Top = 6
+              Width = 43
+              Caption = 'Folders'
+              Font.Style = [fsBold]
+              ParentFont = False
+            end
+            object btnDriveC: TButton
+              Left = 60
+              Height = 22
+              Top = 3
+              Width = 32
+              Caption = 'C:\'
+              TabOrder = 0
+              OnClick = btnDriveCClick
+            end
+            object btnUserHome: TButton
+              Left = 96
+              Height = 22
+              Top = 3
+              Width = 50
+              Caption = 'Home'
+              TabOrder = 1
+              OnClick = btnUserHomeClick
+            end
+            object btnDesktop: TButton
+              Left = 150
+              Height = 22
+              Top = 3
+              Width = 58
+              Caption = 'Desktop'
+              TabOrder = 2
+              OnClick = btnDesktopClick
+            end
+          end
+          object ShellTreeView1: TShellTreeView
+            Left = 0
+            Height = 423
+            Top = 28
+            Width = 260
+            Align = alClient
+            FileSortType = fstFoldersFirst
+            ObjectTypes = [otFolders]
+            TabOrder = 1
+            OnSelectionChanged = ShellTreeView1SelectionChanged
+            Options = [tvoAutoItemHeight, tvoKeepCollapsedNodes, tvoReadOnly, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
+          end
+        end
+        object splMain: TSplitter
+          Left = 260
+          Height = 451
+          Top = 0
+          Width = 5
+        end
+        object pnlRight: TPanel
+          Left = 265
+          Height = 451
+          Top = 0
+          Width = 777
+          Align = alClient
+          BevelOuter = bvNone
+          ClientHeight = 451
+          ClientWidth = 777
+          TabOrder = 2
+          object lvResults: TListView
+            Left = 0
+            Height = 451
+            Top = 0
+            Width = 777
+            Align = alClient
+            Columns = <
+              item
+                Caption = 'File Name'
+                Width = 220
+              end
+              item
+                Caption = 'Folder'
+                Width = 280
+              end
+              item
+                Alignment = taRightJustify
+                Caption = 'Size'
+                Width = 85
+              end
+              item
+                Caption = 'Modified'
+                Width = 135
+              end
+              item
+                Caption = 'Type'
+                Width = 60
+              end>
+            GridLines = True
+            PopupMenu = pmResults
+            ReadOnly = True
+            RowSelect = True
+            TabOrder = 0
+            ViewStyle = vsReport
+            OnColumnClick = lvResultsColumnClick
+            OnCompare = lvResultsCompare
+            OnDblClick = lvResultsDblClick
+            OnDeletion = lvResultsDeletion
+            OnSelectItem = lvResultsSelectItem
+          end
+        end
+      end
+    end
+    object tabNotepad: TTabSheet
+      Caption = 'Notepad'
+      ClientHeight = 561
+      ClientWidth = 1042
+      object pnlNotepadToolbar: TPanel
+        Left = 0
+        Height = 36
+        Top = 0
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 36
+        ClientWidth = 1042
+        TabOrder = 0
+        object btnNewFile: TButton
+          Left = 6
+          Height = 26
+          Top = 5
+          Width = 50
+          Caption = 'New'
+          TabOrder = 0
+          OnClick = btnNewFileClick
+        end
+        object btnOpenFile: TButton
+          Left = 60
+          Height = 26
+          Top = 5
+          Width = 58
+          Caption = 'Open...'
+          TabOrder = 1
+          OnClick = btnOpenFileClick
+        end
+        object btnSaveFile: TButton
+          Left = 122
+          Height = 26
+          Top = 5
+          Width = 50
+          Caption = 'Save'
+          TabOrder = 2
+          OnClick = btnSaveFileClick
+        end
+        object btnSaveAs: TButton
+          Left = 176
+          Height = 26
+          Top = 5
+          Width = 65
+          Caption = 'Save As...'
+          TabOrder = 3
+          OnClick = btnSaveAsClick
+        end
+        object btnUndo: TButton
+          Left = 247
+          Height = 26
+          Top = 5
+          Width = 48
+          Caption = 'Undo'
+          TabOrder = 4
+          OnClick = btnUndoClick
+        end
+        object btnRedo: TButton
+          Left = 299
+          Height = 26
+          Top = 5
+          Width = 48
+          Caption = 'Redo'
+          TabOrder = 5
+          OnClick = btnRedoClick
+        end
+        object btnFindDialog: TButton
+          Left = 353
+          Height = 26
+          Top = 5
+          Width = 85
+          Caption = 'Find / Replace'
+          TabOrder = 6
+          OnClick = btnFindDialogClick
+        end
+        object cbWordWrap: TCheckBox
+          Left = 445
+          Height = 19
+          Top = 9
+          Width = 80
+          Caption = 'Word Wrap'
+          TabOrder = 7
+          OnClick = cbWordWrapClick
+        end
+        object lblSyntax: TLabel
+          Left = 535
+          Height = 15
+          Top = 10
+          Width = 38
+          Caption = 'Syntax:'
+        end
+        object cmbSyntax: TComboBox
+          Left = 577
+          Height = 23
+          Top = 6
+          Width = 110
+          ItemHeight = 15
+          Items.Strings = (
+            'Plain Text'
+            'Pascal'
+            'Python'
+            'HTML / XML'
+            'CSS'
+            'JavaScript / JSON'
+            'SQL'
+            'Batch'
+            'INI'
+          )
+          Style = csDropDownList
+          TabOrder = 8
+          OnChange = cmbSyntaxChange
+        end
+        object lblCurrentFile: TLabel
+          Left = 698
+          Height = 15
+          Top = 10
+          Width = 336
+          Anchors = [akTop, akLeft, akRight]
+          Caption = 'Untitled'
+          Font.Style = [fsBold]
+          ParentFont = False
+        end
+      end
+      object pnlFindReplace: TPanel
+        Left = 0
+        Height = 36
+        Top = 36
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 36
+        ClientWidth = 1042
+        TabOrder = 1
+        Visible = False
+        object lblFindText: TLabel
+          Left = 8
+          Height = 15
+          Top = 10
+          Width = 26
+          Caption = 'Find:'
+        end
+        object edtFindText: TEdit
+          Left = 38
+          Height = 23
+          Top = 6
+          Width = 150
+          TabOrder = 0
+        end
+        object btnFindNext: TButton
+          Left = 194
+          Height = 24
+          Top = 6
+          Width = 65
+          Caption = 'Find Next'
+          TabOrder = 1
+          OnClick = btnFindNextClick
+        end
+        object lblReplaceText: TLabel
+          Left = 268
+          Height = 15
+          Top = 10
+          Width = 44
+          Caption = 'Replace:'
+        end
+        object edtReplaceText: TEdit
+          Left = 316
+          Height = 23
+          Top = 6
           Width = 140
-        end>
-      GridLines = True
-      ReadOnly = True
-      RowSelect = True
-      TabOrder = 0
-      ViewStyle = vsReport
-      OnDblClick = lvResultsDblClick
+          TabOrder = 2
+        end
+        object btnReplaceNext: TButton
+          Left = 462
+          Height = 24
+          Top = 6
+          Width = 60
+          Caption = 'Replace'
+          TabOrder = 3
+          OnClick = btnReplaceNextClick
+        end
+        object btnReplaceAll: TButton
+          Left = 527
+          Height = 24
+          Top = 6
+          Width = 72
+          Caption = 'Replace All'
+          TabOrder = 4
+          OnClick = btnReplaceAllClick
+        end
+        object cbMatchCase: TCheckBox
+          Left = 608
+          Height = 19
+          Top = 9
+          Width = 83
+          Caption = 'Match Case'
+          TabOrder = 5
+        end
+        object cbWholeWord: TCheckBox
+          Left = 698
+          Height = 19
+          Top = 9
+          Width = 84
+          Caption = 'Whole Word'
+          TabOrder = 6
+        end
+        object btnCloseFind: TButton
+          Left = 790
+          Height = 24
+          Top = 6
+          Width = 26
+          Caption = '✕'
+          TabOrder = 7
+          OnClick = btnCloseFindClick
+        end
+      end
+      object SynEdit1: TSynEdit
+        Left = 0
+        Height = 465
+        Top = 72
+        Width = 1042
+        Align = alClient
+        Font.Height = -13
+        Font.Name = 'Consolas'
+        Font.Pitch = fpFixed
+        Font.Quality = fqCleartype
+        ParentColor = False
+        ParentFont = False
+        TabOrder = 2
+        Gutter.Width = 55
+        RightGutter.Width = 0
+        OnChange = SynEdit1Change
+        OnStatusChange = SynEdit1StatusChange
+      end
+      object pnlNotepadStatus: TPanel
+        Left = 0
+        Height = 24
+        Top = 537
+        Width = 1042
+        Align = alBottom
+        BevelOuter = bvNone
+        ClientHeight = 24
+        ClientWidth = 1042
+        TabOrder = 3
+        object lblNotepadStatus: TLabel
+          Left = 10
+          Height = 15
+          Top = 5
+          Width = 240
+          Caption = 'Line: 1  Col: 1 | Length: 0 | UTF-8 | Saved'
+        end
+      end
     end
   end
   object StatusBar1: TStatusBar
@@ -213,17 +642,78 @@ object frmMain: TfrmMain
     Height = 25
     Top = 625
     Width = 1050
-    Panels = <
+    Panels = <    
       item
         Width = 700
-      end
+      end    
       item
         Alignment = taRightJustify
         Width = 150
-      end
+      end    
       item
         Alignment = taRightJustify
         Width = 150
       end>
+  end
+  object OpenDialog1: TOpenDialog
+    Filter = 'All Files (*.*)|*.*|Text Files (*.txt)|*.txt|Markdown (*.md)|*.md|Pascal Files (*.pas;*.pp;*.lpr;*.lfm)|*.pas;*.pp;*.lpr;*.lfm|Python (*.py)|*.py|Web Files (*.html;*.htm;*.css;*.js;*.json)|*.html;*.htm;*.css;*.js;*.json|SQL (*.sql)|*.sql|Batch (*.bat;*.cmd)|*.bat;*.cmd|Config (*.ini;*.cfg;*.xml)|*.ini;*.cfg;*.xml'
+    Left = 32
+    Top = 560
+  end
+  object SaveDialog1: TSaveDialog
+    Filter = 'Text Files (*.txt)|*.txt|Markdown (*.md)|*.md|Pascal Files (*.pas)|*.pas|All Files (*.*)|*.*'
+    Left = 104
+    Top = 560
+  end
+  object SelectDirectoryDialog1: TSelectDirectoryDialog
+    Left = 184
+    Top = 560
+  end
+  object pmResults: TPopupMenu
+    Left = 264
+    Top = 560
+    object miOpenInNotepad: TMenuItem
+      Caption = 'Open in Notepad'
+      OnClick = miOpenInNotepadClick
+    end
+    object miRevealInExplorer: TMenuItem
+      Caption = 'Reveal in Explorer'
+      OnClick = miRevealInExplorerClick
+    end
+    object miOpenFile: TMenuItem
+      Caption = 'Open / Run File'
+      OnClick = miOpenFileClick
+    end
+    object miCopyPath: TMenuItem
+      Caption = 'Copy Full Path'
+      OnClick = miCopyPathClick
+    end
+  end
+  object TrayIcon1: TTrayIcon
+    Hint = 'Ace''s Utilities'
+    PopupMenu = pmTray
+    OnClick = TrayIcon1Click
+    Left = 344
+    Top = 560
+  end
+  object pmTray: TPopupMenu
+    Left = 424
+    Top = 560
+    object miTrayOpen: TMenuItem
+      Caption = 'Open Ace''s Utilities'
+      Default = True
+      OnClick = miTrayOpenClick
+    end
+    object miTrayNotepad: TMenuItem
+      Caption = 'Open Notepad'
+      OnClick = miTrayNotepadClick
+    end
+    object miTraySep: TMenuItem
+      Caption = '-'
+    end
+    object miTrayExit: TMenuItem
+      Caption = 'Exit'
+      OnClick = miTrayExitClick
+    end
   end
 end

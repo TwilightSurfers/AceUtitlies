@@ -8,9 +8,13 @@
 lib/
 backup/
 
-# Compiled binary
-AceFileSearch.exe
-AceFileSearch
+# Compiled binaries
+AceUtils.exe
+AceUtils
+*.exe
+
+# Configuration files
+*.ini
 
 # IDE session
 *.lps
