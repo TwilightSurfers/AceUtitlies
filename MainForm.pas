@@ -1027,18 +1027,22 @@ begin
   if (APath = '') or DirectoryExists(APath) then Exit(False);
   Ext := LowerCase(ExtractFileExt(APath));
   Result := (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
-            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
+            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or (Ext = '.dpr') or
             (Ext = '.py') or (Ext = '.pyw') or
-            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
+            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') or (Ext = '.xml') or (Ext = '.svg') or
+            (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.phtml') or
             (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
-            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
+            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or (Ext = '.mjs') or
             (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
-            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
+            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or (Ext = '.log') or
             (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
-            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
-            (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
-            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
-            (Ext = '.toml');
+            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or
+            (Ext = '.h') or (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.cs') or
+            (Ext = '.java') or (Ext = '.go') or (Ext = '.rs') or
+            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.env') or
+            (Ext = '.pl') or (Ext = '.pm') or (Ext = '.cgi') or
+            (Ext = '.vbs') or (Ext = '.vb') or (Ext = '.bas') or (Ext = '.vba') or
+            (Ext = '.yaml') or (Ext = '.yml') or (Ext = '.toml');
 end;
 
 function TfrmMain.IsPreviewableFile(const APath: string): Boolean;

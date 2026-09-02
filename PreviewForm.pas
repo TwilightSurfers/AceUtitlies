@@ -7,8 +7,10 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
   SynEdit, SynEditWrappedView,
-  SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterCSS,
-  SynHighlighterJScript, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni;
+  SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterHTML,
+  SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
+  SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
+  SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB;
 
 type
 
@@ -50,11 +52,19 @@ type
     FHighlighterPas: TSynPasSyn;
     FHighlighterPython: TSynPythonSyn;
     FHighlighterXML: TSynXMLSyn;
+    FHighlighterHTML: TSynHTMLSyn;
+    FHighlighterPHP: TSynPHPSyn;
     FHighlighterCSS: TSynCssSyn;
     FHighlighterJS: TSynJScriptSyn;
+    FHighlighterCpp: TSynCppSyn;
+    FHighlighterJava: TSynJavaSyn;
     FHighlighterSQL: TSynSQLSyn;
     FHighlighterBat: TSynBatSyn;
     FHighlighterIni: TSynIniSyn;
+    FHighlighterDiff: TSynDiffSyn;
+    FHighlighterSh: TSynUNIXShellScriptSyn;
+    FHighlighterPerl: TSynPerlSyn;
+    FHighlighterVB: TSynVBSyn;
 
     procedure AutoDetectHighlighter(const AFileName: string);
     procedure LoadPreviewLines(const AFilePath: string; Lines: TStrings; MaxLines: Integer);
@@ -101,11 +111,19 @@ begin
   FHighlighterPas := TSynPasSyn.Create(Self);
   FHighlighterPython := TSynPythonSyn.Create(Self);
   FHighlighterXML := TSynXMLSyn.Create(Self);
+  FHighlighterHTML := TSynHTMLSyn.Create(Self);
+  FHighlighterPHP := TSynPHPSyn.Create(Self);
   FHighlighterCSS := TSynCssSyn.Create(Self);
   FHighlighterJS := TSynJScriptSyn.Create(Self);
+  FHighlighterCpp := TSynCppSyn.Create(Self);
+  FHighlighterJava := TSynJavaSyn.Create(Self);
   FHighlighterSQL := TSynSQLSyn.Create(Self);
   FHighlighterBat := TSynBatSyn.Create(Self);
   FHighlighterIni := TSynIniSyn.Create(Self);
+  FHighlighterDiff := TSynDiffSyn.Create(Self);
+  FHighlighterSh := TSynUNIXShellScriptSyn.Create(Self);
+  FHighlighterPerl := TSynPerlSyn.Create(Self);
+  FHighlighterVB := TSynVBSyn.Create(Self);
 
   FormStyle := fsStayOnTop;
   Position := poMainFormCenter;
@@ -136,18 +154,22 @@ begin
   if (APath = '') or DirectoryExists(APath) then Exit(False);
   Ext := LowerCase(ExtractFileExt(APath));
   Result := (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
-            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
+            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or (Ext = '.dpr') or
             (Ext = '.py') or (Ext = '.pyw') or
-            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
+            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') or (Ext = '.xml') or (Ext = '.svg') or
+            (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.phtml') or
             (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
-            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
+            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or (Ext = '.mjs') or
             (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
-            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
+            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or (Ext = '.log') or
             (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
-            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
-            (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
-            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
-            (Ext = '.toml');
+            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or
+            (Ext = '.h') or (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.cs') or
+            (Ext = '.java') or (Ext = '.go') or (Ext = '.rs') or
+            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.env') or
+            (Ext = '.pl') or (Ext = '.pm') or (Ext = '.cgi') or
+            (Ext = '.vbs') or (Ext = '.vb') or (Ext = '.bas') or (Ext = '.vba') or
+            (Ext = '.yaml') or (Ext = '.yml') or (Ext = '.toml');
 end;
 
 procedure TfrmPreview.btnOpenInNotepadClick(Sender: TObject);
@@ -245,8 +267,24 @@ begin
     FHighlighterPas.CommentAttri.Foreground := $0068AA68;
     FHighlighterPas.KeyAttri.Foreground := $00E08050;
     FHighlighterPas.StringAttri.Foreground := $0080B0FF;
+
     FHighlighterPython.CommentAttri.Foreground := $0068AA68;
     FHighlighterPython.KeyAttri.Foreground := $00E08050;
+
+    FHighlighterCpp.CommentAttri.Foreground := $0068AA68;
+    FHighlighterCpp.KeyAttri.Foreground := $00E08050;
+
+    FHighlighterJava.CommentAttri.Foreground := $0068AA68;
+    FHighlighterJava.KeyAttri.Foreground := $00E08050;
+
+    FHighlighterPHP.CommentAttri.Foreground := $0068AA68;
+    FHighlighterPHP.KeyAttri.Foreground := $00E08050;
+
+    FHighlighterSQL.CommentAttri.Foreground := $0068AA68;
+    FHighlighterSQL.KeyAttri.Foreground := $00E08050;
+
+    FHighlighterJS.CommentAttri.Foreground := $0068AA68;
+    FHighlighterJS.KeyAttri.Foreground := $00E08050;
   end;
 end;
 
@@ -255,22 +293,73 @@ var
   Ext: string;
 begin
   Ext := LowerCase(ExtractFileExt(AFileName));
-  if (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') then
+
+  // Pascal / Delphi / Lazarus
+  if (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or (Ext = '.dpr') then
     synPreview.Highlighter := FHighlighterPas
-  else if Ext = '.py' then
+
+  // Python
+  else if (Ext = '.py') or (Ext = '.pyw') then
     synPreview.Highlighter := FHighlighterPython
-  else if (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') then
+
+  // HTML
+  else if (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') then
+    synPreview.Highlighter := FHighlighterHTML
+
+  // XML / SVG
+  else if (Ext = '.xml') or (Ext = '.svg') or (Ext = '.xaml') or (Ext = '.plist') or (Ext = '.rss') then
     synPreview.Highlighter := FHighlighterXML
-  else if Ext = '.css' then
+
+  // PHP
+  else if (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.phtml') then
+    synPreview.Highlighter := FHighlighterPHP
+
+  // CSS / Styling
+  else if (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') then
     synPreview.Highlighter := FHighlighterCSS
-  else if (Ext = '.js') or (Ext = '.json') or (Ext = '.ts') then
+
+  // JavaScript / TypeScript / JSON
+  else if (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or (Ext = '.mjs') then
     synPreview.Highlighter := FHighlighterJS
-  else if Ext = '.sql' then
+
+  // C / C++ / C#
+  else if (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or
+          (Ext = '.h') or (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.cs') then
+    synPreview.Highlighter := FHighlighterCpp
+
+  // Java
+  else if (Ext = '.java') then
+    synPreview.Highlighter := FHighlighterJava
+
+  // SQL
+  else if (Ext = '.sql') then
     synPreview.Highlighter := FHighlighterSQL
+
+  // Batch / Windows Command
   else if (Ext = '.bat') or (Ext = '.cmd') then
     synPreview.Highlighter := FHighlighterBat
-  else if (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.md') then
+
+  // Shell / Bash / Unix
+  else if (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.env') then
+    synPreview.Highlighter := FHighlighterSh
+
+  // Perl
+  else if (Ext = '.pl') or (Ext = '.pm') or (Ext = '.cgi') then
+    synPreview.Highlighter := FHighlighterPerl
+
+  // Visual Basic / VBScript
+  else if (Ext = '.vbs') or (Ext = '.vb') or (Ext = '.bas') or (Ext = '.vba') then
+    synPreview.Highlighter := FHighlighterVB
+
+  // Diff / Patches
+  else if (Ext = '.diff') or (Ext = '.patch') then
+    synPreview.Highlighter := FHighlighterDiff
+
+  // Config / INI / Markdown / YAML / TOML
+  else if (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or
+          (Ext = '.md') or (Ext = '.markdown') or (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
     synPreview.Highlighter := FHighlighterIni
+
   else
     synPreview.Highlighter := nil;
 end;
@@ -406,19 +495,7 @@ begin
   end;
 
   // 2. Text, Code, Scripts, Markdown Preview
-  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
-     (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or
-     (Ext = '.py') or (Ext = '.pyw') or
-     (Ext = '.html') or (Ext = '.htm') or (Ext = '.xml') or (Ext = '.svg') or
-     (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
-     (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or
-     (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
-     (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.log') or
-     (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
-     (Ext = '.c') or (Ext = '.cpp') or (Ext = '.h') or (Ext = '.hpp') or
-     (Ext = '.java') or (Ext = '.cs') or (Ext = '.go') or (Ext = '.rs') or
-     (Ext = '.sh') or (Ext = '.bash') or (Ext = '.yaml') or (Ext = '.yml') or
-     (Ext = '.toml') then
+  if IsTextFile(APath) then
   begin
     try
       LoadPreviewLines(APath, synPreview.Lines, 300);
