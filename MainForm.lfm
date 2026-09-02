@@ -6,9 +6,11 @@ object frmMain: TfrmMain
   Caption = 'Ace''s Utilities'
   ClientHeight = 650
   ClientWidth = 1050
+  KeyPreview = True
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   OnShow = FormShow
   Position = poScreenCenter
   LCLVersion = '3.6.0.0'
@@ -626,6 +628,7 @@ object frmMain: TfrmMain
         Font.Quality = fqCleartype
         ParentColor = False
         ParentFont = False
+        PopupMenu = popNotepad
         TabOrder = 2
         Gutter.Width = 55
         RightGutter.Width = 0
@@ -733,6 +736,51 @@ object frmMain: TfrmMain
     object miTrayExit: TMenuItem
       Caption = 'Exit'
       OnClick = miTrayExitClick
+    end
+  end
+  object popNotepad: TPopupMenu
+    OnPopup = popNotepadPopup
+    Left = 496
+    Top = 560
+    object miCut: TMenuItem
+      Caption = 'Cut'
+      ShortCut = 16472
+      OnClick = miCutClick
+    end
+    object miCopy: TMenuItem
+      Caption = 'Copy'
+      ShortCut = 16451
+      OnClick = miCopyClick
+    end
+    object miPaste: TMenuItem
+      Caption = 'Paste'
+      ShortCut = 16470
+      OnClick = miPasteClick
+    end
+    object miDelete: TMenuItem
+      Caption = 'Delete'
+      OnClick = miDeleteClick
+    end
+    object miSepNotepad1: TMenuItem
+      Caption = '-'
+    end
+    object miSelectAll: TMenuItem
+      Caption = 'Select All'
+      ShortCut = 16449
+      OnClick = miSelectAllClick
+    end
+    object miSepNotepad2: TMenuItem
+      Caption = '-'
+    end
+    object miUndo: TMenuItem
+      Caption = 'Undo'
+      ShortCut = 16474
+      OnClick = miUndoClick
+    end
+    object miRedo: TMenuItem
+      Caption = 'Redo'
+      ShortCut = 16473
+      OnClick = miRedoClick
     end
   end
 end

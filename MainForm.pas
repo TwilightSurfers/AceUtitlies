@@ -11,7 +11,7 @@ uses
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterHTML,
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
-  SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding;
+  SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding, LazUTF8, LCLType;
 
 type
   PResultInfo = ^TResultInfo;
@@ -124,11 +124,23 @@ type
     miTraySep: TMenuItem;
     miTrayExit: TMenuItem;
 
+    popNotepad: TPopupMenu;
+    miCut: TMenuItem;
+    miCopy: TMenuItem;
+    miPaste: TMenuItem;
+    miDelete: TMenuItem;
+    miSepNotepad1: TMenuItem;
+    miSelectAll: TMenuItem;
+    miSepNotepad2: TMenuItem;
+    miUndo: TMenuItem;
+    miRedo: TMenuItem;
+
     // Form Events
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 
     // Header & Tray Events
     procedure btnToggleDarkModeClick(Sender: TObject);
@@ -178,6 +190,14 @@ type
     procedure btnCloseFindClick(Sender: TObject);
     procedure SynEdit1Change(Sender: TObject);
     procedure SynEdit1StatusChange(Sender: TObject; Changes: TSynStatusChanges);
+    procedure miCutClick(Sender: TObject);
+    procedure miCopyClick(Sender: TObject);
+    procedure miPasteClick(Sender: TObject);
+    procedure miDeleteClick(Sender: TObject);
+    procedure miSelectAllClick(Sender: TObject);
+    procedure miUndoClick(Sender: TObject);
+    procedure miRedoClick(Sender: TObject);
+    procedure popNotepadPopup(Sender: TObject);
 
   private
     // Search Engine State
@@ -861,11 +881,17 @@ function TfrmMain.ConvertToUTF8(const S: string): string;
 var
   Enc: string;
   Dummy: Boolean;
+  Clean: string;
 begin
   if S = '' then Exit('');
-  // Check for UTF-8 BOM
-  if (Length(S) >= 3) and (S[1] = #$EF) and (S[2] = #$BB) and (S[3] = #$BF) then
-    Exit(Copy(S, 4, Length(S) - 3));
+  Clean := S;
+  // Strip UTF-8 BOM if present
+  if (Length(Clean) >= 3) and (Clean[1] = #$EF) and (Clean[2] = #$BB) and (Clean[3] = #$BF) then
+    Delete(Clean, 1, 3);
+
+  // If already valid UTF-8, DO NOT convert (prevents double-encoding mojibake on em-dash, emojis, smart quotes)
+  if FindInvalidUTF8Codepoint(PChar(Clean), Length(Clean)) = -1 then
+    Exit(Clean);
 
   // Check for UTF-16 LE BOM
   if (Length(S) >= 2) and (S[1] = #$FF) and (S[2] = #$FE) then
@@ -875,38 +901,40 @@ begin
   if (Length(S) >= 2) and (S[1] = #$FE) and (S[2] = #$FF) then
     Exit(ConvertEncodingToUTF8(S, 'ucs-2be', Dummy));
 
-  Enc := GuessEncoding(S);
+  Enc := GuessEncoding(Clean);
   if (Enc = '') or (SameText(Enc, 'utf-8')) or (SameText(Enc, 'utf8')) then
-    Result := UTF8BOMToUTF8(S)
+    Result := Clean
   else
-    Result := ConvertEncodingToUTF8(S, Enc, Dummy);
+    Result := ConvertEncodingToUTF8(Clean, Enc, Dummy);
 end;
 
 procedure TfrmMain.ApplyHighlighterTheme(ADark: Boolean);
 var
-  CommentCol, KeyCol, StringCol, NumberCol, SymbolCol, TagCol, AttrCol, ValCol: TColor;
+  CommentCol, KeyCol, StringCol, NumberCol, SymbolCol, BracketCol, TagCol, AttrCol, ValCol: TColor;
 begin
   if ADark then
   begin
     CommentCol := $0068AA68;  // Soft Sage Green
-    KeyCol     := $00569CD6;  // Vibrant Blue / Amber ($00E08050)
-    StringCol  := $0080B0FF;  // Light Peach / Sky Blue
+    KeyCol     := $00569CD6;  // Bright Cyan / Sky Blue
+    StringCol  := $009CDCFE;  // Light Sky Blue / Cyan
     NumberCol  := $0070DF90;  // Emerald Green
-    SymbolCol  := $00D4D4D4;  // Crisp light gray
+    SymbolCol  := $00D4D4D4;  // Crisp Silver
+    BracketCol := $0050D0FF;  // Golden Yellow
     TagCol     := $004EC9B0;  // Teal / Cyan
     AttrCol    := $009CDCFE;  // Sky blue
     ValCol     := $00CE9178;  // Warm peach
   end
   else
   begin
-    CommentCol := $00008000;  // Forest green
-    KeyCol     := $00B00000;  // Royal blue / Navy
-    StringCol  := $00000099;  // Deep maroon / crimson
-    NumberCol  := $000060A0;  // Deep teal/amber
-    SymbolCol  := $00333333;  // Dark charcoal
+    CommentCol := $00008000;  // Forest Green
+    KeyCol     := $00B00000;  // Royal Blue / Navy
+    StringCol  := $00007700;  // Clean Dark Green
+    NumberCol  := $000060C0;  // Amber / Dark Orange
+    SymbolCol  := $00202020;  // Dark Charcoal
+    BracketCol := $00800080;  // Vivid Purple
     TagCol     := $00800000;  // Navy
     AttrCol    := $00804000;  // Dark cyan
-    ValCol     := $00000080;  // Maroon
+    ValCol     := $00007700;  // Dark green
   end;
 
   // 1. Pascal
@@ -928,7 +956,7 @@ begin
   FHighlighterJS.StringAttri.Foreground := StringCol;
   FHighlighterJS.NumberAttri.Foreground := NumberCol;
   FHighlighterJS.SymbolAttri.Foreground := SymbolCol;
-  FHighlighterJS.BracketAttri.Foreground := TagCol;
+  FHighlighterJS.BracketAttri.Foreground := BracketCol;
 
   // 4. HTML
   FHighlighterHTML.CommentAttri.Foreground := CommentCol;
@@ -2113,6 +2141,85 @@ end;
 procedure TfrmMain.SynEdit1StatusChange(Sender: TObject; Changes: TSynStatusChanges);
 begin
   UpdateNotepadStatus;
+end;
+
+procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if (PageControl1.ActivePage = tabNotepad) and (ssCtrl in Shift) then
+  begin
+    case Key of
+      VK_C:
+        if SynEdit1.Focused and (SynEdit1.SelText <> '') then
+        begin
+          SynEdit1.CopyToClipboard;
+          Key := 0;
+        end;
+      VK_X:
+        if SynEdit1.Focused and (SynEdit1.SelText <> '') then
+        begin
+          SynEdit1.CutToClipboard;
+          Key := 0;
+        end;
+      VK_V:
+        if SynEdit1.Focused then
+        begin
+          SynEdit1.PasteFromClipboard;
+          Key := 0;
+        end;
+      VK_A:
+        if SynEdit1.Focused then
+        begin
+          SynEdit1.SelectAll;
+          Key := 0;
+        end;
+    end;
+  end;
+end;
+
+procedure TfrmMain.popNotepadPopup(Sender: TObject);
+begin
+  miCut.Enabled := (SynEdit1.SelText <> '');
+  miCopy.Enabled := (SynEdit1.SelText <> '');
+  miPaste.Enabled := Clipboard.HasFormat(CF_TEXT);
+  miDelete.Enabled := (SynEdit1.SelText <> '');
+  miUndo.Enabled := SynEdit1.CanUndo;
+  miRedo.Enabled := SynEdit1.CanRedo;
+  miSelectAll.Enabled := (SynEdit1.Lines.Count > 0);
+end;
+
+procedure TfrmMain.miCutClick(Sender: TObject);
+begin
+  SynEdit1.CutToClipboard;
+end;
+
+procedure TfrmMain.miCopyClick(Sender: TObject);
+begin
+  SynEdit1.CopyToClipboard;
+end;
+
+procedure TfrmMain.miPasteClick(Sender: TObject);
+begin
+  SynEdit1.PasteFromClipboard;
+end;
+
+procedure TfrmMain.miDeleteClick(Sender: TObject);
+begin
+  SynEdit1.ClearSelection;
+end;
+
+procedure TfrmMain.miSelectAllClick(Sender: TObject);
+begin
+  SynEdit1.SelectAll;
+end;
+
+procedure TfrmMain.miUndoClick(Sender: TObject);
+begin
+  SynEdit1.Undo;
+end;
+
+procedure TfrmMain.miRedoClick(Sender: TObject);
+begin
+  SynEdit1.Redo;
 end;
 
 end.

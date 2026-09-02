@@ -6,6 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
+  Menus, Clipbrd, LazUTF8,
   SynEdit, SynEditWrappedView,
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterHTML,
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
@@ -40,10 +41,19 @@ type
     lblHexTitle: TLabel;
     memHex: TMemo;
 
+    popPreview: TPopupMenu;
+    miPrevCopy: TMenuItem;
+    miPrevSep: TMenuItem;
+    miPrevSelectAll: TMenuItem;
+
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormCreate(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure btnOpenInNotepadClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
+    procedure miPrevCopyClick(Sender: TObject);
+    procedure miPrevSelectAllClick(Sender: TObject);
+    procedure popPreviewPopup(Sender: TObject);
 
   private
     FCurrentPath: string;
@@ -184,8 +194,46 @@ begin
       frmMain.OpenFileInNotepad(FCurrentPath);
       frmMain.PageControl1.ActivePage := frmMain.tabNotepad;
       frmMain.BringToFront;
+      Close;
     end;
   end;
+end;
+
+procedure TfrmPreview.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if ssCtrl in Shift then
+  begin
+    case Key of
+      VK_C:
+        if synPreview.Visible and (synPreview.SelText <> '') then
+        begin
+          synPreview.CopyToClipboard;
+          Key := 0;
+        end;
+      VK_A:
+        if synPreview.Visible then
+        begin
+          synPreview.SelectAll;
+          Key := 0;
+        end;
+    end;
+  end;
+end;
+
+procedure TfrmPreview.popPreviewPopup(Sender: TObject);
+begin
+  miPrevCopy.Enabled := (synPreview.SelText <> '');
+  miPrevSelectAll.Enabled := (synPreview.Lines.Count > 0);
+end;
+
+procedure TfrmPreview.miPrevCopyClick(Sender: TObject);
+begin
+  synPreview.CopyToClipboard;
+end;
+
+procedure TfrmPreview.miPrevSelectAllClick(Sender: TObject);
+begin
+  synPreview.SelectAll;
 end;
 
 procedure TfrmPreview.SetWindowsTitleBarDark(AForm: TForm; ADark: Boolean);
@@ -272,11 +320,17 @@ function TfrmPreview.ConvertToUTF8(const S: string): string;
 var
   Enc: string;
   Dummy: Boolean;
+  Clean: string;
 begin
   if S = '' then Exit('');
-  // Check for UTF-8 BOM
-  if (Length(S) >= 3) and (S[1] = #$EF) and (S[2] = #$BB) and (S[3] = #$BF) then
-    Exit(Copy(S, 4, Length(S) - 3));
+  Clean := S;
+  // Strip UTF-8 BOM if present
+  if (Length(Clean) >= 3) and (Clean[1] = #$EF) and (Clean[2] = #$BB) and (Clean[3] = #$BF) then
+    Delete(Clean, 1, 3);
+
+  // If already valid UTF-8, DO NOT convert (prevents double-encoding mojibake on em-dash, emojis, smart quotes)
+  if FindInvalidUTF8Codepoint(PChar(Clean), Length(Clean)) = -1 then
+    Exit(Clean);
 
   // Check for UTF-16 LE BOM
   if (Length(S) >= 2) and (S[1] = #$FF) and (S[2] = #$FE) then
@@ -286,38 +340,40 @@ begin
   if (Length(S) >= 2) and (S[1] = #$FE) and (S[2] = #$FF) then
     Exit(ConvertEncodingToUTF8(S, 'ucs-2be', Dummy));
 
-  Enc := GuessEncoding(S);
+  Enc := GuessEncoding(Clean);
   if (Enc = '') or (SameText(Enc, 'utf-8')) or (SameText(Enc, 'utf8')) then
-    Result := UTF8BOMToUTF8(S)
+    Result := Clean
   else
-    Result := ConvertEncodingToUTF8(S, Enc, Dummy);
+    Result := ConvertEncodingToUTF8(Clean, Enc, Dummy);
 end;
 
 procedure TfrmPreview.ApplyHighlighterTheme(ADark: Boolean);
 var
-  CommentCol, KeyCol, StringCol, NumberCol, SymbolCol, TagCol, AttrCol, ValCol: TColor;
+  CommentCol, KeyCol, StringCol, NumberCol, SymbolCol, BracketCol, TagCol, AttrCol, ValCol: TColor;
 begin
   if ADark then
   begin
     CommentCol := $0068AA68;  // Soft Sage Green
-    KeyCol     := $00569CD6;  // Vibrant Blue / Amber ($00E08050)
-    StringCol  := $0080B0FF;  // Light Peach / Sky Blue
+    KeyCol     := $00569CD6;  // Bright Cyan / Sky Blue
+    StringCol  := $009CDCFE;  // Light Sky Blue / Cyan
     NumberCol  := $0070DF90;  // Emerald Green
-    SymbolCol  := $00D4D4D4;  // Crisp light gray
+    SymbolCol  := $00D4D4D4;  // Crisp Silver
+    BracketCol := $0050D0FF;  // Golden Yellow
     TagCol     := $004EC9B0;  // Teal / Cyan
     AttrCol    := $009CDCFE;  // Sky blue
     ValCol     := $00CE9178;  // Warm peach
   end
   else
   begin
-    CommentCol := $00008000;  // Forest green
-    KeyCol     := $00B00000;  // Royal blue / Navy
-    StringCol  := $00000099;  // Deep maroon / crimson
-    NumberCol  := $000060A0;  // Deep teal/amber
-    SymbolCol  := $00333333;  // Dark charcoal
+    CommentCol := $00008000;  // Forest Green
+    KeyCol     := $00B00000;  // Royal Blue / Navy
+    StringCol  := $00007700;  // Clean Dark Green
+    NumberCol  := $000060C0;  // Amber / Dark Orange
+    SymbolCol  := $00202020;  // Dark Charcoal
+    BracketCol := $00800080;  // Vivid Purple
     TagCol     := $00800000;  // Navy
     AttrCol    := $00804000;  // Dark cyan
-    ValCol     := $00000080;  // Maroon
+    ValCol     := $00007700;  // Dark green
   end;
 
   // 1. Pascal
@@ -339,7 +395,7 @@ begin
   FHighlighterJS.StringAttri.Foreground := StringCol;
   FHighlighterJS.NumberAttri.Foreground := NumberCol;
   FHighlighterJS.SymbolAttri.Foreground := SymbolCol;
-  FHighlighterJS.BracketAttri.Foreground := TagCol;
+  FHighlighterJS.BracketAttri.Foreground := BracketCol;
 
   // 4. HTML
   FHighlighterHTML.CommentAttri.Foreground := CommentCol;

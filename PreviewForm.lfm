@@ -8,8 +8,10 @@ object frmPreview: TfrmPreview
   ClientWidth = 560
   DoubleBuffered = True
   FormStyle = fsStayOnTop
+  KeyPreview = True
   OnClose = FormClose
   OnCreate = FormCreate
+  OnKeyDown = FormKeyDown
   Position = poMainFormCenter
   LCLVersion = '3.6.0.0'
   object pnlTop: TPanel
@@ -116,6 +118,7 @@ object frmPreview: TfrmPreview
       Font.Quality = fqCleartype
       ParentColor = False
       ParentFont = False
+      PopupMenu = popPreview
       ReadOnly = True
       TabOrder = 1
       Visible = False
@@ -198,8 +201,25 @@ object frmPreview: TfrmPreview
         ParentFont = False
         ReadOnly = True
         ScrollBars = ssAutoBoth
-        TabOrder = 0
       end
+    end
+  end
+  object popPreview: TPopupMenu
+    OnPopup = popPreviewPopup
+    Left = 480
+    Top = 80
+    object miPrevCopy: TMenuItem
+      Caption = 'Copy'
+      ShortCut = 16451
+      OnClick = miPrevCopyClick
+    end
+    object miPrevSep: TMenuItem
+      Caption = '-'
+    end
+    object miPrevSelectAll: TMenuItem
+      Caption = 'Select All'
+      ShortCut = 16449
+      OnClick = miPrevSelectAllClick
     end
   end
 end
