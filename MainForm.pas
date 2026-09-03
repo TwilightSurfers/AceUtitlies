@@ -12,7 +12,7 @@ uses
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding, LazUTF8, LCLType,
-  SynHighlighterMarkdown;
+  ImgList, SynHighlighterMarkdown;
 
 type
   PResultInfo = ^TResultInfo;
@@ -157,6 +157,7 @@ type
     btnApplyRemap: TButton;
     lblRemapHelp: TLabel;
     lvContextMenu: TListView;
+    ImageList1: TImageList;
 
     // Form Events
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -336,7 +337,7 @@ uses
   {$IFDEF WINDOWS}
   Windows, ShellAPI,
   {$ENDIF}
-  DateUtils, PreviewForm;
+  LResources, DateUtils, PreviewForm;
 
 const
   FILE_ATTRIBUTE_REPARSE_POINT = $00000400;
@@ -548,6 +549,18 @@ begin
 
   FAllowClose := False;
   Application.OnMinimize := @AppMinimize;
+
+  // Initialize tab glyphs into ImageList1
+  ImageList1.Clear;
+  ImageList1.Width := 16;
+  ImageList1.Height := 16;
+  ImageList1.AddLazarusResource('chaicon-search');
+  ImageList1.AddLazarusResource('chaicon-page-edit');
+  ImageList1.AddLazarusResource('chaicon-settings');
+  PageControl1.Images := ImageList1;
+  tabSearch.ImageIndex := 0;
+  tabNotepad.ImageIndex := 1;
+  tabContextMenu.ImageIndex := 2;
 
   // Load and apply all saved settings
   LoadAllOptions;
@@ -3064,4 +3077,6 @@ begin
   SynEdit1.Redo;
 end;
 
+initialization
+  {$I tabicons.lrs}
 end.
