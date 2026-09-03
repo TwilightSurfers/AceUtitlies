@@ -878,52 +878,67 @@ object frmMain: TfrmMain
       end
       object pnlAboutLinks: TPanel
         Left = 0
-        Height = 80
+        Height = 148
         Top = 85
         Width = 1042
         Align = alTop
         BevelOuter = bvNone
-        ClientHeight = 80
+        ClientHeight = 148
         ClientWidth = 1042
         TabOrder = 1
         object pnlLinkWeb: TPanel
           Cursor = crHandPoint
           Left = 12
-          Height = 66
+          Height = 64
           Top = 6
           Width = 325
           BevelOuter = bvRaised
-          ClientHeight = 66
+          ClientHeight = 64
           ClientWidth = 325
           TabOrder = 0
           OnClick = pnlLinkWebClick
-          object imgLinkWeb: TImage
+          object pnlImgContainerWeb: TPanel
             Cursor = crHandPoint
-            Left = 10
-            Height = 44
-            Top = 11
+            Left = 8
+            Height = 48
+            Top = 8
             Width = 48
-            Center = True
-            Proportional = True
-            Stretch = True
+            BevelOuter = bvNone
+            ClientHeight = 48
+            ClientWidth = 48
+            Color = 15263976
+            ParentColor = False
+            TabOrder = 0
             OnClick = pnlLinkWebClick
+            object imgLinkWeb: TImage
+              Cursor = crHandPoint
+              Left = 0
+              Height = 48
+              Top = 0
+              Width = 48
+              Align = alClient
+              Center = True
+              Proportional = True
+              Stretch = True
+              OnClick = pnlLinkWebClick
+            end
           end
           object lblLinkWebTitle: TLabel
             Cursor = crHandPoint
-            Left = 68
+            Left = 66
             Height = 16
-            Top = 13
+            Top = 12
             Width = 100
-            Caption = 'Official Website'
+            Caption = 'Twilight Surfers'
             Font.Style = [fsBold]
             ParentFont = False
             OnClick = pnlLinkWebClick
           end
           object lblLinkWebUrl: TLabel
             Cursor = crHandPoint
-            Left = 68
+            Left = 66
             Height = 15
-            Top = 33
+            Top = 32
             Width = 130
             Caption = 'twilightsurfers.net'
             Font.Color = clHighlight
@@ -932,46 +947,183 @@ object frmMain: TfrmMain
             OnClick = pnlLinkWebClick
           end
         end
-        object pnlLinkX: TPanel
+        object pnlLinkFavAmp: TPanel
           Cursor = crHandPoint
           Left = 350
-          Height = 66
+          Height = 64
           Top = 6
           Width = 325
           BevelOuter = bvRaised
-          ClientHeight = 66
+          ClientHeight = 64
           ClientWidth = 325
           TabOrder = 1
-          OnClick = pnlLinkXClick
-          object imgLinkX: TImage
+          OnClick = pnlLinkFavAmpClick
+          object pnlImgContainerFavAmp: TPanel
             Cursor = crHandPoint
-            Left = 10
-            Height = 44
-            Top = 11
+            Left = 8
+            Height = 48
+            Top = 8
             Width = 48
-            Center = True
-            Proportional = True
-            Stretch = True
+            BevelOuter = bvNone
+            ClientHeight = 48
+            ClientWidth = 48
+            Color = 15263976
+            ParentColor = False
+            TabOrder = 0
+            OnClick = pnlLinkFavAmpClick
+            object imgLinkFavAmp: TImage
+              Cursor = crHandPoint
+              Left = 0
+              Height = 48
+              Top = 0
+              Width = 48
+              Align = alClient
+              Center = True
+              Proportional = True
+              Stretch = True
+              OnClick = pnlLinkFavAmpClick
+            end
+          end
+          object lblLinkFavAmpTitle: TLabel
+            Cursor = crHandPoint
+            Left = 66
+            Height = 16
+            Top = 12
+            Width = 120
+            Caption = 'Built with FavAMP'
+            Font.Style = [fsBold]
+            ParentFont = False
+            OnClick = pnlLinkFavAmpClick
+          end
+          object lblLinkFavAmpUrl: TLabel
+            Cursor = crHandPoint
+            Left = 66
+            Height = 15
+            Top = 32
+            Width = 130
+            Caption = 'player.favamp.com'
+            Font.Color = clHighlight
+            Font.Style = [fsUnderline]
+            ParentFont = False
+            OnClick = pnlLinkFavAmpClick
+          end
+        end
+        object pnlLinkRankGalactic: TPanel
+          Cursor = crHandPoint
+          Left = 688
+          Height = 64
+          Top = 6
+          Width = 340
+          BevelOuter = bvRaised
+          ClientHeight = 64
+          ClientWidth = 340
+          TabOrder = 2
+          OnClick = pnlLinkRankGalacticClick
+          object pnlImgContainerRankGalactic: TPanel
+            Cursor = crHandPoint
+            Left = 8
+            Height = 48
+            Top = 8
+            Width = 48
+            BevelOuter = bvNone
+            ClientHeight = 48
+            ClientWidth = 48
+            Color = 15263976
+            ParentColor = False
+            TabOrder = 0
+            OnClick = pnlLinkRankGalacticClick
+            object imgLinkRankGalactic: TImage
+              Cursor = crHandPoint
+              Left = 0
+              Height = 48
+              Top = 0
+              Width = 48
+              Align = alClient
+              Center = True
+              Proportional = True
+              Stretch = True
+              OnClick = pnlLinkRankGalacticClick
+            end
+          end
+          object lblLinkRankGalacticTitle: TLabel
+            Cursor = crHandPoint
+            Left = 66
+            Height = 16
+            Top = 12
+            Width = 130
+            Caption = 'Rank Galactic SEO'
+            Font.Style = [fsBold]
+            ParentFont = False
+            OnClick = pnlLinkRankGalacticClick
+          end
+          object lblLinkRankGalacticUrl: TLabel
+            Cursor = crHandPoint
+            Left = 66
+            Height = 15
+            Top = 32
+            Width = 120
+            Caption = 'rankgalactic.com'
+            Font.Color = clHighlight
+            Font.Style = [fsUnderline]
+            ParentFont = False
+            OnClick = pnlLinkRankGalacticClick
+          end
+        end
+        object pnlLinkX: TPanel
+          Cursor = crHandPoint
+          Left = 12
+          Height = 64
+          Top = 76
+          Width = 505
+          BevelOuter = bvRaised
+          ClientHeight = 64
+          ClientWidth = 505
+          TabOrder = 3
+          OnClick = pnlLinkXClick
+          object pnlImgContainerX: TPanel
+            Cursor = crHandPoint
+            Left = 8
+            Height = 48
+            Top = 8
+            Width = 48
+            BevelOuter = bvNone
+            ClientHeight = 48
+            ClientWidth = 48
+            Color = 15263976
+            ParentColor = False
+            TabOrder = 0
             OnClick = pnlLinkXClick
+            object imgLinkX: TImage
+              Cursor = crHandPoint
+              Left = 0
+              Height = 48
+              Top = 0
+              Width = 48
+              Align = alClient
+              Center = True
+              Proportional = True
+              Stretch = True
+              OnClick = pnlLinkXClick
+            end
           end
           object lblLinkXTitle: TLabel
             Cursor = crHandPoint
-            Left = 68
+            Left = 66
             Height = 16
-            Top = 13
-            Width = 70
-            Caption = 'X Profile'
+            Top = 12
+            Width = 130
+            Caption = 'X (@TwilightSurfers)'
             Font.Style = [fsBold]
             ParentFont = False
             OnClick = pnlLinkXClick
           end
           object lblLinkXUrl: TLabel
             Cursor = crHandPoint
-            Left = 68
+            Left = 66
             Height = 15
-            Top = 33
-            Width = 110
-            Caption = '@TwilightSurfers'
+            Top = 32
+            Width = 150
+            Caption = 'x.com/TwilightSurfers'
             Font.Color = clHighlight
             Font.Style = [fsUnderline]
             ParentFont = False
@@ -980,32 +1132,47 @@ object frmMain: TfrmMain
         end
         object pnlLinkGithub: TPanel
           Cursor = crHandPoint
-          Left = 688
-          Height = 66
-          Top = 6
-          Width = 340
+          Left = 530
+          Height = 64
+          Top = 76
+          Width = 498
           BevelOuter = bvRaised
-          ClientHeight = 66
-          ClientWidth = 340
-          TabOrder = 2
+          ClientHeight = 64
+          ClientWidth = 498
+          TabOrder = 4
           OnClick = pnlLinkGithubClick
-          object imgLinkGithub: TImage
+          object pnlImgContainerGithub: TPanel
             Cursor = crHandPoint
-            Left = 10
-            Height = 44
-            Top = 11
+            Left = 8
+            Height = 48
+            Top = 8
             Width = 48
-            Center = True
-            Proportional = True
-            Stretch = True
+            BevelOuter = bvNone
+            ClientHeight = 48
+            ClientWidth = 48
+            Color = 15263976
+            ParentColor = False
+            TabOrder = 0
             OnClick = pnlLinkGithubClick
+            object imgLinkGithub: TImage
+              Cursor = crHandPoint
+              Left = 0
+              Height = 48
+              Top = 0
+              Width = 48
+              Align = alClient
+              Center = True
+              Proportional = True
+              Stretch = True
+              OnClick = pnlLinkGithubClick
+            end
           end
           object lblLinkGithubTitle: TLabel
             Cursor = crHandPoint
-            Left = 68
+            Left = 66
             Height = 16
-            Top = 13
-            Width = 130
+            Top = 12
+            Width = 150
             Caption = 'GitHub Repository'
             Font.Style = [fsBold]
             ParentFont = False
@@ -1013,11 +1180,11 @@ object frmMain: TfrmMain
           end
           object lblLinkGithubUrl: TLabel
             Cursor = crHandPoint
-            Left = 68
+            Left = 66
             Height = 15
-            Top = 33
-            Width = 160
-            Caption = 'github.com/TwilightSurfers'
+            Top = 32
+            Width = 220
+            Caption = 'github.com/TwilightSurfers/AceUtitlies'
             Font.Color = clHighlight
             Font.Style = [fsUnderline]
             ParentFont = False

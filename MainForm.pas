@@ -167,14 +167,27 @@ type
     lblAboutAuthor: TLabel;
     pnlAboutLinks: TPanel;
     pnlLinkWeb: TPanel;
+    pnlImgContainerWeb: TPanel;
     imgLinkWeb: TImage;
     lblLinkWebTitle: TLabel;
     lblLinkWebUrl: TLabel;
+    pnlLinkFavAmp: TPanel;
+    pnlImgContainerFavAmp: TPanel;
+    imgLinkFavAmp: TImage;
+    lblLinkFavAmpTitle: TLabel;
+    lblLinkFavAmpUrl: TLabel;
+    pnlLinkRankGalactic: TPanel;
+    pnlImgContainerRankGalactic: TPanel;
+    imgLinkRankGalactic: TImage;
+    lblLinkRankGalacticTitle: TLabel;
+    lblLinkRankGalacticUrl: TLabel;
     pnlLinkX: TPanel;
+    pnlImgContainerX: TPanel;
     imgLinkX: TImage;
     lblLinkXTitle: TLabel;
     lblLinkXUrl: TLabel;
     pnlLinkGithub: TPanel;
+    pnlImgContainerGithub: TPanel;
     imgLinkGithub: TImage;
     lblLinkGithubTitle: TLabel;
     lblLinkGithubUrl: TLabel;
@@ -198,6 +211,8 @@ type
 
     // About Tab Events
     procedure pnlLinkWebClick(Sender: TObject);
+    procedure pnlLinkFavAmpClick(Sender: TObject);
+    procedure pnlLinkRankGalacticClick(Sender: TObject);
     procedure pnlLinkXClick(Sender: TObject);
     procedure pnlLinkGithubClick(Sender: TObject);
 
@@ -1143,26 +1158,48 @@ begin
   pnlAboutHeader.Color := HeaderBg;
   pnlAboutLinks.Color := HeaderBg;
   pnlLinkWeb.Color := PanelColor;
+  pnlLinkFavAmp.Color := PanelColor;
+  pnlLinkRankGalactic.Color := PanelColor;
   pnlLinkX.Color := PanelColor;
   pnlLinkGithub.Color := PanelColor;
-  lblAboutTitle.Font.Color := TextColor;
+
   if ADark then
   begin
+    pnlImgContainerWeb.Color := $002E2E2E;
+    pnlImgContainerFavAmp.Color := $002E2E2E;
+    pnlImgContainerRankGalactic.Color := $002E2E2E;
+    pnlImgContainerX.Color := $002E2E2E;
+    pnlImgContainerGithub.Color := $002E2E2E;
+
     lblAboutSubtitle.Font.Color := $00C0C0C0;
     lblAboutAuthor.Font.Color := $00A0A0A0;
     lblLinkWebUrl.Font.Color := $00FFB060;
+    lblLinkFavAmpUrl.Font.Color := $00FFB060;
+    lblLinkRankGalacticUrl.Font.Color := $00FFB060;
     lblLinkXUrl.Font.Color := $00FFB060;
     lblLinkGithubUrl.Font.Color := $00FFB060;
   end
   else
   begin
+    pnlImgContainerWeb.Color := $00E8E8E8;
+    pnlImgContainerFavAmp.Color := $00E8E8E8;
+    pnlImgContainerRankGalactic.Color := $00E8E8E8;
+    pnlImgContainerX.Color := $00E8E8E8;
+    pnlImgContainerGithub.Color := $00E8E8E8;
+
     lblAboutSubtitle.Font.Color := clGray;
     lblAboutAuthor.Font.Color := clGray;
     lblLinkWebUrl.Font.Color := clHighlight;
+    lblLinkFavAmpUrl.Font.Color := clHighlight;
+    lblLinkRankGalacticUrl.Font.Color := clHighlight;
     lblLinkXUrl.Font.Color := clHighlight;
     lblLinkGithubUrl.Font.Color := clHighlight;
   end;
+
+  lblAboutTitle.Font.Color := TextColor;
   lblLinkWebTitle.Font.Color := TextColor;
+  lblLinkFavAmpTitle.Font.Color := TextColor;
+  lblLinkRankGalacticTitle.Font.Color := TextColor;
   lblLinkXTitle.Font.Color := TextColor;
   lblLinkGithubTitle.Font.Color := TextColor;
   mmoAboutFeatures.Color := EditBg;
@@ -3277,6 +3314,16 @@ begin
   OpenURL('http://twilightsurfers.net');
 end;
 
+procedure TfrmMain.pnlLinkFavAmpClick(Sender: TObject);
+begin
+  OpenURL('https://player.favamp.com');
+end;
+
+procedure TfrmMain.pnlLinkRankGalacticClick(Sender: TObject);
+begin
+  OpenURL('https://rankgalactic.com');
+end;
+
 procedure TfrmMain.pnlLinkXClick(Sender: TObject);
 begin
   OpenURL('https://x.com/TwilightSurfers');
@@ -3294,11 +3341,19 @@ begin
   except
   end;
   try
-    imgLinkX.Picture.PNG.LoadFromLazarusResource('maven-mvp');
+    imgLinkFavAmp.Picture.PNG.LoadFromLazarusResource('favAMP');
   except
   end;
   try
-    imgLinkGithub.Picture.PNG.LoadFromLazarusResource('favAMP');
+    imgLinkRankGalactic.Picture.PNG.LoadFromLazarusResource('Rank-Galactic-SEO');
+  except
+  end;
+  try
+    imgLinkX.Picture.PNG.LoadFromLazarusResource('x-logo');
+  except
+  end;
+  try
+    imgLinkGithub.Picture.PNG.LoadFromLazarusResource('maven-mvp');
   except
   end;
 
