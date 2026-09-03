@@ -54,6 +54,15 @@
         <IsPartOfProject Value="True"/>
       </Unit>
     </Units>
+    <VersionInfo>
+      <UseVersionInfo Value="True"/>
+      <AutoIncrementBuild Value="True"/>
+      <MajorVersionNr Value="1"/>
+      <MinorVersionNr Value="2"/>
+      <RevisionNr Value="0"/>
+      <BuildNr Value="1"/>
+      <StringTable CompanyName="Twilight Surfers Development" FileDescription="Ace's Utilities - Real Windows Search, Notepad, &amp; Shell Tools" InternalName="AceUtils" LegalCopyright="Copyright (c) 2026 Twilight Surfers Development. MIT License." OriginalFilename="AceUtils.exe" ProductName="Ace's Utilities" ProductVersion="1.2.0"/>
+    </VersionInfo>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>

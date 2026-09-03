@@ -12,7 +12,7 @@ uses
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding, LazUTF8, LCLType,
-  ImgList, SynHighlighterMarkdown;
+  ImgList, LCLIntf, SynHighlighterMarkdown;
 
 type
   PResultInfo = ^TResultInfo;
@@ -159,12 +159,47 @@ type
     lvContextMenu: TListView;
     ImageList1: TImageList;
 
+    // About Tab Components
+    tabAbout: TTabSheet;
+    pnlAboutHeader: TPanel;
+    lblAboutTitle: TLabel;
+    lblAboutSubtitle: TLabel;
+    lblAboutAuthor: TLabel;
+    pnlAboutLinks: TPanel;
+    pnlLinkWeb: TPanel;
+    imgLinkWeb: TImage;
+    lblLinkWebTitle: TLabel;
+    lblLinkWebUrl: TLabel;
+    pnlLinkX: TPanel;
+    imgLinkX: TImage;
+    lblLinkXTitle: TLabel;
+    lblLinkXUrl: TLabel;
+    pnlLinkGithub: TPanel;
+    imgLinkGithub: TImage;
+    lblLinkGithubTitle: TLabel;
+    lblLinkGithubUrl: TLabel;
+    pcAboutInfo: TPageControl;
+    tabAboutFeatures: TTabSheet;
+    mmoAboutFeatures: TMemo;
+    tabAboutBuildLog: TTabSheet;
+    mmoAboutBuildLog: TMemo;
+    tabAboutLicense: TTabSheet;
+    mmoAboutLicense: TMemo;
+    tmrStatus: TTimer;
+
     // Form Events
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure tmrStatusTimer(Sender: TObject);
+
+    // About Tab Events
+    procedure pnlLinkWebClick(Sender: TObject);
+    procedure pnlLinkXClick(Sender: TObject);
+    procedure pnlLinkGithubClick(Sender: TObject);
 
     // Header & Tray Events
     procedure btnToggleDarkModeClick(Sender: TObject);
@@ -328,6 +363,10 @@ type
     procedure EnsureTrayIconLoaded;
     procedure CheckAndPromptFileAssociation;
     procedure RegisterFileAssociations(ARegister: Boolean);
+
+    // Status Bar & About Helpers
+    procedure UpdateKeyboardAndTimerStatus;
+    procedure LoadAboutContent;
   public
     procedure OpenFileInNotepad(const AFileName: string);
   end;
@@ -565,10 +604,15 @@ begin
   ImageList1.AddLazarusResource('chaicon-search');
   ImageList1.AddLazarusResource('chaicon-page-edit');
   ImageList1.AddLazarusResource('chaicon-settings');
+  ImageList1.AddLazarusResource('chaicon-info');
   PageControl1.Images := ImageList1;
   tabSearch.ImageIndex := 0;
   tabNotepad.ImageIndex := 1;
   tabContextMenu.ImageIndex := 2;
+  tabAbout.ImageIndex := 3;
+
+  LoadAboutContent;
+  UpdateKeyboardAndTimerStatus;
 
   // Load and apply all saved settings
   LoadAllOptions;
@@ -1094,6 +1138,39 @@ begin
     lblRemapHelp.Font.Color := $00A0A0A0
   else
     lblRemapHelp.Font.Color := clGray;
+
+  // About Tab
+  pnlAboutHeader.Color := HeaderBg;
+  pnlAboutLinks.Color := HeaderBg;
+  pnlLinkWeb.Color := PanelColor;
+  pnlLinkX.Color := PanelColor;
+  pnlLinkGithub.Color := PanelColor;
+  lblAboutTitle.Font.Color := TextColor;
+  if ADark then
+  begin
+    lblAboutSubtitle.Font.Color := $00C0C0C0;
+    lblAboutAuthor.Font.Color := $00A0A0A0;
+    lblLinkWebUrl.Font.Color := $00FFB060;
+    lblLinkXUrl.Font.Color := $00FFB060;
+    lblLinkGithubUrl.Font.Color := $00FFB060;
+  end
+  else
+  begin
+    lblAboutSubtitle.Font.Color := clGray;
+    lblAboutAuthor.Font.Color := clGray;
+    lblLinkWebUrl.Font.Color := clHighlight;
+    lblLinkXUrl.Font.Color := clHighlight;
+    lblLinkGithubUrl.Font.Color := clHighlight;
+  end;
+  lblLinkWebTitle.Font.Color := TextColor;
+  lblLinkXTitle.Font.Color := TextColor;
+  lblLinkGithubTitle.Font.Color := TextColor;
+  mmoAboutFeatures.Color := EditBg;
+  mmoAboutFeatures.Font.Color := TextColor;
+  mmoAboutBuildLog.Color := EditBg;
+  mmoAboutBuildLog.Font.Color := TextColor;
+  mmoAboutLicense.Color := EditBg;
+  mmoAboutLicense.Font.Color := TextColor;
 
   // Labels
   lblPattern.Font.Color := TextColor;
@@ -3071,6 +3148,7 @@ end;
 
 procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
+  UpdateKeyboardAndTimerStatus;
   if (PageControl1.ActivePage = tabNotepad) and (ssCtrl in Shift) then
   begin
     case Key of
@@ -3146,6 +3224,186 @@ end;
 procedure TfrmMain.miRedoClick(Sender: TObject);
 begin
   SynEdit1.Redo;
+end;
+
+{ ----------------------------------------------------------------------------
+  Keyboard Status, Timer, and About Tab Implementation
+  ---------------------------------------------------------------------------- }
+
+procedure TfrmMain.tmrStatusTimer(Sender: TObject);
+begin
+  UpdateKeyboardAndTimerStatus;
+end;
+
+procedure TfrmMain.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  UpdateKeyboardAndTimerStatus;
+end;
+
+procedure TfrmMain.UpdateKeyboardAndTimerStatus;
+{$IFDEF WINDOWS}
+var
+  CapsLockOn, NumLockOn, InsertOn: Boolean;
+begin
+  CapsLockOn := (GetKeyState(VK_CAPITAL) and 1) <> 0;
+  NumLockOn  := (GetKeyState(VK_NUMLOCK) and 1) <> 0;
+  InsertOn   := (GetKeyState(VK_INSERT) and 1) <> 0;
+
+  if CapsLockOn then
+    StatusBar1.Panels[3].Text := 'CAPS'
+  else
+    StatusBar1.Panels[3].Text := '';
+
+  if NumLockOn then
+    StatusBar1.Panels[4].Text := 'NUM'
+  else
+    StatusBar1.Panels[4].Text := '';
+
+  if InsertOn then
+    StatusBar1.Panels[5].Text := 'OVR'
+  else
+    StatusBar1.Panels[5].Text := 'INS';
+
+  StatusBar1.Panels[6].Text := FormatDateTime('hh:nn:ss am/pm', Now);
+end;
+{$ELSE}
+begin
+  StatusBar1.Panels[6].Text := FormatDateTime('hh:nn:ss am/pm', Now);
+end;
+{$ENDIF}
+
+procedure TfrmMain.pnlLinkWebClick(Sender: TObject);
+begin
+  OpenURL('http://twilightsurfers.net');
+end;
+
+procedure TfrmMain.pnlLinkXClick(Sender: TObject);
+begin
+  OpenURL('https://x.com/TwilightSurfers');
+end;
+
+procedure TfrmMain.pnlLinkGithubClick(Sender: TObject);
+begin
+  OpenURL('https://github.com/TwilightSurfers/AceUtitlies');
+end;
+
+procedure TfrmMain.LoadAboutContent;
+begin
+  try
+    imgLinkWeb.Picture.PNG.LoadFromLazarusResource('search-the-web');
+  except
+  end;
+  try
+    imgLinkX.Picture.PNG.LoadFromLazarusResource('maven-mvp');
+  except
+  end;
+  try
+    imgLinkGithub.Picture.PNG.LoadFromLazarusResource('favAMP');
+  except
+  end;
+
+  mmoAboutFeatures.Lines.Clear;
+  mmoAboutFeatures.Lines.Add('=== ACE''S UTILITIES (AceUtils) ===');
+  mmoAboutFeatures.Lines.Add('Fast Windows Search, Modern Notepad Replacement & Shell Management');
+  mmoAboutFeatures.Lines.Add('Developed by Twilight Surfers Development | Released under the MIT License.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('KEY CAPABILITIES:');
+  mmoAboutFeatures.Lines.Add('-----------------');
+  mmoAboutFeatures.Lines.Add('1. CONTEXT MENU MANAGEMENT & WINDOWS 11 ASSOCIATION TAKEOVER:');
+  mmoAboutFeatures.Lines.Add('   - Reclaims .txt and .md associations hijacked by Windows 11 UWP Notepad.');
+  mmoAboutFeatures.Lines.Add('   - Cleans UserChoice/UserChoiceLatest per-user with ZERO admin rights.');
+  mmoAboutFeatures.Lines.Add('   - Audits HKCU shell verbs across *, Directory, Background, .txt, .md, Applications.');
+  mmoAboutFeatures.Lines.Add('   - Identifies and highlights broken/stale verbs pointing to missing executables.');
+  mmoAboutFeatures.Lines.Add('   - Allows one-click purging, label editing, and command-line remapping.');
+  mmoAboutFeatures.Lines.Add('   - Interactive multi-column header sorting with Ascending/Descending indicators.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('2. REAL WINDOWS FILE SEARCH:');
+  mmoAboutFeatures.Lines.Add('   - Safe Breadth-First Search (BFS) directory traversal engine.');
+  mmoAboutFeatures.Lines.Add('   - Automatic NTFS junction & reparse point loop prevention ($00000400).');
+  mmoAboutFeatures.Lines.Add('   - Fast pattern search with wildcards (*.pas, *.md) or substring matching.');
+  mmoAboutFeatures.Lines.Add('   - Content searching inside files with configurable case sensitivity.');
+  mmoAboutFeatures.Lines.Add('   - Results list multi-column sorting by Name, Folder, True Byte Size, Date, Type.');
+  mmoAboutFeatures.Lines.Add('   - Copy Filename Only, Copy File Path Only, Copy File Path and Name.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('3. FLOATING LIVE PREVIEW:');
+  mmoAboutFeatures.Lines.Add('   - Modeless floating preview window updating in real-time as results are clicked.');
+  mmoAboutFeatures.Lines.Add('   - Image scaling preview (.png, .jpg, .bmp, .ico, .gif) with dimension readouts.');
+  mmoAboutFeatures.Lines.Add('   - TSynEdit code preview with line numbers and syntax coloring.');
+  mmoAboutFeatures.Lines.Add('   - High-res shell icon rendering and 16-column Hex + ASCII byte peek.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('4. NOTEPAD REPLACEMENT:');
+  mmoAboutFeatures.Lines.Add('   - Tabbed editor powered by TSynEdit with dirty tracking.');
+  mmoAboutFeatures.Lines.Add('   - Dedicated custom Markdown highlighter (headers, code blocks, lists, links).');
+  mmoAboutFeatures.Lines.Add('   - Highlighters for Pascal, Python, HTML, XML, CSS, JS, SQL, Batch, INI, Diff.');
+  mmoAboutFeatures.Lines.Add('   - Slide-down Find & Replace bar with regex, match case, and whole words.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('5. NATIVE WINDOWS 11 POLISH:');
+  mmoAboutFeatures.Lines.Add('   - Native DWM dark title bar via dwmapi.dll Desktop Window Manager attribute.');
+  mmoAboutFeatures.Lines.Add('   - System tray minimize/close with quick actions context menu.');
+  mmoAboutFeatures.Lines.Add('   - Live keyboard status (CAPS, NUM, INS) and ticking System Clock in status bar.');
+  mmoAboutFeatures.Lines.Add('   - Embedded 16x16 chaicon modern icon set (727 icons under MIT License).');
+
+  mmoAboutBuildLog.Lines.Clear;
+  mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
+  mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.2.0] - 2026-09-03');
+  mmoAboutBuildLog.Lines.Add('  * Added comprehensive About tab with project info, MIT License, and links.');
+  mmoAboutBuildLog.Lines.Add('  * Integrated Twilight Surfers Development credentials and exe VersionInfo.');
+  mmoAboutBuildLog.Lines.Add('  * Added live keyboard status indicators in StatusBar (CAPS, NUM, INS/OVR).');
+  mmoAboutBuildLog.Lines.Add('  * Added real-time ticking System Clock panel to StatusBar.');
+  mmoAboutBuildLog.Lines.Add('  * Added clickable link cards with proportional image thumbnails for web/X/GitHub.');
+  mmoAboutBuildLog.Lines.Add('  * Embedded About tab chaicon-info glyph and social image assets.');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.1.5] - 2026-09-03');
+  mmoAboutBuildLog.Lines.Add('  * Added interactive multi-column header sorting to Context Menu Mgtmt tab.');
+  mmoAboutBuildLog.Lines.Add('  * Column sorting toggles between Ascending (▲) and Descending (▼).');
+  mmoAboutBuildLog.Lines.Add('  * Auto-persists active sort column and direction across list refreshes.');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.1.0] - 2026-09-03');
+  mmoAboutBuildLog.Lines.Add('  * Added TImageList (16x16) and connected to PageControl1 notebook tabs.');
+  mmoAboutBuildLog.Lines.Add('  * Imported modern chaicon package: 727 MIT-licensed 16x16 PNG glyphs.');
+  mmoAboutBuildLog.Lines.Add('  * Compiled tabicons.lrs resource embedding glyphs for 100% portable standalone binary.');
+  mmoAboutBuildLog.Lines.Add('  * Assigned custom icons: Search, Notepad, Context Menu, and About tabs.');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.0.5] - 2026-09-03');
+  mmoAboutBuildLog.Lines.Add('  * Built "Context Menu Mgtmt" tab for auditing HKCU user shell verbs.');
+  mmoAboutBuildLog.Lines.Add('  * Added automatic stale entry detection with red visual highlight for missing targets.');
+  mmoAboutBuildLog.Lines.Add('  * Added one-click stale verb cleanup and shell verb removal via SHChangeNotify.');
+  mmoAboutBuildLog.Lines.Add('  * Added verb command-line remapping with interactive executable file browser.');
+  mmoAboutBuildLog.Lines.Add('  * Added "Take Back .txt & .md Associations" to reclaim Windows 11 defaults.');
+  mmoAboutBuildLog.Lines.Add('  * Added cross-platform {$IFDEF WINDOWS} guards for seamless Linux compilation.');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.0.0] - 2026-09-03');
+  mmoAboutBuildLog.Lines.Add('  * Initial release under Ace''s Utilities (AceUtils).');
+  mmoAboutBuildLog.Lines.Add('  * Fast BFS search engine with junction loop skip and content search.');
+  mmoAboutBuildLog.Lines.Add('  * Floating live preview with image scaling, syntax preview, and hex peek.');
+  mmoAboutBuildLog.Lines.Add('  * Built-in SynEdit Notepad editor with custom Markdown syntax highlighter.');
+  mmoAboutBuildLog.Lines.Add('  * Native Windows 11 DWM dark title bar and system tray background integration.');
+
+  mmoAboutLicense.Lines.Clear;
+  mmoAboutLicense.Lines.Add('MIT License');
+  mmoAboutLicense.Lines.Add('');
+  mmoAboutLicense.Lines.Add('Copyright (c) 2026 Twilight Surfers Development');
+  mmoAboutLicense.Lines.Add('');
+  mmoAboutLicense.Lines.Add('Permission is hereby granted, free of charge, to any person obtaining a copy');
+  mmoAboutLicense.Lines.Add('of this software and associated documentation files (the "Software"), to deal');
+  mmoAboutLicense.Lines.Add('in the Software without restriction, including without limitation the rights');
+  mmoAboutLicense.Lines.Add('to use, copy, modify, merge, publish, distribute, sublicense, and/or sell');
+  mmoAboutLicense.Lines.Add('copies of the Software, and to permit persons to whom the Software is');
+  mmoAboutLicense.Lines.Add('furnished to do so, subject to the following conditions:');
+  mmoAboutLicense.Lines.Add('');
+  mmoAboutLicense.Lines.Add('The above copyright notice and this permission notice shall be included in all');
+  mmoAboutLicense.Lines.Add('copies or substantial portions of the Software.');
+  mmoAboutLicense.Lines.Add('');
+  mmoAboutLicense.Lines.Add('THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR');
+  mmoAboutLicense.Lines.Add('IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,');
+  mmoAboutLicense.Lines.Add('FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE');
+  mmoAboutLicense.Lines.Add('AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER');
+  mmoAboutLicense.Lines.Add('LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,');
+  mmoAboutLicense.Lines.Add('OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE');
+  mmoAboutLicense.Lines.Add('SOFTWARE.');
 end;
 
 initialization
