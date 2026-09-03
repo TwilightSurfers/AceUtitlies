@@ -834,11 +834,274 @@ object frmMain: TfrmMain
         OnSelectItem = lvContextMenuSelectItem
       end
     end
+    object tabExplorer: TTabSheet
+      Caption = 'The Real Explorer'
+      ClientHeight = 561
+      ClientWidth = 1042
+      ImageIndex = 3
+      object pnlExplorerTop: TPanel
+        Left = 0
+        Height = 70
+        Top = 0
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 70
+        ClientWidth = 1042
+        TabOrder = 0
+        object pnlExplorerNav: TPanel
+          Left = 0
+          Height = 36
+          Top = 0
+          Width = 1042
+          Align = alTop
+          BevelOuter = bvNone
+          ClientHeight = 36
+          ClientWidth = 1042
+          TabOrder = 0
+          object btnExpBack: TButton
+            Left = 6
+            Height = 26
+            Top = 5
+            Width = 32
+            Caption = '◀'
+            TabOrder = 0
+            OnClick = btnExpBackClick
+          end
+          object btnExpForward: TButton
+            Left = 40
+            Height = 26
+            Top = 5
+            Width = 32
+            Caption = '▶'
+            TabOrder = 1
+            OnClick = btnExpForwardClick
+          end
+          object btnExpUp: TButton
+            Left = 74
+            Height = 26
+            Top = 5
+            Width = 44
+            Caption = '▲ Up'
+            TabOrder = 2
+            OnClick = btnExpUpClick
+          end
+          object btnExpRefresh: TButton
+            Left = 120
+            Height = 26
+            Top = 5
+            Width = 60
+            Caption = '⟳ Refresh'
+            TabOrder = 3
+            OnClick = btnExpRefreshClick
+          end
+          object btnExpDefault: TButton
+            Left = 182
+            Height = 26
+            Top = 5
+            Width = 68
+            Caption = '🏠 Default'
+            TabOrder = 4
+            OnClick = btnExpDefaultClick
+          end
+          object edtExpPath: TEdit
+            Left = 254
+            Height = 26
+            Top = 5
+            Width = 506
+            Anchors = [akTop, akLeft, akRight]
+            TabOrder = 5
+            OnKeyDown = edtExpPathKeyDown
+          end
+          object btnExpGo: TButton
+            Left = 764
+            Height = 26
+            Top = 5
+            Width = 36
+            Anchors = [akTop, akRight]
+            Caption = '➔'
+            TabOrder = 6
+            OnClick = btnExpGoClick
+          end
+          object btnExpSetDefault: TButton
+            Left = 804
+            Height = 26
+            Top = 5
+            Width = 96
+            Anchors = [akTop, akRight]
+            Caption = '⭐ Set Default'
+            TabOrder = 7
+            OnClick = btnExpSetDefaultClick
+          end
+          object btnExpPreview: TButton
+            Left = 904
+            Height = 26
+            Top = 5
+            Width = 76
+            Anchors = [akTop, akRight]
+            Caption = '👁 Preview'
+            TabOrder = 8
+            OnClick = btnExpPreviewClick
+          end
+          object btnExpNewFolder: TButton
+            Left = 984
+            Height = 26
+            Top = 5
+            Width = 52
+            Anchors = [akTop, akRight]
+            Caption = '+ Folder'
+            TabOrder = 9
+            OnClick = btnExpNewFolderClick
+          end
+        end
+        object pnlExpQuickBar: TPanel
+          Left = 0
+          Height = 34
+          Top = 36
+          Width = 1042
+          Align = alClient
+          BevelOuter = bvNone
+          ClientHeight = 34
+          ClientWidth = 1042
+          TabOrder = 1
+          object lblExpQuick: TLabel
+            Left = 8
+            Height = 15
+            Top = 9
+            Width = 62
+            Caption = 'Quick Jump:'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object btnJumpDesktop: TButton
+            Left = 78
+            Height = 24
+            Top = 5
+            Width = 74
+            Caption = 'Desktop'
+            TabOrder = 0
+            OnClick = btnJumpDesktopClick
+          end
+          object btnJumpDownloads: TButton
+            Left = 156
+            Height = 24
+            Top = 5
+            Width = 84
+            Caption = 'Downloads'
+            TabOrder = 1
+            OnClick = btnJumpDownloadsClick
+          end
+          object btnJumpDocuments: TButton
+            Left = 244
+            Height = 24
+            Top = 5
+            Width = 84
+            Caption = 'Documents'
+            TabOrder = 2
+            OnClick = btnJumpDocumentsClick
+          end
+          object btnJumpPictures: TButton
+            Left = 332
+            Height = 24
+            Top = 5
+            Width = 74
+            Caption = 'Pictures'
+            TabOrder = 3
+            OnClick = btnJumpPicturesClick
+          end
+          object btnJumpDriveC: TButton
+            Left = 410
+            Height = 24
+            Top = 5
+            Width = 84
+            Caption = 'Local Disk (C:)'
+            TabOrder = 4
+            OnClick = btnJumpDriveCClick
+          end
+          object btnJumpUserHome: TButton
+            Left = 498
+            Height = 24
+            Top = 5
+            Width = 80
+            Caption = 'User Profile'
+            TabOrder = 5
+            OnClick = btnJumpUserHomeClick
+          end
+        end
+      end
+      object pnlExpBody: TPanel
+        Left = 0
+        Height = 491
+        Top = 70
+        Width = 1042
+        Align = alClient
+        BevelOuter = bvNone
+        ClientHeight = 491
+        ClientWidth = 1042
+        TabOrder = 1
+        object pnlExpLeft: TPanel
+          Left = 0
+          Height = 491
+          Top = 0
+          Width = 230
+          Align = alLeft
+          BevelOuter = bvNone
+          ClientHeight = 491
+          ClientWidth = 230
+          TabOrder = 0
+          object ShellTreeViewExplorer: TShellTreeView
+            Left = 0
+            Height = 491
+            Top = 0
+            Width = 230
+            Align = alClient
+            FileSortType = fstAlphabet
+            TabOrder = 0
+            ObjectTypes = [otFolders]
+            OnChange = ShellTreeViewExplorerChange
+          end
+        end
+        object splExplorer: TSplitter
+          Left = 230
+          Height = 491
+          Top = 0
+          Width = 5
+        end
+        object pnlExpRight: TPanel
+          Left = 235
+          Height = 491
+          Top = 0
+          Width = 807
+          Align = alClient
+          BevelOuter = bvNone
+          ClientHeight = 491
+          ClientWidth = 807
+          TabOrder = 1
+          object ShellListViewExplorer: TShellListView
+            Left = 0
+            Height = 491
+            Top = 0
+            Width = 807
+            Align = alClient
+            MultiSelect = True
+            ObjectTypes = [otFolders, otNonFolders]
+            ReadOnly = True
+            RowSelect = True
+            TabOrder = 0
+            ViewStyle = vsReport
+            PopupMenu = popExplorer
+            OnDblClick = ShellListViewExplorerDblClick
+            OnSelectItem = ShellListViewExplorerSelectItem
+            OnKeyDown = ShellListViewExplorerKeyDown
+          end
+        end
+      end
+    end
     object tabAbout: TTabSheet
       Caption = 'About'
       ClientHeight = 561
       ClientWidth = 1042
-      ImageIndex = 3
+      ImageIndex = 4
       object pnlAboutHeader: TPanel
         Left = 0
         Height = 85
@@ -1429,6 +1692,57 @@ object frmMain: TfrmMain
       Caption = 'Redo'
       ShortCut = 16473
       OnClick = miRedoClick
+    end
+  end
+  object popExplorer: TPopupMenu
+    OnPopup = popExplorerPopup
+    Left = 560
+    Top = 560
+    object miExpOpen: TMenuItem
+      Caption = 'Open'
+      Default = True
+      OnClick = miExpOpenClick
+    end
+    object miExpNotepad: TMenuItem
+      Caption = 'Open in Notepad Tab'
+      OnClick = miExpNotepadClick
+    end
+    object miExpPreview: TMenuItem
+      Caption = 'Show Live Preview'
+      OnClick = btnExpPreviewClick
+    end
+    object miExpReveal: TMenuItem
+      Caption = 'Reveal in Windows Explorer'
+      OnClick = miExpRevealClick
+    end
+    object miExpSep1: TMenuItem
+      Caption = '-'
+    end
+    object miExpCopyPath: TMenuItem
+      Caption = 'Copy Full Path'
+      ShortCut = 49219
+      OnClick = miExpCopyPathClick
+    end
+    object miExpCopyName: TMenuItem
+      Caption = 'Copy Filename Only'
+      OnClick = miExpCopyNameClick
+    end
+    object miExpSep2: TMenuItem
+      Caption = '-'
+    end
+    object miExpNewFolder: TMenuItem
+      Caption = 'New Folder...'
+      OnClick = btnExpNewFolderClick
+    end
+    object miExpRename: TMenuItem
+      Caption = 'Rename...'
+      ShortCut = 113
+      OnClick = miExpRenameClick
+    end
+    object miExpDelete: TMenuItem
+      Caption = 'Delete to Recycle Bin'
+      ShortCut = 46
+      OnClick = miExpDeleteClick
     end
   end
   object ImageList1: TImageList

@@ -162,6 +162,47 @@ type
     lvContextMenu: TListView;
     ImageList1: TImageList;
 
+    // The Real Explorer Components
+    tabExplorer: TTabSheet;
+    pnlExplorerTop: TPanel;
+    pnlExplorerNav: TPanel;
+    btnExpBack: TButton;
+    btnExpForward: TButton;
+    btnExpUp: TButton;
+    btnExpRefresh: TButton;
+    btnExpDefault: TButton;
+    edtExpPath: TEdit;
+    btnExpGo: TButton;
+    btnExpSetDefault: TButton;
+    btnExpPreview: TButton;
+    btnExpNewFolder: TButton;
+    pnlExpQuickBar: TPanel;
+    lblExpQuick: TLabel;
+    btnJumpDesktop: TButton;
+    btnJumpDownloads: TButton;
+    btnJumpDocuments: TButton;
+    btnJumpPictures: TButton;
+    btnJumpDriveC: TButton;
+    btnJumpUserHome: TButton;
+    pnlExpBody: TPanel;
+    pnlExpLeft: TPanel;
+    ShellTreeViewExplorer: TShellTreeView;
+    splExplorer: TSplitter;
+    pnlExpRight: TPanel;
+    ShellListViewExplorer: TShellListView;
+    popExplorer: TPopupMenu;
+    miExpOpen: TMenuItem;
+    miExpNotepad: TMenuItem;
+    miExpPreview: TMenuItem;
+    miExpReveal: TMenuItem;
+    miExpSep1: TMenuItem;
+    miExpCopyPath: TMenuItem;
+    miExpCopyName: TMenuItem;
+    miExpSep2: TMenuItem;
+    miExpNewFolder: TMenuItem;
+    miExpRename: TMenuItem;
+    miExpDelete: TMenuItem;
+
     // About Tab Components
     tabAbout: TTabSheet;
     pnlAboutHeader: TPanel;
@@ -218,6 +259,36 @@ type
     procedure pnlLinkRankGalacticClick(Sender: TObject);
     procedure pnlLinkXClick(Sender: TObject);
     procedure pnlLinkGithubClick(Sender: TObject);
+
+    // The Real Explorer Events
+    procedure btnExpBackClick(Sender: TObject);
+    procedure btnExpForwardClick(Sender: TObject);
+    procedure btnExpUpClick(Sender: TObject);
+    procedure btnExpRefreshClick(Sender: TObject);
+    procedure btnExpDefaultClick(Sender: TObject);
+    procedure edtExpPathKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure btnExpGoClick(Sender: TObject);
+    procedure btnExpSetDefaultClick(Sender: TObject);
+    procedure btnExpPreviewClick(Sender: TObject);
+    procedure btnExpNewFolderClick(Sender: TObject);
+    procedure btnJumpDesktopClick(Sender: TObject);
+    procedure btnJumpDownloadsClick(Sender: TObject);
+    procedure btnJumpDocumentsClick(Sender: TObject);
+    procedure btnJumpPicturesClick(Sender: TObject);
+    procedure btnJumpDriveCClick(Sender: TObject);
+    procedure btnJumpUserHomeClick(Sender: TObject);
+    procedure ShellTreeViewExplorerChange(Sender: TObject; Node: TTreeNode);
+    procedure ShellListViewExplorerDblClick(Sender: TObject);
+    procedure ShellListViewExplorerSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+    procedure ShellListViewExplorerKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure popExplorerPopup(Sender: TObject);
+    procedure miExpOpenClick(Sender: TObject);
+    procedure miExpNotepadClick(Sender: TObject);
+    procedure miExpRevealClick(Sender: TObject);
+    procedure miExpCopyPathClick(Sender: TObject);
+    procedure miExpCopyNameClick(Sender: TObject);
+    procedure miExpRenameClick(Sender: TObject);
+    procedure miExpDeleteClick(Sender: TObject);
 
     // Header & Tray Events
     procedure btnToggleDarkModeClick(Sender: TObject);
@@ -388,6 +459,20 @@ type
     // Status Bar & About Helpers
     procedure UpdateKeyboardAndTimerStatus;
     procedure LoadAboutContent;
+
+  private
+    // The Real Explorer State & Helpers
+    FExpDefaultFolder: string;
+    FExpHistory: TStringList;
+    FExpHistoryIndex: Integer;
+    FExpNavigating: Boolean;
+
+    procedure NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
+    procedure UpdateExplorerNavButtons;
+    procedure PreviewExplorerFile(const APath: string);
+    function GetExplorerSelectedPath: string;
+    function GetUserDesktopPath: string;
+    function GetUserSpecialPath(const AFoId: string): string;
   public
     procedure OpenFileInNotepad(const AFileName: string);
   end;
@@ -502,7 +587,7 @@ begin
       edtSearchPath.Text := 'C:\';
 
     // Notepad Options
-    cbWordWrap.Checked := Ini.ReadBool('Notepad', 'WordWrap', False);
+    cbWordWrap.Checked := Ini.ReadBool('Notepad', 'WordWrap', True);
     ColorStr := Ini.ReadString('Notepad', 'FontColor', '');
     if ColorStr <> '' then
     begin
@@ -514,6 +599,12 @@ begin
     end
     else
       FCustomFontColor := clNone;
+
+    // Explorer Options
+    FExpDefaultFolder := Ini.ReadString('Explorer', 'DefaultFolder', GetUserDesktopPath);
+    if not DirectoryExists(FExpDefaultFolder) then
+      FExpDefaultFolder := GetUserDesktopPath;
+    NavigateExplorerTo(FExpDefaultFolder);
 
   finally
     Ini.Free;
@@ -562,6 +653,9 @@ begin
       Ini.WriteString('Notepad', 'FontColor', ColorToString(FCustomFontColor))
     else
       Ini.DeleteKey('Notepad', 'FontColor');
+
+    // Explorer Options
+    Ini.WriteString('Explorer', 'DefaultFolder', FExpDefaultFolder);
   finally
     Ini.Free;
   end;
@@ -625,12 +719,21 @@ begin
   ImageList1.AddLazarusResource('chaicon-search');
   ImageList1.AddLazarusResource('chaicon-page-edit');
   ImageList1.AddLazarusResource('chaicon-settings');
+  ImageList1.AddLazarusResource('chaicon-folder-open');
   ImageList1.AddLazarusResource('chaicon-info');
   PageControl1.Images := ImageList1;
   tabSearch.ImageIndex := 0;
   tabNotepad.ImageIndex := 1;
   tabContextMenu.ImageIndex := 2;
-  tabAbout.ImageIndex := 3;
+  tabExplorer.ImageIndex := 3;
+  tabAbout.ImageIndex := 4;
+
+  // Initialize The Real Explorer state
+  FExpHistory := TStringList.Create;
+  FExpHistoryIndex := -1;
+  FExpNavigating := False;
+  FExpDefaultFolder := GetUserDesktopPath;
+  ShellTreeViewExplorer.ShellListView := ShellListViewExplorer;
 
   LoadAboutContent;
   UpdateKeyboardAndTimerStatus;
@@ -674,6 +777,7 @@ end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
+  FreeAndNil(FExpHistory);
   FreeAndNil(FWrapPlugin);
   SaveAllOptions;
 end;
@@ -1215,6 +1319,20 @@ begin
   mmoAboutBuildLog.Font.Color := TextColor;
   mmoAboutLicense.Color := EditBg;
   mmoAboutLicense.Font.Color := TextColor;
+
+  // The Real Explorer Tab
+  pnlExplorerTop.Color := HeaderBg;
+  pnlExplorerNav.Color := HeaderBg;
+  pnlExpQuickBar.Color := PanelColor;
+  lblExpQuick.Font.Color := TextColor;
+  edtExpPath.Color := EditBg;
+  edtExpPath.Font.Color := TextColor;
+  pnlExpLeft.Color := PanelColor;
+  pnlExpRight.Color := PanelColor;
+  ShellTreeViewExplorer.Color := EditBg;
+  ShellTreeViewExplorer.Font.Color := TextColor;
+  ShellListViewExplorer.Color := EditBg;
+  ShellListViewExplorer.Font.Color := TextColor;
 
   // Labels
   lblPattern.Font.Color := TextColor;
@@ -3470,6 +3588,13 @@ begin
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.3.0] - 2026-09-03');
+  mmoAboutBuildLog.Lines.Add('  * Added "The Real Explorer" tab with permanent Details view and folders first.');
+  mmoAboutBuildLog.Lines.Add('  * Configured default launch folder to user Desktop with 1-click Set Default.');
+  mmoAboutBuildLog.Lines.Add('  * Added full navigation history (Back/Fwd/Up/Refresh), address bar, and quick jump chips.');
+  mmoAboutBuildLog.Lines.Add('  * Integrated floating live preview for on-the-fly image, syntax, and hex inspection.');
+  mmoAboutBuildLog.Lines.Add('  * Added complete context menu with Recycle Bin delete, rename, and Notepad tab routing.');
+  mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.2.0] - 2026-09-03');
   mmoAboutBuildLog.Lines.Add('  * Added comprehensive About tab with project info, MIT License, and links.');
   mmoAboutBuildLog.Lines.Add('  * Integrated Twilight Surfers Development credentials and exe VersionInfo.');
@@ -3526,6 +3651,470 @@ begin
   mmoAboutLicense.Lines.Add('LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,');
   mmoAboutLicense.Lines.Add('OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE');
   mmoAboutLicense.Lines.Add('SOFTWARE.');
+end;
+
+{ ----------------------------------------------------------------------------
+  The Real Explorer Implementation
+  ---------------------------------------------------------------------------- }
+
+function TfrmMain.GetUserDesktopPath: string;
+begin
+  {$IFDEF WINDOWS}
+  Result := SysUtils.GetEnvironmentVariable('USERPROFILE') + '\Desktop';
+  if not DirectoryExists(Result) then
+    Result := SysUtils.GetEnvironmentVariable('ONEDRIVE') + '\Desktop';
+  if not DirectoryExists(Result) then
+    Result := GetUserDir + 'Desktop';
+  {$ELSE}
+  Result := GetUserDir + 'Desktop';
+  {$ENDIF}
+  if not DirectoryExists(Result) then
+    Result := GetUserDir;
+end;
+
+function TfrmMain.GetUserSpecialPath(const AFoId: string): string;
+begin
+  {$IFDEF WINDOWS}
+  if SameText(AFoId, 'Downloads') then
+    Result := SysUtils.GetEnvironmentVariable('USERPROFILE') + '\Downloads'
+  else if SameText(AFoId, 'Documents') then
+    Result := SysUtils.GetEnvironmentVariable('USERPROFILE') + '\Documents'
+  else if SameText(AFoId, 'Pictures') then
+    Result := SysUtils.GetEnvironmentVariable('USERPROFILE') + '\Pictures'
+  else
+    Result := SysUtils.GetEnvironmentVariable('USERPROFILE');
+  {$ELSE}
+  Result := GetUserDir + AFoId;
+  {$ENDIF}
+  if not DirectoryExists(Result) then
+    Result := GetUserDir;
+end;
+
+function TfrmMain.GetExplorerSelectedPath: string;
+begin
+  Result := '';
+  if Assigned(ShellListViewExplorer.Selected) then
+    Result := ShellListViewExplorer.GetPathFromItem(ShellListViewExplorer.Selected)
+  else
+    Result := ShellListViewExplorer.Root;
+end;
+
+procedure TfrmMain.UpdateExplorerNavButtons;
+begin
+  btnExpBack.Enabled := (FExpHistoryIndex > 0);
+  btnExpForward.Enabled := (FExpHistoryIndex < FExpHistory.Count - 1);
+end;
+
+procedure TfrmMain.NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
+var
+  CleanPath: string;
+begin
+  CleanPath := Trim(APath);
+  if CleanPath = '' then Exit;
+  if not DirectoryExists(CleanPath) then
+  begin
+    MessageDlg('Cannot Find Folder', 'The path "' + CleanPath + '" does not exist.', mtError, [mbOK], 0);
+    Exit;
+  end;
+
+  FExpNavigating := True;
+  try
+    ShellListViewExplorer.Root := CleanPath;
+    edtExpPath.Text := CleanPath;
+
+    try
+      ShellTreeViewExplorer.Path := CleanPath;
+    except
+    end;
+
+    if AddToHistory then
+    begin
+      while FExpHistory.Count > FExpHistoryIndex + 1 do
+        FExpHistory.Delete(FExpHistory.Count - 1);
+      FExpHistory.Add(CleanPath);
+      FExpHistoryIndex := FExpHistory.Count - 1;
+    end;
+
+    UpdateExplorerNavButtons;
+    SetStatus(' Explorer: ' + CleanPath);
+  finally
+    FExpNavigating := False;
+  end;
+end;
+
+procedure TfrmMain.btnExpBackClick(Sender: TObject);
+begin
+  if FExpHistoryIndex > 0 then
+  begin
+    Dec(FExpHistoryIndex);
+    NavigateExplorerTo(FExpHistory[FExpHistoryIndex], False);
+  end;
+end;
+
+procedure TfrmMain.btnExpForwardClick(Sender: TObject);
+begin
+  if FExpHistoryIndex < FExpHistory.Count - 1 then
+  begin
+    Inc(FExpHistoryIndex);
+    NavigateExplorerTo(FExpHistory[FExpHistoryIndex], False);
+  end;
+end;
+
+procedure TfrmMain.btnExpUpClick(Sender: TObject);
+var
+  CurPath, ParentPath: string;
+begin
+  CurPath := ShellListViewExplorer.Root;
+  ParentPath := ExtractFileDir(ExcludeTrailingPathDelimiter(CurPath));
+  if (ParentPath <> '') and DirectoryExists(ParentPath) and (ParentPath <> CurPath) then
+    NavigateExplorerTo(ParentPath);
+end;
+
+procedure TfrmMain.btnExpRefreshClick(Sender: TObject);
+begin
+  ShellListViewExplorer.UpdateView;
+  try
+    ShellTreeViewExplorer.Refresh(ShellTreeViewExplorer.Selected);
+  except
+  end;
+end;
+
+procedure TfrmMain.btnExpDefaultClick(Sender: TObject);
+begin
+  NavigateExplorerTo(FExpDefaultFolder);
+end;
+
+procedure TfrmMain.btnExpSetDefaultClick(Sender: TObject);
+var
+  CurPath: string;
+begin
+  CurPath := ShellListViewExplorer.Root;
+  if DirectoryExists(CurPath) then
+  begin
+    FExpDefaultFolder := CurPath;
+    SaveAllOptions;
+    MessageDlg('Default Folder Saved', 'The Real Explorer will now always open to:'#13#10 + CurPath,
+      mtInformation, [mbOK], 0);
+  end;
+end;
+
+procedure TfrmMain.btnExpPreviewClick(Sender: TObject);
+var
+  SelPath: string;
+begin
+  if frmPreview.Visible then
+    frmPreview.Hide
+  else
+  begin
+    SelPath := GetExplorerSelectedPath;
+    if (SelPath <> '') and FileExists(SelPath) then
+      PreviewExplorerFile(SelPath)
+    else
+      frmPreview.Show;
+  end;
+end;
+
+procedure TfrmMain.PreviewExplorerFile(const APath: string);
+var
+  FS: TFileStream;
+  SizeBytes: Int64;
+  SizeStr, DateStr, TypeStr, FileName: string;
+begin
+  if not FileExists(APath) then Exit;
+  if not IsPreviewableFile(APath) then Exit;
+  if Assigned(frmPreview) and frmPreview.Visible and (frmPreview.CurrentPath = APath) then Exit;
+
+  FileName := ExtractFileName(APath);
+  try
+    FS := TFileStream.Create(APath, fmOpenRead or fmShareDenyNone);
+    try
+      SizeBytes := FS.Size;
+    finally
+      FS.Free;
+    end;
+  except
+    SizeBytes := 0;
+  end;
+
+  SizeStr := FormatFileSize(SizeBytes);
+  DateStr := FormatDateTime('yyyy-mm-dd hh:nn', SafeFileDateToDateTime(FileAge(APath)));
+  TypeStr := UpperCase(ExtractFileExt(APath));
+  if TypeStr = '' then TypeStr := 'File';
+
+  if Assigned(frmPreview) then
+  begin
+    frmPreview.ShowFile(APath, FileName, SizeStr, DateStr, TypeStr, SizeBytes, FDarkMode);
+    if not frmPreview.Visible then
+      frmPreview.Show;
+    frmPreview.BringToFront;
+  end;
+end;
+
+procedure TfrmMain.btnExpNewFolderClick(Sender: TObject);
+var
+  FolderName, NewPath: string;
+begin
+  FolderName := 'New Folder';
+  if InputQuery('New Folder', 'Enter name for the new folder:', FolderName) then
+  begin
+    NewPath := IncludeTrailingPathDelimiter(ShellListViewExplorer.Root) + FolderName;
+    if CreateDir(NewPath) then
+    begin
+      ShellListViewExplorer.UpdateView;
+      SetStatus(' Created folder: ' + NewPath);
+    end
+    else
+      MessageDlg('Error', 'Could not create folder: ' + NewPath, mtError, [mbOK], 0);
+  end;
+end;
+
+procedure TfrmMain.btnJumpDesktopClick(Sender: TObject);
+begin
+  NavigateExplorerTo(GetUserDesktopPath);
+end;
+
+procedure TfrmMain.btnJumpDownloadsClick(Sender: TObject);
+begin
+  NavigateExplorerTo(GetUserSpecialPath('Downloads'));
+end;
+
+procedure TfrmMain.btnJumpDocumentsClick(Sender: TObject);
+begin
+  NavigateExplorerTo(GetUserSpecialPath('Documents'));
+end;
+
+procedure TfrmMain.btnJumpPicturesClick(Sender: TObject);
+begin
+  NavigateExplorerTo(GetUserSpecialPath('Pictures'));
+end;
+
+procedure TfrmMain.btnJumpDriveCClick(Sender: TObject);
+begin
+  NavigateExplorerTo('C:\');
+end;
+
+procedure TfrmMain.btnJumpUserHomeClick(Sender: TObject);
+begin
+  NavigateExplorerTo(GetUserDir);
+end;
+
+procedure TfrmMain.edtExpPathKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if Key = VK_RETURN then
+  begin
+    Key := 0;
+    NavigateExplorerTo(edtExpPath.Text);
+  end;
+end;
+
+procedure TfrmMain.btnExpGoClick(Sender: TObject);
+begin
+  NavigateExplorerTo(edtExpPath.Text);
+end;
+
+procedure TfrmMain.ShellTreeViewExplorerChange(Sender: TObject; Node: TTreeNode);
+begin
+  if FExpNavigating then Exit;
+  if (Node <> nil) and DirectoryExists(ShellTreeViewExplorer.Path) then
+  begin
+    if ShellListViewExplorer.Root <> ShellTreeViewExplorer.Path then
+      NavigateExplorerTo(ShellTreeViewExplorer.Path);
+  end;
+end;
+
+procedure TfrmMain.ShellListViewExplorerDblClick(Sender: TObject);
+var
+  SelPath, Ext: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath = '' then Exit;
+
+  if DirectoryExists(SelPath) then
+  begin
+    NavigateExplorerTo(SelPath);
+    Exit;
+  end;
+
+  Ext := LowerCase(ExtractFileExt(SelPath));
+  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or (Ext = '.log') or
+     (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or
+     (Ext = '.py') or (Ext = '.json') or (Ext = '.xml') or (Ext = '.html') or
+     (Ext = '.css') or (Ext = '.js') or (Ext = '.sql') or (Ext = '.bat') or
+     (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.yaml') or (Ext = '.yml') then
+  begin
+    OpenFileInNotepad(SelPath);
+    PageControl1.ActivePage := tabNotepad;
+  end
+  else
+  begin
+    OpenDocument(SelPath);
+  end;
+end;
+
+procedure TfrmMain.ShellListViewExplorerSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+var
+  SelPath: string;
+begin
+  if not Selected or (Item = nil) then Exit;
+  SelPath := ShellListViewExplorer.GetPathFromItem(Item);
+  if frmPreview.Visible and FileExists(SelPath) then
+    PreviewExplorerFile(SelPath);
+end;
+
+procedure TfrmMain.ShellListViewExplorerKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  case Key of
+    VK_RETURN:
+    begin
+      Key := 0;
+      ShellListViewExplorerDblClick(Sender);
+    end;
+    VK_F2:
+    begin
+      Key := 0;
+      miExpRenameClick(Sender);
+    end;
+    VK_DELETE:
+    begin
+      Key := 0;
+      miExpDeleteClick(Sender);
+    end;
+    VK_BACK:
+    begin
+      Key := 0;
+      btnExpUpClick(Sender);
+    end;
+  end;
+end;
+
+procedure TfrmMain.popExplorerPopup(Sender: TObject);
+var
+  HasSel: Boolean;
+begin
+  HasSel := (ShellListViewExplorer.Selected <> nil);
+  miExpOpen.Enabled := HasSel;
+  miExpNotepad.Enabled := HasSel;
+  miExpPreview.Enabled := HasSel;
+  miExpReveal.Enabled := True;
+  miExpCopyPath.Enabled := HasSel;
+  miExpCopyName.Enabled := HasSel;
+  miExpRename.Enabled := HasSel;
+  miExpDelete.Enabled := HasSel;
+end;
+
+procedure TfrmMain.miExpOpenClick(Sender: TObject);
+begin
+  ShellListViewExplorerDblClick(Sender);
+end;
+
+procedure TfrmMain.miExpNotepadClick(Sender: TObject);
+var
+  SelPath: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if (SelPath <> '') and FileExists(SelPath) then
+  begin
+    OpenFileInNotepad(SelPath);
+    PageControl1.ActivePage := tabNotepad;
+  end;
+end;
+
+procedure TfrmMain.miExpRevealClick(Sender: TObject);
+var
+  SelPath: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath = '' then
+    SelPath := ShellListViewExplorer.Root;
+  {$IFDEF WINDOWS}
+  if FileExists(SelPath) then
+    ShellExecute(Handle, 'open', 'explorer.exe', PChar('/select,"' + SelPath + '"'), nil, SW_SHOWNORMAL)
+  else
+    ShellExecute(Handle, 'open', PChar(SelPath), nil, nil, SW_SHOWNORMAL);
+  {$ELSE}
+  OpenDocument(ExtractFileDir(SelPath));
+  {$ENDIF}
+end;
+
+procedure TfrmMain.miExpCopyPathClick(Sender: TObject);
+var
+  SelPath: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath <> '' then
+    Clipboard.AsText := SelPath;
+end;
+
+procedure TfrmMain.miExpCopyNameClick(Sender: TObject);
+var
+  SelPath: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath <> '' then
+    Clipboard.AsText := ExtractFileName(SelPath);
+end;
+
+procedure TfrmMain.miExpRenameClick(Sender: TObject);
+var
+  SelPath, OldName, NewName, NewPath, Dir: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath = '' then Exit;
+
+  OldName := ExtractFileName(SelPath);
+  NewName := OldName;
+  if InputQuery('Rename', 'Enter new name for "' + OldName + '":', NewName) then
+  begin
+    if (NewName <> '') and (NewName <> OldName) then
+    begin
+      Dir := ExtractFileDir(SelPath);
+      NewPath := IncludeTrailingPathDelimiter(Dir) + NewName;
+      if RenameFile(SelPath, NewPath) then
+      begin
+        ShellListViewExplorer.UpdateView;
+        SetStatus(' Renamed to: ' + NewPath);
+      end
+      else
+        MessageDlg('Error', 'Could not rename to: ' + NewPath, mtError, [mbOK], 0);
+    end;
+  end;
+end;
+
+procedure TfrmMain.miExpDeleteClick(Sender: TObject);
+var
+  SelPath: string;
+  Res: Integer;
+  {$IFDEF WINDOWS}
+  ShOp: TSHFileOpStruct;
+  FromBuf: array of Char;
+  {$ENDIF}
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath = '' then Exit;
+
+  Res := MessageDlg('Confirm Delete', 'Are you sure you want to send this item to the Recycle Bin?'#13#10 + SelPath,
+    mtConfirmation, [mbYes, mbNo], 0);
+  if Res <> mrYes then Exit;
+
+  {$IFDEF WINDOWS}
+  SetLength(FromBuf, Length(SelPath) + 2);
+  Move(SelPath[1], FromBuf[0], Length(SelPath));
+  FromBuf[Length(SelPath)] := #0;
+  FromBuf[Length(SelPath) + 1] := #0;
+
+  FillChar(ShOp, SizeOf(ShOp), 0);
+  ShOp.Wnd := Handle;
+  ShOp.wFunc := FO_DELETE;
+  ShOp.pFrom := @FromBuf[0];
+  ShOp.fFlags := FOF_ALLOWUNDO or FOF_SILENT or FOF_NOCONFIRMATION;
+  SHFileOperation(ShOp);
+  {$ELSE}
+  if DirectoryExists(SelPath) then
+    RemoveDir(SelPath)
+  else
+    DeleteFile(SelPath);
+  {$ENDIF}
+  ShellListViewExplorer.UpdateView;
 end;
 
 initialization
