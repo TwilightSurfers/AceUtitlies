@@ -116,6 +116,10 @@ type
     miOpenInNotepad: TMenuItem;
     miRevealInExplorer: TMenuItem;
     miOpenFile: TMenuItem;
+    miSepResults1: TMenuItem;
+    miCopyFileName: TMenuItem;
+    miCopyFilePath: TMenuItem;
+    miCopyFullPath: TMenuItem;
     miCopyPath: TMenuItem;
 
     TrayIcon1: TTrayIcon;
@@ -169,9 +173,13 @@ type
     procedure lvResultsColumnClick(Sender: TObject; Column: TListColumn);
     procedure lvResultsCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
     procedure lvResultsDeletion(Sender: TObject; Item: TListItem);
+    procedure lvResultsContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
     procedure miOpenInNotepadClick(Sender: TObject);
     procedure miRevealInExplorerClick(Sender: TObject);
     procedure miOpenFileClick(Sender: TObject);
+    procedure miCopyFileNameClick(Sender: TObject);
+    procedure miCopyFilePathClick(Sender: TObject);
+    procedure miCopyFullPathClick(Sender: TObject);
     procedure miCopyPathClick(Sender: TObject);
 
     // Notepad Tab Events
@@ -1693,16 +1701,130 @@ begin
   {$ENDIF}
 end;
 
-procedure TfrmMain.miCopyPathClick(Sender: TObject);
+procedure TfrmMain.lvResultsContextPopup(Sender: TObject; MousePos: TPoint;
+  var Handled: Boolean);
 var
-  FullPath: string;
+  Item: TListItem;
+  HasSelection: Boolean;
 begin
-  if lvResults.Selected <> nil then
+  if (MousePos.X <> -1) and (MousePos.Y <> -1) then
   begin
-    FullPath := IncludeTrailingPathDelimiter(lvResults.Selected.SubItems[0]) + lvResults.Selected.Caption;
-    Clipboard.AsText := FullPath;
-    SetStatus(' Path copied to clipboard: ' + FullPath);
+    Item := lvResults.GetItemAt(MousePos.X, MousePos.Y);
+    if Item <> nil then
+      lvResults.Selected := Item;
   end;
+
+  HasSelection := (lvResults.Selected <> nil);
+  miOpenInNotepad.Enabled := HasSelection;
+  miRevealInExplorer.Enabled := HasSelection;
+  miOpenFile.Enabled := HasSelection;
+  if Assigned(miCopyFileName) then miCopyFileName.Enabled := HasSelection;
+  if Assigned(miCopyFilePath) then miCopyFilePath.Enabled := HasSelection;
+  if Assigned(miCopyFullPath) then miCopyFullPath.Enabled := HasSelection;
+  if Assigned(miCopyPath) then miCopyPath.Enabled := HasSelection;
+end;
+
+procedure TfrmMain.miCopyFileNameClick(Sender: TObject);
+var
+  S: string;
+  i: Integer;
+  SL: TStringList;
+begin
+  if lvResults.Selected = nil then Exit;
+
+  if lvResults.SelCount > 1 then
+  begin
+    SL := TStringList.Create;
+    try
+      for i := 0 to lvResults.Items.Count - 1 do
+        if lvResults.Items[i].Selected then
+          SL.Add(lvResults.Items[i].Caption);
+      Clipboard.AsText := SL.Text;
+      SetStatus(Format(' %d filenames copied to clipboard', [SL.Count]));
+    finally
+      SL.Free;
+    end;
+  end
+  else
+  begin
+    S := lvResults.Selected.Caption;
+    Clipboard.AsText := S;
+    SetStatus(' Filename copied to clipboard: ' + S);
+  end;
+end;
+
+procedure TfrmMain.miCopyFilePathClick(Sender: TObject);
+var
+  S: string;
+  i: Integer;
+  SL: TStringList;
+begin
+  if lvResults.Selected = nil then Exit;
+
+  if lvResults.SelCount > 1 then
+  begin
+    SL := TStringList.Create;
+    try
+      for i := 0 to lvResults.Items.Count - 1 do
+        if lvResults.Items[i].Selected and (lvResults.Items[i].SubItems.Count > 0) then
+          SL.Add(lvResults.Items[i].SubItems[0]);
+      Clipboard.AsText := SL.Text;
+      SetStatus(Format(' %d file paths copied to clipboard', [SL.Count]));
+    finally
+      SL.Free;
+    end;
+  end
+  else
+  begin
+    if lvResults.Selected.SubItems.Count > 0 then
+      S := lvResults.Selected.SubItems[0]
+    else
+      S := '';
+    Clipboard.AsText := S;
+    SetStatus(' File path copied to clipboard: ' + S);
+  end;
+end;
+
+procedure TfrmMain.miCopyFullPathClick(Sender: TObject);
+var
+  S: string;
+  i: Integer;
+  SL: TStringList;
+begin
+  if lvResults.Selected = nil then Exit;
+
+  if lvResults.SelCount > 1 then
+  begin
+    SL := TStringList.Create;
+    try
+      for i := 0 to lvResults.Items.Count - 1 do
+        if lvResults.Items[i].Selected then
+        begin
+          if lvResults.Items[i].SubItems.Count > 0 then
+            SL.Add(IncludeTrailingPathDelimiter(lvResults.Items[i].SubItems[0]) + lvResults.Items[i].Caption)
+          else
+            SL.Add(lvResults.Items[i].Caption);
+        end;
+      Clipboard.AsText := SL.Text;
+      SetStatus(Format(' %d full paths copied to clipboard', [SL.Count]));
+    finally
+      SL.Free;
+    end;
+  end
+  else
+  begin
+    if lvResults.Selected.SubItems.Count > 0 then
+      S := IncludeTrailingPathDelimiter(lvResults.Selected.SubItems[0]) + lvResults.Selected.Caption
+    else
+      S := lvResults.Selected.Caption;
+    Clipboard.AsText := S;
+    SetStatus(' Path and filename copied to clipboard: ' + S);
+  end;
+end;
+
+procedure TfrmMain.miCopyPathClick(Sender: TObject);
+begin
+  miCopyFullPathClick(Sender);
 end;
 
 { ----------------------------------------------------------------------------

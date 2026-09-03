@@ -20,6 +20,7 @@ Tired of Windows Search indexing freezes, search loops, or failing to find files
 - **Content Search**: Optional full-text scan inside files with configurable case sensitivity.
 - **Interactive Multi-Column Header Sorting**: Click any column (**File Name**, **Folder**, **Size**, **Modified Date**, **Type**) to sort Ascending (`▲`) or Descending (`▼`). File sizes sort by true numeric byte count (so 10 MB correctly sorts higher than 2 KB).
 - **Directory Tree & Quick Buttons**: Includes a full `TShellTreeView`, directory browse dialog, and one-click quick jump buttons for `C:\`, User Home, and Desktop.
+- **Rich Results Context Menu**: Right-click any search result to Open in Notepad, Reveal in Explorer, Open / Run File, **Copy Filename Only**, **Copy File Path Only**, or **Copy File Path and Name** (with multi-item selection support).
 
 ### 👁️ 2. Floating Live File Preview Window
 Preview files dynamically on a single click without blocking the main search window:

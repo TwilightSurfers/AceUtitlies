@@ -378,6 +378,7 @@ object frmMain: TfrmMain
             OnClick = lvResultsClick
             OnColumnClick = lvResultsColumnClick
             OnCompare = lvResultsCompare
+            OnContextPopup = lvResultsContextPopup
             OnDblClick = lvResultsDblClick
             OnDeletion = lvResultsDeletion
             OnSelectItem = lvResultsSelectItem
@@ -707,9 +708,20 @@ object frmMain: TfrmMain
       Caption = 'Open / Run File'
       OnClick = miOpenFileClick
     end
-    object miCopyPath: TMenuItem
-      Caption = 'Copy Full Path'
-      OnClick = miCopyPathClick
+    object miSepResults1: TMenuItem
+      Caption = '-'
+    end
+    object miCopyFileName: TMenuItem
+      Caption = 'Copy Filename Only'
+      OnClick = miCopyFileNameClick
+    end
+    object miCopyFilePath: TMenuItem
+      Caption = 'Copy File Path Only'
+      OnClick = miCopyFilePathClick
+    end
+    object miCopyFullPath: TMenuItem
+      Caption = 'Copy File Path and Name'
+      OnClick = miCopyFullPathClick
     end
   end
   object TrayIcon1: TTrayIcon
