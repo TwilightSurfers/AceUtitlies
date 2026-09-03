@@ -499,6 +499,7 @@ object frmMain: TfrmMain
             'Java'
             'Diff'
             'Shell Script'
+            'Markdown'
           )
           Style = csDropDownList
           TabOrder = 8

@@ -12,7 +12,7 @@ uses
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
-  LConvEncoding;
+  SynHighlighterMarkdown, LConvEncoding;
 
 type
 
@@ -76,6 +76,7 @@ type
     FHighlighterSh: TSynUNIXShellScriptSyn;
     FHighlighterPerl: TSynPerlSyn;
     FHighlighterVB: TSynVBSyn;
+    FHighlighterMarkdown: TSynMarkdownSyn;
 
     procedure AutoDetectHighlighter(const AFileName: string);
     procedure ApplyHighlighterTheme(ADark: Boolean);
@@ -137,6 +138,7 @@ begin
   FHighlighterSh := TSynUNIXShellScriptSyn.Create(Self);
   FHighlighterPerl := TSynPerlSyn.Create(Self);
   FHighlighterVB := TSynVBSyn.Create(Self);
+  FHighlighterMarkdown := TSynMarkdownSyn.Create(Self);
 
   FormStyle := fsStayOnTop;
   Position := poMainFormCenter;
@@ -462,6 +464,38 @@ begin
   FHighlighterIni.StringAttri.Foreground := StringCol;
   FHighlighterIni.NumberAttri.Foreground := NumberCol;
   FHighlighterIni.SymbolAttri.Foreground := SymbolCol;
+
+  // 13. Markdown
+  FHighlighterMarkdown.HeaderAttri.Foreground := KeyCol;
+  FHighlighterMarkdown.HeaderAttri.Style := [fsBold];
+  FHighlighterMarkdown.CodeBlockAttri.Foreground := ValCol;
+  FHighlighterMarkdown.InlineCodeAttri.Foreground := ValCol;
+  FHighlighterMarkdown.BlockQuoteAttri.Foreground := SymbolCol;
+  FHighlighterMarkdown.BlockQuoteAttri.Style := [fsItalic];
+  FHighlighterMarkdown.ListAttri.Foreground := BracketCol;
+  FHighlighterMarkdown.ListAttri.Style := [fsBold];
+  if ADark then
+  begin
+    FHighlighterMarkdown.BoldAttri.Foreground := clWhite;
+    FHighlighterMarkdown.ItalicAttri.Foreground := StringCol;
+    FHighlighterMarkdown.LinkTextAttri.Foreground := TagCol;
+    FHighlighterMarkdown.LinkUrlAttri.Foreground := $00808080;
+  end
+  else
+  begin
+    FHighlighterMarkdown.BoldAttri.Foreground := clBlack;
+    FHighlighterMarkdown.ItalicAttri.Foreground := $00303030;
+    FHighlighterMarkdown.LinkTextAttri.Foreground := KeyCol;
+    FHighlighterMarkdown.LinkUrlAttri.Foreground := $00707070;
+  end;
+  FHighlighterMarkdown.BoldAttri.Style := [fsBold];
+  FHighlighterMarkdown.ItalicAttri.Style := [fsItalic];
+  FHighlighterMarkdown.LinkTextAttri.Style := [fsUnderline];
+  FHighlighterMarkdown.RuleAttri.Foreground := CommentCol;
+  FHighlighterMarkdown.TagAttri.Foreground := TagCol;
+  FHighlighterMarkdown.CommentAttri.Foreground := CommentCol;
+  FHighlighterMarkdown.CommentAttri.Style := [fsItalic];
+  FHighlighterMarkdown.TextAttri.Foreground := SymbolCol;
 end;
 
 procedure TfrmPreview.AutoDetectHighlighter(const AFileName: string);
@@ -531,9 +565,13 @@ begin
   else if (Ext = '.diff') or (Ext = '.patch') then
     synPreview.Highlighter := FHighlighterDiff
 
-  // Config / INI / Markdown / YAML / TOML
+  // Markdown
+  else if (Ext = '.md') or (Ext = '.markdown') or (Ext = '.mdown') or (Ext = '.mkd') then
+    synPreview.Highlighter := FHighlighterMarkdown
+
+  // Config / INI / YAML / TOML
   else if (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or
-          (Ext = '.md') or (Ext = '.markdown') or (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
+          (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
     synPreview.Highlighter := FHighlighterIni
 
   else

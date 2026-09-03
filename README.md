@@ -33,7 +33,7 @@ Preview files dynamically on a single click without blocking the main search win
 ### 📝 3. Windows 11 Notepad Replacement
 A complete, tabbed text and code editor powered by `TSynEdit`:
 - **File Management**: New, Open, Save, and Save As with dirty-tracking prompts so you never lose unsaved changes.
-- **Multi-Language Syntax Highlighting**: Includes syntax highlighters for Pascal (`.pas`, `.pp`, `.lpr`), Python (`.py`), HTML/XML (`.html`, `.xml`), CSS (`.css`), JavaScript/JSON (`.js`, `.json`), SQL (`.sql`), Batch (`.bat`, `.cmd`), and INI/Markdown (`.ini`, `.md`).
+- **Multi-Language Syntax Highlighting**: Includes syntax highlighters for Pascal (`.pas`, `.pp`, `.lpr`), Python (`.py`), HTML/XML (`.html`, `.xml`), CSS (`.css`), JavaScript/JSON (`.js`, `.json`), SQL (`.sql`), Batch (`.bat`, `.cmd`), INI/Config (`.ini`, `.cfg`), and a **dedicated custom Markdown syntax highlighter** (`.md`, `.markdown`) with header, code block, list, blockquote, link, and formatting styles for both dark and light modes.
 - **Find & Replace Bar**: Sleek slide-down search bar with Find Next, Replace, Replace All, Case Sensitivity, and Whole Word matching.
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
 - **Status Bar**: Live line number, column number, character position, and modified state tracker.

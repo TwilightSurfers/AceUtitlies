@@ -11,7 +11,8 @@ uses
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterHTML,
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
-  SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding, LazUTF8, LCLType;
+  SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding, LazUTF8, LCLType,
+  SynHighlighterMarkdown;
 
 type
   PResultInfo = ^TResultInfo;
@@ -234,6 +235,7 @@ type
     FHighlighterIni: TSynIniSyn;
     FHighlighterDiff: TSynDiffSyn;
     FHighlighterSh: TSynUNIXShellScriptSyn;
+    FHighlighterMarkdown: TSynMarkdownSyn;
 
     // Search Helpers
     procedure DoSearch(const APath, APattern, AContent: string; ARecursive, ACaseSensitive, AIncludeFolders: Boolean);
@@ -482,6 +484,7 @@ begin
   FHighlighterIni := TSynIniSyn.Create(Self);
   FHighlighterDiff := TSynDiffSyn.Create(Self);
   FHighlighterSh := TSynUNIXShellScriptSyn.Create(Self);
+  FHighlighterMarkdown := TSynMarkdownSyn.Create(Self);
 
   cmbSyntax.ItemIndex := 0;
   SynEdit1.Highlighter := nil;
@@ -1200,6 +1203,38 @@ begin
   FHighlighterIni.StringAttri.Foreground := StringCol;
   FHighlighterIni.NumberAttri.Foreground := NumberCol;
   FHighlighterIni.SymbolAttri.Foreground := SymbolCol;
+
+  // 13. Markdown
+  FHighlighterMarkdown.HeaderAttri.Foreground := KeyCol;
+  FHighlighterMarkdown.HeaderAttri.Style := [fsBold];
+  FHighlighterMarkdown.CodeBlockAttri.Foreground := ValCol;
+  FHighlighterMarkdown.InlineCodeAttri.Foreground := ValCol;
+  FHighlighterMarkdown.BlockQuoteAttri.Foreground := SymbolCol;
+  FHighlighterMarkdown.BlockQuoteAttri.Style := [fsItalic];
+  FHighlighterMarkdown.ListAttri.Foreground := BracketCol;
+  FHighlighterMarkdown.ListAttri.Style := [fsBold];
+  if ADark then
+  begin
+    FHighlighterMarkdown.BoldAttri.Foreground := clWhite;
+    FHighlighterMarkdown.ItalicAttri.Foreground := StringCol;
+    FHighlighterMarkdown.LinkTextAttri.Foreground := TagCol;
+    FHighlighterMarkdown.LinkUrlAttri.Foreground := $00808080;
+  end
+  else
+  begin
+    FHighlighterMarkdown.BoldAttri.Foreground := clBlack;
+    FHighlighterMarkdown.ItalicAttri.Foreground := $00303030;
+    FHighlighterMarkdown.LinkTextAttri.Foreground := KeyCol;
+    FHighlighterMarkdown.LinkUrlAttri.Foreground := $00707070;
+  end;
+  FHighlighterMarkdown.BoldAttri.Style := [fsBold];
+  FHighlighterMarkdown.ItalicAttri.Style := [fsItalic];
+  FHighlighterMarkdown.LinkTextAttri.Style := [fsUnderline];
+  FHighlighterMarkdown.RuleAttri.Foreground := CommentCol;
+  FHighlighterMarkdown.TagAttri.Foreground := TagCol;
+  FHighlighterMarkdown.CommentAttri.Foreground := CommentCol;
+  FHighlighterMarkdown.CommentAttri.Style := [fsItalic];
+  FHighlighterMarkdown.TextAttri.Foreground := SymbolCol;
 end;
 
 procedure TfrmMain.btnToggleDarkModeClick(Sender: TObject);
@@ -2104,7 +2139,7 @@ begin
   else if (Ext = '.bat') or (Ext = '.cmd') then
     cmbSyntax.ItemIndex := 7
   else if (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or
-          (Ext = '.md') or (Ext = '.markdown') or (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
+          (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
     cmbSyntax.ItemIndex := 8
   else if (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.phtml') then
     cmbSyntax.ItemIndex := 9
@@ -2117,6 +2152,8 @@ begin
     cmbSyntax.ItemIndex := 12
   else if (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.env') then
     cmbSyntax.ItemIndex := 13
+  else if (Ext = '.md') or (Ext = '.markdown') or (Ext = '.mdown') or (Ext = '.mkd') then
+    cmbSyntax.ItemIndex := 14
   else
     cmbSyntax.ItemIndex := 0;
 
@@ -2139,6 +2176,7 @@ begin
     11: SynEdit1.Highlighter := FHighlighterJava;
     12: SynEdit1.Highlighter := FHighlighterDiff;
     13: SynEdit1.Highlighter := FHighlighterSh;
+    14: SynEdit1.Highlighter := FHighlighterMarkdown;
     else
       SynEdit1.Highlighter := nil;
   end;
