@@ -74,6 +74,7 @@ object frmMain: TfrmMain
     Align = alClient
     TabIndex = 0
     TabOrder = 1
+    OnChange = PageControl1Change
     object tabSearch: TTabSheet
       Caption = 'File Search'
       ClientHeight = 561
@@ -654,6 +655,174 @@ object frmMain: TfrmMain
           Width = 240
           Caption = 'Line: 1  Col: 1 | Length: 0 | UTF-8 | Saved'
         end
+      end
+    end
+    object tabContextMenu: TTabSheet
+      Caption = 'Context Menu Mgtmt'
+      ClientHeight = 561
+      ClientWidth = 1042
+      object pnlContextMenuToolbar: TPanel
+        Left = 0
+        Height = 40
+        Top = 0
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 40
+        ClientWidth = 1042
+        TabOrder = 0
+        object btnRefreshContextMenu: TButton
+          Left = 8
+          Height = 28
+          Top = 6
+          Width = 85
+          Caption = 'Refresh List'
+          TabOrder = 0
+          OnClick = btnRefreshContextMenuClick
+        end
+        object btnDeleteContextVerb: TButton
+          Left = 99
+          Height = 28
+          Top = 6
+          Width = 150
+          Caption = 'Remove Selected Entry'
+          TabOrder = 1
+          OnClick = btnDeleteContextVerbClick
+        end
+        object btnCleanStaleVerbs: TButton
+          Left = 255
+          Height = 28
+          Top = 6
+          Width = 145
+          Caption = 'Clean All Stale Entries'
+          TabOrder = 2
+          OnClick = btnCleanStaleVerbsClick
+        end
+        object btnTakeoverAssoc: TButton
+          Left = 406
+          Height = 28
+          Top = 6
+          Width = 210
+          Caption = 'Take Back .txt & .md Associations'
+          TabOrder = 3
+          OnClick = btnTakeoverAssocClick
+        end
+        object lblContextMenuStatus: TLabel
+          Left = 624
+          Height = 15
+          Top = 12
+          Width = 405
+          Anchors = [akTop, akLeft, akRight]
+          Caption = 'Scans per-user context menu shell verbs in HKCU.'
+        end
+      end
+      object pnlContextMenuBottom: TPanel
+        Left = 0
+        Height = 76
+        Top = 485
+        Width = 1042
+        Align = alBottom
+        BevelOuter = bvNone
+        ClientHeight = 76
+        ClientWidth = 1042
+        TabOrder = 1
+        object lblEditVerbLabel: TLabel
+          Left = 8
+          Height = 15
+          Top = 12
+          Width = 72
+          Caption = 'Display Name:'
+        end
+        object edtEditVerbLabel: TEdit
+          Left = 86
+          Height = 23
+          Top = 8
+          Width = 220
+          TabOrder = 0
+        end
+        object lblEditVerbCmd: TLabel
+          Left = 316
+          Height = 15
+          Top = 12
+          Width = 83
+          Caption = 'Command Line:'
+        end
+        object edtEditVerbCmd: TEdit
+          Left = 405
+          Height = 23
+          Top = 8
+          Width = 445
+          Anchors = [akTop, akLeft, akRight]
+          TabOrder = 1
+        end
+        object btnBrowseRemapExe: TButton
+          Left = 856
+          Height = 25
+          Top = 7
+          Width = 80
+          Anchors = [akTop, akRight]
+          Caption = 'Browse...'
+          TabOrder = 2
+          OnClick = btnBrowseRemapExeClick
+        end
+        object btnApplyRemap: TButton
+          Left = 942
+          Height = 25
+          Top = 7
+          Width = 92
+          Anchors = [akTop, akRight]
+          Caption = 'Save Changes'
+          TabOrder = 3
+          OnClick = btnApplyRemapClick
+        end
+        object lblRemapHelp: TLabel
+          Left = 86
+          Height = 15
+          Top = 42
+          Width = 750
+          Caption = 'Select an entry above to inspect or edit its display label and executable command line without modifying system files.'
+          Font.Color = clGray
+          ParentFont = False
+        end
+      end
+      object lvContextMenu: TListView
+        Left = 0
+        Height = 445
+        Top = 40
+        Width = 1042
+        Align = alClient
+        Columns = <
+          item
+            Caption = 'Scope'
+            Width = 130
+          end
+          item
+            Caption = 'Verb Key'
+            Width = 140
+          end
+          item
+            Caption = 'Menu Display Text'
+            Width = 200
+          end
+          item
+            Caption = 'Target Command Line'
+            Width = 300
+          end
+          item
+            Caption = 'Status'
+            Width = 140
+          end
+          item
+            Caption = 'Registry SubKey'
+            Width = 240
+          end>
+        GridLines = True
+        ReadOnly = True
+        RowSelect = True
+        TabOrder = 2
+        ViewStyle = vsReport
+        OnCustomDrawItem = lvContextMenuCustomDrawItem
+        OnSelectItem = lvContextMenuSelectItem
       end
     end
   end

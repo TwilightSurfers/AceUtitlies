@@ -140,6 +140,24 @@ type
     miUndo: TMenuItem;
     miRedo: TMenuItem;
 
+    // Context Menu Tab Components
+    tabContextMenu: TTabSheet;
+    pnlContextMenuToolbar: TPanel;
+    btnRefreshContextMenu: TButton;
+    btnDeleteContextVerb: TButton;
+    btnCleanStaleVerbs: TButton;
+    btnTakeoverAssoc: TButton;
+    lblContextMenuStatus: TLabel;
+    pnlContextMenuBottom: TPanel;
+    lblEditVerbLabel: TLabel;
+    edtEditVerbLabel: TEdit;
+    lblEditVerbCmd: TLabel;
+    edtEditVerbCmd: TEdit;
+    btnBrowseRemapExe: TButton;
+    btnApplyRemap: TButton;
+    lblRemapHelp: TLabel;
+    lvContextMenu: TListView;
+
     // Form Events
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormCreate(Sender: TObject);
@@ -181,6 +199,17 @@ type
     procedure miCopyFilePathClick(Sender: TObject);
     procedure miCopyFullPathClick(Sender: TObject);
     procedure miCopyPathClick(Sender: TObject);
+
+    // Context Menu Management Events
+    procedure PageControl1Change(Sender: TObject);
+    procedure btnRefreshContextMenuClick(Sender: TObject);
+    procedure btnDeleteContextVerbClick(Sender: TObject);
+    procedure btnCleanStaleVerbsClick(Sender: TObject);
+    procedure btnTakeoverAssocClick(Sender: TObject);
+    procedure btnBrowseRemapExeClick(Sender: TObject);
+    procedure btnApplyRemapClick(Sender: TObject);
+    procedure lvContextMenuSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+    procedure lvContextMenuCustomDrawItem(Sender: TCustomListView; Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
 
     // Notepad Tab Events
     procedure btnNewFileClick(Sender: TObject);
@@ -283,6 +312,12 @@ type
     function GetIniPath: string;
     procedure LoadAllOptions;
     procedure SaveAllOptions;
+
+    // Context Menu Management Helpers
+    procedure ScanContextMenuEntries;
+    procedure DeleteKeyRecurse(const AKeyPath: string);
+    function ExtractExecutableFromCommand(const Cmd: string): string;
+    function ValidateCommandTarget(const Cmd: string): Boolean;
     procedure EnsureTrayIconLoaded;
     procedure CheckAndPromptFileAssociation;
     procedure RegisterFileAssociations(ARegister: Boolean);
@@ -507,6 +542,10 @@ begin
   StatusBar1.Panels[2].Text := 'Dirs: 0';
   UpdateNotepadStatus;
 
+  {$IFNDEF WINDOWS}
+  tabContextMenu.TabVisible := False;
+  {$ENDIF}
+
   FAllowClose := False;
   Application.OnMinimize := @AppMinimize;
 
@@ -540,6 +579,10 @@ begin
 
   // Check file association prompt from INI
   CheckAndPromptFileAssociation;
+
+  {$IFDEF WINDOWS}
+  ScanContextMenuEntries;
+  {$ENDIF}
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -644,37 +687,42 @@ begin
   end;
 end;
 
+procedure TfrmMain.DeleteKeyRecurse(const AKeyPath: string);
+{$IFDEF WINDOWS}
+var
+  LReg: TRegistry;
+  SubKeys: TStringList;
+  i: Integer;
+begin
+  LReg := TRegistry.Create(KEY_ALL_ACCESS);
+  try
+    LReg.RootKey := HKEY_CURRENT_USER;
+    if LReg.OpenKey(AKeyPath, False) then
+    begin
+      SubKeys := TStringList.Create;
+      try
+        LReg.GetKeyNames(SubKeys);
+        for i := 0 to SubKeys.Count - 1 do
+          DeleteKeyRecurse(AKeyPath + '\' + SubKeys[i]);
+      finally
+        SubKeys.Free;
+      end;
+      LReg.CloseKey;
+    end;
+    LReg.DeleteKey(AKeyPath);
+  finally
+    LReg.Free;
+  end;
+end;
+{$ELSE}
+begin
+end;
+{$ENDIF}
+
 procedure TfrmMain.RegisterFileAssociations(ARegister: Boolean);
 var
   Reg: TRegistry;
   AppExe, ExeTitle, CmdStr: string;
-
-  procedure DeleteKeyRecurse(const AKeyPath: string);
-  var
-    LReg: TRegistry;
-    SubKeys: TStringList;
-    i: Integer;
-  begin
-    LReg := TRegistry.Create(KEY_ALL_ACCESS);
-    try
-      LReg.RootKey := HKEY_CURRENT_USER;
-      if LReg.OpenKey(AKeyPath, False) then
-      begin
-        SubKeys := TStringList.Create;
-        try
-          LReg.GetKeyNames(SubKeys);
-          for i := 0 to SubKeys.Count - 1 do
-            DeleteKeyRecurse(AKeyPath + '\' + SubKeys[i]);
-        finally
-          SubKeys.Free;
-        end;
-        LReg.CloseKey;
-      end;
-      LReg.DeleteKey(AKeyPath);
-    finally
-      LReg.Free;
-    end;
-  end;
 
   procedure RegisterProgId(const AProgId, ADescription: string);
   begin
@@ -1008,6 +1056,23 @@ begin
   pnlNotepadToolbar.Color := HeaderBg;
   pnlFindReplace.Color := PanelColor;
   pnlNotepadStatus.Color := HeaderBg;
+
+  // Context Menu Management Tab
+  pnlContextMenuToolbar.Color := HeaderBg;
+  pnlContextMenuBottom.Color := HeaderBg;
+  lvContextMenu.Color := EditBg;
+  lvContextMenu.Font.Color := TextColor;
+  edtEditVerbLabel.Color := EditBg;
+  edtEditVerbLabel.Font.Color := TextColor;
+  edtEditVerbCmd.Color := EditBg;
+  edtEditVerbCmd.Font.Color := TextColor;
+  lblContextMenuStatus.Font.Color := TextColor;
+  lblEditVerbLabel.Font.Color := TextColor;
+  lblEditVerbCmd.Font.Color := TextColor;
+  if ADark then
+    lblRemapHelp.Font.Color := $00A0A0A0
+  else
+    lblRemapHelp.Font.Color := clGray;
 
   // Labels
   lblPattern.Font.Color := TextColor;
@@ -1826,6 +1891,446 @@ procedure TfrmMain.miCopyPathClick(Sender: TObject);
 begin
   miCopyFullPathClick(Sender);
 end;
+
+{ ----------------------------------------------------------------------------
+  Context Menu Management Implementation
+  ---------------------------------------------------------------------------- }
+
+procedure TfrmMain.PageControl1Change(Sender: TObject);
+begin
+  {$IFDEF WINDOWS}
+  if PageControl1.ActivePage = tabContextMenu then
+  begin
+    if lvContextMenu.Items.Count = 0 then
+      ScanContextMenuEntries;
+  end;
+  {$ENDIF}
+end;
+
+function TfrmMain.ExtractExecutableFromCommand(const Cmd: string): string;
+var
+  S: string;
+  P: Integer;
+begin
+  Result := '';
+  S := Trim(Cmd);
+  if S = '' then Exit;
+
+  if S[1] = '"' then
+  begin
+    Delete(S, 1, 1);
+    P := Pos('"', S);
+    if P > 0 then
+      Result := Copy(S, 1, P - 1)
+    else
+      Result := S;
+  end
+  else
+  begin
+    P := Pos(' ', S);
+    if P > 0 then
+      Result := Copy(S, 1, P - 1)
+    else
+      Result := S;
+  end;
+end;
+
+function TfrmMain.ValidateCommandTarget(const Cmd: string): Boolean;
+{$IFDEF WINDOWS}
+var
+  ExePath: string;
+begin
+  ExePath := ExtractExecutableFromCommand(Cmd);
+  if ExePath = '' then
+    Exit(False);
+
+  if FileExists(ExePath) or DirectoryExists(ExePath) then
+    Exit(True);
+
+  if ExtractFilePath(ExePath) = '' then
+  begin
+    if FileExists('C:\Windows\System32\' + ExePath) or
+       FileExists('C:\Windows\' + ExePath) then
+      Exit(True);
+  end;
+
+  Result := FileExists(ExePath);
+end;
+{$ELSE}
+begin
+  Result := True;
+end;
+{$ENDIF}
+
+procedure TfrmMain.ScanContextMenuEntries;
+{$IFDEF WINDOWS}
+var
+  Reg: TRegistry;
+  StaleCount: Integer;
+
+  procedure ScanShellKey(const ARootPath, AScopeName: string);
+  var
+    Verbs: TStringList;
+    i: Integer;
+    VerbKey, VerbPath, MenuText, CmdStr: string;
+    Item: TListItem;
+    IsValid: Boolean;
+  begin
+    if not Reg.OpenKeyReadOnly(ARootPath) then Exit;
+    Verbs := TStringList.Create;
+    try
+      Reg.GetKeyNames(Verbs);
+      Reg.CloseKey;
+
+      for i := 0 to Verbs.Count - 1 do
+      begin
+        VerbKey := Verbs[i];
+        VerbPath := ARootPath + '\' + VerbKey;
+
+        MenuText := '';
+        CmdStr := '';
+
+        if Reg.OpenKeyReadOnly(VerbPath) then
+        begin
+          if Reg.ValueExists('') then
+            MenuText := Reg.ReadString('');
+          if (MenuText = '') and Reg.ValueExists('MUIVerb') then
+            MenuText := Reg.ReadString('MUIVerb');
+          Reg.CloseKey;
+        end;
+
+        if MenuText = '' then
+          MenuText := VerbKey;
+
+        if Reg.OpenKeyReadOnly(VerbPath + '\command') then
+        begin
+          if Reg.ValueExists('') then
+            CmdStr := Reg.ReadString('');
+          Reg.CloseKey;
+        end;
+
+        Item := lvContextMenu.Items.Add;
+        Item.Caption := AScopeName;              // Col 0: Scope
+        Item.SubItems.Add(VerbKey);              // Col 1: Verb Key
+        Item.SubItems.Add(MenuText);             // Col 2: Display Text
+        Item.SubItems.Add(CmdStr);               // Col 3: Command
+        if CmdStr <> '' then
+        begin
+          IsValid := ValidateCommandTarget(CmdStr);
+          if IsValid then
+            Item.SubItems.Add('Active (OK)')
+          else
+          begin
+            Item.SubItems.Add('STALE - File missing!');
+            Inc(StaleCount);
+          end;
+        end
+        else
+        begin
+          Item.SubItems.Add('No Command');
+          Inc(StaleCount);
+        end;
+        Item.SubItems.Add(VerbPath);             // Col 5: SubKey Path
+      end;
+    finally
+      Verbs.Free;
+      Reg.CloseKey;
+    end;
+  end;
+
+  procedure ScanApplications;
+  var
+    Apps: TStringList;
+    i: Integer;
+    AppKey, AppPath, CmdStr: string;
+    Item: TListItem;
+    IsValid: Boolean;
+  begin
+    if not Reg.OpenKeyReadOnly('Software\Classes\Applications') then Exit;
+    Apps := TStringList.Create;
+    try
+      Reg.GetKeyNames(Apps);
+      Reg.CloseKey;
+
+      for i := 0 to Apps.Count - 1 do
+      begin
+        AppKey := Apps[i];
+        AppPath := 'Software\Classes\Applications\' + AppKey + '\shell\open';
+        if Reg.KeyExists(AppPath + '\command') then
+        begin
+          CmdStr := '';
+          if Reg.OpenKeyReadOnly(AppPath + '\command') then
+          begin
+            if Reg.ValueExists('') then
+              CmdStr := Reg.ReadString('');
+            Reg.CloseKey;
+          end;
+
+          Item := lvContextMenu.Items.Add;
+          Item.Caption := 'Applications';
+          Item.SubItems.Add(AppKey);
+          Item.SubItems.Add('Open with ' + AppKey);
+          Item.SubItems.Add(CmdStr);
+          if CmdStr <> '' then
+          begin
+            IsValid := ValidateCommandTarget(CmdStr);
+            if IsValid then
+              Item.SubItems.Add('Active (OK)')
+            else
+            begin
+              Item.SubItems.Add('STALE - File missing!');
+              Inc(StaleCount);
+            end;
+          end
+          else
+          begin
+            Item.SubItems.Add('No Command');
+            Inc(StaleCount);
+          end;
+          Item.SubItems.Add('Software\Classes\Applications\' + AppKey);
+        end;
+      end;
+    finally
+      Apps.Free;
+      Reg.CloseKey;
+    end;
+  end;
+
+begin
+  lvContextMenu.Items.BeginUpdate;
+  try
+    lvContextMenu.Items.Clear;
+    StaleCount := 0;
+
+    Reg := TRegistry.Create(KEY_READ);
+    try
+      Reg.RootKey := HKEY_CURRENT_USER;
+
+      ScanShellKey('Software\Classes\*\shell', 'All Files (*)');
+      ScanShellKey('Software\Classes\Directory\shell', 'Folders (Directory)');
+      ScanShellKey('Software\Classes\Directory\Background\shell', 'Desktop / Folder BG');
+      ScanShellKey('Software\Classes\SystemFileAssociations\.txt\shell', 'Text Files (.txt)');
+      ScanShellKey('Software\Classes\SystemFileAssociations\.md\shell', 'Markdown (.md)');
+      ScanApplications;
+    finally
+      Reg.Free;
+    end;
+  finally
+    lvContextMenu.Items.EndUpdate;
+  end;
+
+  if StaleCount > 0 then
+    lblContextMenuStatus.Caption := Format('Total: %d entries found (%d STALE / broken targets)', [lvContextMenu.Items.Count, StaleCount])
+  else
+    lblContextMenuStatus.Caption := Format('Total: %d entries found (all targets valid)', [lvContextMenu.Items.Count]);
+end;
+{$ELSE}
+begin
+  lblContextMenuStatus.Caption := 'Context menu management is only available on Windows.';
+end;
+{$ENDIF}
+
+procedure TfrmMain.btnRefreshContextMenuClick(Sender: TObject);
+begin
+  ScanContextMenuEntries;
+  SetStatus(' Context menu list refreshed.');
+end;
+
+procedure TfrmMain.lvContextMenuSelectItem(Sender: TObject; Item: TListItem;
+  Selected: Boolean);
+begin
+  if Selected and (Item <> nil) and (Item.SubItems.Count >= 3) then
+  begin
+    edtEditVerbLabel.Text := Item.SubItems[1]; // Display Text
+    edtEditVerbCmd.Text := Item.SubItems[2];   // Command
+  end
+  else
+  begin
+    edtEditVerbLabel.Text := '';
+    edtEditVerbCmd.Text := '';
+  end;
+end;
+
+procedure TfrmMain.lvContextMenuCustomDrawItem(Sender: TCustomListView;
+  Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
+begin
+  if (Item <> nil) and (Item.SubItems.Count >= 4) and (Pos('STALE', Item.SubItems[3]) > 0) then
+  begin
+    if FDarkMode then
+      Sender.Canvas.Font.Color := $008080FF
+    else
+      Sender.Canvas.Font.Color := $000000C8;
+  end;
+  DefaultDraw := True;
+end;
+
+procedure TfrmMain.btnDeleteContextVerbClick(Sender: TObject);
+{$IFDEF WINDOWS}
+var
+  SubKeyPath, VerbName: string;
+begin
+  if (lvContextMenu.Selected = nil) or (lvContextMenu.Selected.SubItems.Count < 5) then
+  begin
+    MessageDlg('Please select a context menu entry to remove.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  VerbName := lvContextMenu.Selected.SubItems[0];
+  SubKeyPath := lvContextMenu.Selected.SubItems[4];
+
+  if MessageDlg('Remove Context Menu Entry',
+    Format('Are you sure you want to delete "%s"?' + sLineBreak + sLineBreak +
+           'Registry SubKey: HKCU\%s' + sLineBreak + sLineBreak +
+           'This only removes the per-user entry and requires no reboot.', [VerbName, SubKeyPath]),
+    mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    DeleteKeyRecurse(SubKeyPath);
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nil, nil);
+    ScanContextMenuEntries;
+    SetStatus(' Context menu entry removed: ' + VerbName);
+  end;
+end;
+{$ELSE}
+begin
+  ShowMessage('Context menu management is only available on Windows.');
+end;
+{$ENDIF}
+
+procedure TfrmMain.btnCleanStaleVerbsClick(Sender: TObject);
+{$IFDEF WINDOWS}
+var
+  i, RemovedCount: Integer;
+  Item: TListItem;
+  SubKeyPath: string;
+begin
+  RemovedCount := 0;
+  for i := 0 to lvContextMenu.Items.Count - 1 do
+    if (lvContextMenu.Items[i].SubItems.Count >= 4) and
+       (Pos('STALE', lvContextMenu.Items[i].SubItems[3]) > 0) then
+      Inc(RemovedCount);
+
+  if RemovedCount = 0 then
+  begin
+    ShowMessage('No stale or orphaned context menu entries found.');
+    Exit;
+  end;
+
+  if MessageDlg('Clean Stale Entries',
+    Format('Found %d stale context menu entries with missing target executables.' + sLineBreak + sLineBreak +
+           'Would you like to remove all of them from HKCU now?', [RemovedCount]),
+    mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    for i := lvContextMenu.Items.Count - 1 downto 0 do
+    begin
+      Item := lvContextMenu.Items[i];
+      if (Item.SubItems.Count >= 5) and (Pos('STALE', Item.SubItems[3]) > 0) then
+      begin
+        SubKeyPath := Item.SubItems[4];
+        DeleteKeyRecurse(SubKeyPath);
+      end;
+    end;
+
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nil, nil);
+    ScanContextMenuEntries;
+    ShowMessage(Format('Successfully cleaned %d stale context menu entries.', [RemovedCount]));
+    SetStatus(Format(' Cleaned %d stale context menu entries.', [RemovedCount]));
+  end;
+end;
+{$ELSE}
+begin
+  ShowMessage('Context menu management is only available on Windows.');
+end;
+{$ENDIF}
+
+procedure TfrmMain.btnApplyRemapClick(Sender: TObject);
+{$IFDEF WINDOWS}
+var
+  SubKeyPath, NewLabel, NewCmd: string;
+  Reg: TRegistry;
+begin
+  if (lvContextMenu.Selected = nil) or (lvContextMenu.Selected.SubItems.Count < 5) then
+  begin
+    MessageDlg('Please select an entry to edit.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  SubKeyPath := lvContextMenu.Selected.SubItems[4];
+  NewLabel := Trim(edtEditVerbLabel.Text);
+  NewCmd := Trim(edtEditVerbCmd.Text);
+
+  if NewCmd = '' then
+  begin
+    MessageDlg('Command line cannot be empty.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  Reg := TRegistry.Create(KEY_WRITE);
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(SubKeyPath, False) then
+    begin
+      if NewLabel <> '' then
+        Reg.WriteString('', NewLabel);
+      Reg.CloseKey;
+    end;
+
+    if Reg.OpenKey(SubKeyPath + '\command', True) then
+    begin
+      Reg.WriteString('', NewCmd);
+      Reg.CloseKey;
+    end;
+  finally
+    Reg.Free;
+  end;
+
+  SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nil, nil);
+  ScanContextMenuEntries;
+  ShowMessage('Context menu entry updated successfully.');
+  SetStatus(' Updated context menu entry: ' + SubKeyPath);
+end;
+{$ELSE}
+begin
+  ShowMessage('Context menu management is only available on Windows.');
+end;
+{$ENDIF}
+
+procedure TfrmMain.btnBrowseRemapExeClick(Sender: TObject);
+begin
+  OpenDialog1.Title := 'Select Target Executable';
+  OpenDialog1.Filter := 'Executable Files (*.exe;*.bat;*.cmd)|*.exe;*.bat;*.cmd|All Files (*.*)|*.*';
+  if OpenDialog1.Execute then
+    edtEditVerbCmd.Text := '"' + OpenDialog1.FileName + '" "%1"';
+end;
+
+procedure TfrmMain.btnTakeoverAssocClick(Sender: TObject);
+{$IFDEF WINDOWS}
+var
+  Ini: TIniFile;
+begin
+  if MessageDlg('Take Back File Associations',
+    'Enforce Ace''s Utilities as default handler for .txt and .md files?' + sLineBreak + sLineBreak +
+    'This removes Windows 11 UserChoice overrides that redirect files to UWP Notepad, ' +
+    'registers clean ProgIDs, and refreshes the Windows shell without admin rights.',
+    mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    RegisterFileAssociations(True);
+    Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'AceUtils.ini');
+    try
+      Ini.WriteBool('FileAssociations', 'Registered', True);
+    finally
+      Ini.Free;
+    end;
+    ScanContextMenuEntries;
+    ShowMessage('File associations reclaimed successfully!' + sLineBreak +
+                '.txt and .md files will now open in Ace''s Utilities.');
+    SetStatus(' File associations enforced for .txt and .md.');
+  end;
+end;
+{$ELSE}
+begin
+  ShowMessage('File associations are only available on Windows.');
+end;
+{$ENDIF}
 
 { ----------------------------------------------------------------------------
   Core Search Engine

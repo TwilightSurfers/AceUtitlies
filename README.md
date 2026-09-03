@@ -6,23 +6,35 @@
 [![Framework](https://img.shields.io/badge/built%20with-Lazarus%20%2F%20Free%20Pascal-orange)](https://www.lazarus-ide.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Ace's Utilities** (`AceUtils`) is a high-performance, lightweight desktop application written in Object Pascal using the Free Pascal Compiler (FPC) and Lazarus LCL. While tailored for modern Windows workflows, the entire codebase is written using portable LCL components and clean conditional directives, allowing it to be **compiled and run on Linux very easily**.
+**Ace's Utilities** (`AceUtils`) is a high-performance, lightweight desktop power tool written in Object Pascal using the Free Pascal Compiler (FPC) and Lazarus LCL. While tailored for modern Windows workflows, the entire codebase is written using portable LCL components and clean conditional directives, allowing it to be **compiled and run on Linux very easily**.
+
+> **It also takes back the .txt and .md associations Windows keeps STEALING. No admin rights, no registry surgery on your end.**
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-### 🔍 1. Real Windows File Search (That Actually Works)
+### ⚡ 1. Context Menu Management & Windows 11 Association Takeover
+Microsoft keeps hijacking file associations in Windows 11 using hidden `UserChoice` / `UserChoiceLatest` registry keys, forcing files to open in modern UWP Notepad even after you set your defaults. Ace's Utilities fixes this once and for all:
+- **Take Back Stolen File Associations**: Reclaims `.txt`, `.md`, and `.markdown` defaults with a single click. Wipes out the Windows 11 `UserChoiceLatest` hijack, registers clean ProgIDs, and broadcasts shell notifications—**100% per-user with zero admin rights and zero reboots**.
+- **Per-User Shell Verb Scanner**: Audits all registered context menu entries in `HKCU\Software\Classes` across `*` (all files), `Directory` (folders), `Background`, `.txt`, `.md`, and registered `Applications`.
+- **Stale / Orphaned Entry Detection**: Automatically parses target commands and inspects the filesystem to flag dead entries whose executables no longer exist (e.g., from uninstalled or renamed apps).
+- **One-Click Stale Purge**: Instantly cleans out all orphaned shell verbs in one click.
+- **Edit & Remap Commands**: Modify display labels and repoint command-line paths for any user context menu item directly from the UI.
+- **Context Menu Toggle**: Add or remove "Open with Ace's Utilities" from Explorer right-click menus on the fly.
+- **Headless CLI Registration**: Supports `/register` and `/unregister` flags for silent scripting or automated deployment.
+
+### 🔍 2. Real Windows File Search (That Actually Works)
 Tired of Windows Search indexing freezes, search loops, or failing to find files that are right in front of you?
 - **Fast Traversal Engine**: Safe Breadth-First Search (BFS) directory walker.
 - **Junction Point & Symlink Protection**: Automatically skips NTFS reparse points (`FILE_ATTRIBUTE_REPARSE_POINT` `$400`), avoiding endless recursion loops common in Windows 11 user directories (e.g. `Application Data`).
 - **Flexible Pattern Matching**: Type `*.pas` or simply `MainForm`—terms without explicit wildcards automatically perform substring searches.
-- **Content Search**: Optional full-text scan inside files with configurable case sensitivity.
+- **Content Search**: Full-text scanning inside files with configurable case sensitivity.
 - **Interactive Multi-Column Header Sorting**: Click any column (**File Name**, **Folder**, **Size**, **Modified Date**, **Type**) to sort Ascending (`▲`) or Descending (`▼`). File sizes sort by true numeric byte count (so 10 MB correctly sorts higher than 2 KB).
 - **Directory Tree & Quick Buttons**: Includes a full `TShellTreeView`, directory browse dialog, and one-click quick jump buttons for `C:\`, User Home, and Desktop.
-- **Rich Results Context Menu**: Right-click any search result to Open in Notepad, Reveal in Explorer, Open / Run File, **Copy Filename Only**, **Copy File Path Only**, or **Copy File Path and Name** (with multi-item selection support).
+- **Rich Results Context Menu**: Right-click any search result to Open in Notepad, Reveal in Explorer, Open / Run File, **Copy Filename Only**, **Copy File Path Only**, or **Copy File Path and Name** (with multi-item selection clipboard support).
 
-### 👁️ 2. Floating Live File Preview Window
+### 👁️ 3. Floating Live File Preview Window
 Preview files dynamically on a single click without blocking the main search window:
 - **Modeless Floating Window**: Stays open side-by-side with your search list; click any result and the preview updates instantaneously.
 - **Image Previews**: Seamless native rendering for `.png`, `.jpg`, `.jpeg`, `.bmp`, `.ico`, and `.gif` with proportional scaling, dimension readouts (`Width x Height`), and file size.
@@ -31,7 +43,7 @@ Preview files dynamically on a single click without blocking the main search win
 - **"Open in Editor" Quick Action**: One click jumps straight into the built-in Notepad editor tab.
 - **Enable / Disable Toggle**: Easily toggle live preview on or off with the search option checkbox.
 
-### 📝 3. Windows 11 Notepad Replacement
+### 📝 4. Windows 11 Notepad Replacement
 A complete, tabbed text and code editor powered by `TSynEdit`:
 - **File Management**: New, Open, Save, and Save As with dirty-tracking prompts so you never lose unsaved changes.
 - **Multi-Language Syntax Highlighting**: Includes syntax highlighters for Pascal (`.pas`, `.pp`, `.lpr`), Python (`.py`), HTML/XML (`.html`, `.xml`), CSS (`.css`), JavaScript/JSON (`.js`, `.json`), SQL (`.sql`), Batch (`.bat`, `.cmd`), INI/Config (`.ini`, `.cfg`), and a **dedicated custom Markdown syntax highlighter** (`.md`, `.markdown`) with header, code block, list, blockquote, link, and formatting styles for both dark and light modes.
@@ -39,12 +51,12 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
 - **Status Bar**: Live line number, column number, character position, and modified state tracker.
 
-### 🌙 4. Native Windows 11 Dark Mode
+### 🌙 5. Native Windows 11 Dark Mode
 - **Native DWM Titlebar**: Integrates directly with Windows 11 Desktop Window Manager (`DwmSetWindowAttribute` via `dwmapi.dll`) for a true dark window frame.
 - **Automatic System Detection**: Detects your Windows theme preference (`AppsUseLightTheme`) on startup.
 - **One-Click Toggle**: Switch between Dark and Light mode anytime via the header toggle button.
 
-### 📥 5. System Tray Integration
+### 📥 6. System Tray Integration
 - **Run in System Tray**: Check the "Run in System Tray" option to keep Ace's Utilities running quietly in your Windows notification area.
 - **Minimize & Close to Tray**: Minimizing or closing the window cleanly hides it to the tray.
 - **Tray Context Menu**: Right-click the tray icon for quick actions:
@@ -53,14 +65,6 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
   - *Exit*
 - **One-Click Restore**: Left-clicking the tray icon restores the window to normal view immediately.
 - **Persistent Setting**: Preferences are saved across restarts in `AceUtils.ini`.
-
-### 📂 6. Windows Explorer Shell Integration & Windows 11 Notepad Override
-- **Full File Associations**: Complete one-click registration associates `.txt`, `.md`, and `.markdown` files with Ace's Utilities.
-- **Windows 11 Notepad Override**: Cleans up Windows 11 `UserChoice` / `UserChoiceLatest` registry hijacking for `.md` and `.txt`, so files double-clicked or opened in Explorer launch directly in Ace's Utilities instead of the modern UWP Notepad.
-- **Context Menu Integration**: Adds "Open with Ace's Utilities" directly to Windows Explorer right-click context menus for instant access.
-- **Zero Admin Privileges Required**: Writes cleanly to per-user `HKCU\Software\Classes` without needing Administrator privileges or modifying system files.
-- **Command-Line Registration**: Supports `/register` and `/unregister` flags for headless setup or automation.
-- **Easy Toggle**: Add or remove all associations and context menu items at any time directly from the header button.
 
 ---
 
