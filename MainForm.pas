@@ -130,6 +130,9 @@ type
     miTrayExit: TMenuItem;
 
     popNotepad: TPopupMenu;
+    miNotepadSave: TMenuItem;
+    miNotepadSaveAs: TMenuItem;
+    miSepNotepad0: TMenuItem;
     miCut: TMenuItem;
     miCopy: TMenuItem;
     miPaste: TMenuItem;
@@ -280,6 +283,8 @@ type
     procedure btnReplaceAllClick(Sender: TObject);
     procedure btnCloseFindClick(Sender: TObject);
     procedure SynEdit1Change(Sender: TObject);
+    procedure SynEdit1Enter(Sender: TObject);
+    procedure SynEdit1Exit(Sender: TObject);
     procedure SynEdit1StatusChange(Sender: TObject; Changes: TSynStatusChanges);
     procedure miCutClick(Sender: TObject);
     procedure miCopyClick(Sender: TObject);
@@ -355,6 +360,7 @@ type
     function SaveCurrentFile: Boolean;
     function PromptSaveIfModified: Boolean;
     procedure UpdateNotepadStatus;
+    procedure UpdateSaveButtonState;
     procedure AutoDetectHighlighter(const AFileName: string);
     procedure ApplySyntax(Index: Integer);
     procedure ApplyHighlighterTheme(ADark: Boolean);
@@ -631,6 +637,7 @@ begin
 
   // Load and apply all saved settings
   LoadAllOptions;
+  UpdateSaveButtonState;
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
@@ -2033,6 +2040,7 @@ end;
 
 procedure TfrmMain.PageControl1Change(Sender: TObject);
 begin
+  UpdateSaveButtonState;
   {$IFDEF WINDOWS}
   if PageControl1.ActivePage = tabContextMenu then
   begin
@@ -2885,6 +2893,7 @@ begin
     FIsModified := False;
     lblCurrentFile.Caption := ExtractFileName(AFileName) + ' (' + AFileName + ')';
     UpdateNotepadStatus;
+    UpdateSaveButtonState;
     SetStatus(' Opened file: ' + AFileName);
   except
     on E: Exception do
@@ -2906,6 +2915,7 @@ begin
       FIsModified := False;
       lblCurrentFile.Caption := ExtractFileName(FCurrentFileName) + ' (' + FCurrentFileName + ')';
       UpdateNotepadStatus;
+      UpdateSaveButtonState;
       SetStatus(' File saved: ' + FCurrentFileName);
       Result := True;
     except
@@ -2942,6 +2952,31 @@ begin
   if FIsModified then ModStr := 'Modified' else ModStr := 'Saved';
   lblNotepadStatus.Caption := Format('Line: %d  Col: %d | Lines: %d | Chars: %d | UTF-8 | %s',
     [SynEdit1.CaretY, SynEdit1.CaretX, SynEdit1.Lines.Count, Length(SynEdit1.Text), ModStr]);
+end;
+
+procedure TfrmMain.UpdateSaveButtonState;
+var
+  OnNotepadTab: Boolean;
+  HasContent: Boolean;
+  CanSave: Boolean;
+  CanSaveAs: Boolean;
+begin
+  OnNotepadTab := (PageControl1.ActivePage = tabNotepad);
+  HasContent := (Trim(SynEdit1.Text) <> '');
+
+  // Save is enabled if on Notepad tab, document has modifications, and is not empty
+  CanSave := OnNotepadTab and HasContent and FIsModified;
+
+  // Save As is enabled if on Notepad tab and document has content
+  CanSaveAs := OnNotepadTab and HasContent;
+
+  btnSaveFile.Enabled := CanSave;
+  btnSaveAs.Enabled := CanSaveAs;
+
+  if Assigned(miNotepadSave) then
+    miNotepadSave.Enabled := CanSave;
+  if Assigned(miNotepadSaveAs) then
+    miNotepadSaveAs.Enabled := CanSaveAs;
 end;
 
 procedure TfrmMain.AutoDetectHighlighter(const AFileName: string);
@@ -3024,6 +3059,7 @@ begin
   cmbSyntax.ItemIndex := 0;
   ApplySyntax(0);
   UpdateNotepadStatus;
+  UpdateSaveButtonState;
 end;
 
 procedure TfrmMain.btnOpenFileClick(Sender: TObject);
@@ -3051,6 +3087,7 @@ begin
     FCurrentFileName := SaveDialog1.FileName;
     SaveCurrentFile;
     AutoDetectHighlighter(FCurrentFileName);
+    UpdateSaveButtonState;
   end;
 end;
 
@@ -3176,11 +3213,23 @@ begin
       lblCurrentFile.Caption := '*Untitled';
   end;
   UpdateNotepadStatus;
+  UpdateSaveButtonState;
+end;
+
+procedure TfrmMain.SynEdit1Enter(Sender: TObject);
+begin
+  UpdateSaveButtonState;
+end;
+
+procedure TfrmMain.SynEdit1Exit(Sender: TObject);
+begin
+  UpdateSaveButtonState;
 end;
 
 procedure TfrmMain.SynEdit1StatusChange(Sender: TObject; Changes: TSynStatusChanges);
 begin
   UpdateNotepadStatus;
+  UpdateSaveButtonState;
 end;
 
 procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -3188,6 +3237,21 @@ begin
   UpdateKeyboardAndTimerStatus;
   if (PageControl1.ActivePage = tabNotepad) and (ssCtrl in Shift) then
   begin
+    if (ssShift in Shift) and (Key = VK_S) then
+    begin
+      if btnSaveAs.Enabled then
+        btnSaveAsClick(nil);
+      Key := 0;
+      Exit;
+    end
+    else if (Key = VK_S) then
+    begin
+      if btnSaveFile.Enabled then
+        btnSaveFileClick(nil);
+      Key := 0;
+      Exit;
+    end;
+
     case Key of
       VK_C:
         if SynEdit1.Focused and (SynEdit1.SelText <> '') then
@@ -3219,6 +3283,7 @@ end;
 
 procedure TfrmMain.popNotepadPopup(Sender: TObject);
 begin
+  UpdateSaveButtonState;
   miCut.Enabled := (SynEdit1.SelText <> '');
   miCopy.Enabled := (SynEdit1.SelText <> '');
   miPaste.Enabled := Clipboard.HasFormat(CF_TEXT);
@@ -3226,6 +3291,8 @@ begin
   miUndo.Enabled := SynEdit1.CanUndo;
   miRedo.Enabled := SynEdit1.CanRedo;
   miSelectAll.Enabled := (SynEdit1.Lines.Count > 0);
+  miNotepadSave.Enabled := btnSaveFile.Enabled;
+  miNotepadSaveAs.Enabled := btnSaveAs.Enabled;
 end;
 
 procedure TfrmMain.miCutClick(Sender: TObject);

@@ -640,6 +640,8 @@ object frmMain: TfrmMain
         Gutter.Width = 55
         RightGutter.Width = 0
         OnChange = SynEdit1Change
+        OnEnter = SynEdit1Enter
+        OnExit = SynEdit1Exit
         OnStatusChange = SynEdit1StatusChange
       end
       object pnlNotepadStatus: TPanel
@@ -1375,6 +1377,19 @@ object frmMain: TfrmMain
     OnPopup = popNotepadPopup
     Left = 496
     Top = 560
+    object miNotepadSave: TMenuItem
+      Caption = 'Save'
+      ShortCut = 16467
+      OnClick = btnSaveFileClick
+    end
+    object miNotepadSaveAs: TMenuItem
+      Caption = 'Save As...'
+      ShortCut = 49235
+      OnClick = btnSaveAsClick
+    end
+    object miSepNotepad0: TMenuItem
+      Caption = '-'
+    end
     object miCut: TMenuItem
       Caption = 'Cut'
       ShortCut = 16472
