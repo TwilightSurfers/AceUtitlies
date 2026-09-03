@@ -505,10 +505,22 @@ end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
 begin
-  // Check if launched with a file argument (e.g. via context menu or file open)
+  // Check command-line arguments
   if ParamCount >= 1 then
   begin
-    if FileExists(ParamStr(1)) then
+    if SameText(ParamStr(1), '/register') or SameText(ParamStr(1), '-register') or SameText(ParamStr(1), '--register') then
+    begin
+      RegisterFileAssociations(True);
+      Application.Terminate;
+      Exit;
+    end
+    else if SameText(ParamStr(1), '/unregister') or SameText(ParamStr(1), '-unregister') or SameText(ParamStr(1), '--unregister') then
+    begin
+      RegisterFileAssociations(False);
+      Application.Terminate;
+      Exit;
+    end
+    else if FileExists(ParamStr(1)) then
     begin
       OpenFileInNotepad(ParamStr(1));
       PageControl1.ActivePage := tabNotepad;
@@ -602,10 +614,10 @@ begin
     Prompted := Ini.ReadBool('FileAssociations', 'Prompted', False);
     if not Prompted then
     begin
-      // Ask user to add context menu
+      // Ask user to add associations and context menu
       if MessageDlg('File Association',
-        'Would you like to add "Open with Ace''s Utilities" to the Windows Explorer context menu for .txt and .md files?' + sLineBreak + sLineBreak +
-        '(This does not overwrite default app defaults, only adds an instant right-click option.)',
+        'Would you like to associate .txt and .md files with Ace''s Utilities and add Explorer context menu integration?' + sLineBreak + sLineBreak +
+        '(This enables opening .txt and .md files directly in Ace''s Utilities and bypasses the Windows 11 Notepad.)',
         mtConfirmation, [mbYes, mbNo], 0) = mrYes then
       begin
         RegisterFileAssociations(True);
@@ -624,14 +636,95 @@ end;
 procedure TfrmMain.RegisterFileAssociations(ARegister: Boolean);
 var
   Reg: TRegistry;
-  AppExe, CmdStr: string;
+  AppExe, ExeTitle, CmdStr: string;
 
-  procedure SetShellVerb(const AExt: string);
+  procedure DeleteKeyRecurse(const AKeyPath: string);
+  var
+    LReg: TRegistry;
+    SubKeys: TStringList;
+    i: Integer;
   begin
-    // Write per-user association under HKCU\Software\Classes\SystemFileAssociations\<ext>\shell
+    LReg := TRegistry.Create(KEY_ALL_ACCESS);
+    try
+      LReg.RootKey := HKEY_CURRENT_USER;
+      if LReg.OpenKey(AKeyPath, False) then
+      begin
+        SubKeys := TStringList.Create;
+        try
+          LReg.GetKeyNames(SubKeys);
+          for i := 0 to SubKeys.Count - 1 do
+            DeleteKeyRecurse(AKeyPath + '\' + SubKeys[i]);
+        finally
+          SubKeys.Free;
+        end;
+        LReg.CloseKey;
+      end;
+      LReg.DeleteKey(AKeyPath);
+    finally
+      LReg.Free;
+    end;
+  end;
+
+  procedure RegisterProgId(const AProgId, ADescription: string);
+  begin
+    // HKCU\Software\Classes\<ProgId>
+    if Reg.OpenKey('Software\Classes\' + AProgId, True) then
+    begin
+      Reg.WriteString('', ADescription);
+      Reg.CloseKey;
+    end;
+    if Reg.OpenKey('Software\Classes\' + AProgId + '\DefaultIcon', True) then
+    begin
+      Reg.WriteString('', AppExe + ',0');
+      Reg.CloseKey;
+    end;
+    if Reg.OpenKey('Software\Classes\' + AProgId + '\shell\open', True) then
+    begin
+      Reg.WriteString('', 'Open with ' + ExeTitle);
+      Reg.CloseKey;
+    end;
+    if Reg.OpenKey('Software\Classes\' + AProgId + '\shell\open\command', True) then
+    begin
+      Reg.WriteString('', CmdStr);
+      Reg.CloseKey;
+    end;
+  end;
+
+  procedure AssociateExtension(const AExt, AProgId, AContentType: string);
+  begin
+    // HKCU\Software\Classes\<ext>
+    if Reg.OpenKey('Software\Classes\' + AExt, True) then
+    begin
+      Reg.WriteString('', AProgId);
+      Reg.WriteString('PerceivedType', 'text');
+      if AContentType <> '' then
+        Reg.WriteString('Content Type', AContentType);
+      Reg.CloseKey;
+    end;
+
+    // Direct shell\open\command under HKCU\Software\Classes\<ext> for maximum reliability
+    if Reg.OpenKey('Software\Classes\' + AExt + '\shell\open', True) then
+    begin
+      Reg.WriteString('', 'Open with ' + ExeTitle);
+      Reg.CloseKey;
+    end;
+    if Reg.OpenKey('Software\Classes\' + AExt + '\shell\open\command', True) then
+    begin
+      Reg.WriteString('', CmdStr);
+      Reg.CloseKey;
+    end;
+
+    // HKCU\Software\Classes\<ext>\OpenWithProgids
+    if Reg.OpenKey('Software\Classes\' + AExt + '\OpenWithProgids', True) then
+    begin
+      Reg.WriteString(AProgId, '');
+      Reg.CloseKey;
+    end;
+
+    // HKCU\Software\Classes\SystemFileAssociations\<ext>\shell\AceUtils
     if Reg.OpenKey('Software\Classes\SystemFileAssociations\' + AExt + '\shell\AceUtils', True) then
     begin
-      Reg.WriteString('', 'Open with Ace''s Utilities');
+      Reg.WriteString('', 'Open with ' + ExeTitle);
       Reg.WriteString('Icon', AppExe);
       Reg.CloseKey;
     end;
@@ -640,16 +733,58 @@ var
       Reg.WriteString('', CmdStr);
       Reg.CloseKey;
     end;
+
+    // Windows 11 Explorer overrides: remove UserChoice and UserChoiceLatest to prevent modern Notepad hijacking
+    DeleteKeyRecurse('Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\' + AExt + '\UserChoiceLatest');
+    DeleteKeyRecurse('Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\' + AExt + '\UserChoice');
+
+    // Add to FileExts\<ext>\OpenWithProgids
+    if Reg.OpenKey('Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\' + AExt + '\OpenWithProgids', True) then
+    begin
+      Reg.WriteString(AProgId, '');
+      Reg.CloseKey;
+    end;
   end;
 
-  procedure DeleteShellVerb(const AExt: string);
+  procedure UnassociateExtension(const AExt, AProgId: string);
+  var
+    CurVal: string;
   begin
-    Reg.DeleteKey('Software\Classes\SystemFileAssociations\' + AExt + '\shell\AceUtils\command');
-    Reg.DeleteKey('Software\Classes\SystemFileAssociations\' + AExt + '\shell\AceUtils');
+    // Remove ProgID association if it matches ours
+    if Reg.OpenKey('Software\Classes\' + AExt, False) then
+    begin
+      CurVal := Reg.ReadString('');
+      Reg.CloseKey;
+      if CurVal = AProgId then
+      begin
+        if Reg.OpenKey('Software\Classes\' + AExt, False) then
+        begin
+          Reg.DeleteValue('');
+          Reg.CloseKey;
+        end;
+      end;
+    end;
+
+    DeleteKeyRecurse('Software\Classes\' + AExt + '\shell\open');
+
+    if Reg.OpenKey('Software\Classes\' + AExt + '\OpenWithProgids', False) then
+    begin
+      Reg.DeleteValue(AProgId);
+      Reg.CloseKey;
+    end;
+
+    if Reg.OpenKey('Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\' + AExt + '\OpenWithProgids', False) then
+    begin
+      Reg.DeleteValue(AProgId);
+      Reg.CloseKey;
+    end;
+
+    DeleteKeyRecurse('Software\Classes\SystemFileAssociations\' + AExt + '\shell\AceUtils');
   end;
 
 begin
   AppExe := Application.ExeName;
+  ExeTitle := 'Ace''s Utilities';
   CmdStr := '"' + AppExe + '" "%1"';
 
   Reg := TRegistry.Create(KEY_ALL_ACCESS);
@@ -657,12 +792,38 @@ begin
     Reg.RootKey := HKEY_CURRENT_USER;
     if ARegister then
     begin
-      SetShellVerb('.txt');
-      SetShellVerb('.md');
-      // Also register on general files for convenience
+      // Clean up stale AceFileSearch registrations if any exist
+      DeleteKeyRecurse('Software\Classes\SystemFileAssociations\.txt\shell\AceFileSearch');
+      DeleteKeyRecurse('Software\Classes\SystemFileAssociations\.md\shell\AceFileSearch');
+      DeleteKeyRecurse('Software\Classes\*\shell\AceFileSearch');
+
+      // 1. Register ProgIDs for markdown and text files
+      RegisterProgId('AceUtils.AssocFile.md', 'Markdown Document');
+      RegisterProgId('AceUtils.AssocFile.txt', 'Text Document');
+
+      // 2. Associate Extensions (.md, .markdown, .txt)
+      AssociateExtension('.md', 'AceUtils.AssocFile.md', 'text/markdown');
+      AssociateExtension('.markdown', 'AceUtils.AssocFile.md', 'text/markdown');
+      AssociateExtension('.txt', 'AceUtils.AssocFile.txt', 'text/plain');
+
+      // 3. Register Application under HKCU\Software\Classes\Applications\<exe>
+      if Reg.OpenKey('Software\Classes\Applications\' + ExtractFileName(AppExe) + '\shell\open\command', True) then
+      begin
+        Reg.WriteString('', CmdStr);
+        Reg.CloseKey;
+      end;
+      if Reg.OpenKey('Software\Classes\Applications\' + ExtractFileName(AppExe) + '\SupportedTypes', True) then
+      begin
+        Reg.WriteString('.md', '');
+        Reg.WriteString('.markdown', '');
+        Reg.WriteString('.txt', '');
+        Reg.CloseKey;
+      end;
+
+      // 4. Global context menu under *
       if Reg.OpenKey('Software\Classes\*\shell\AceUtils', True) then
       begin
-        Reg.WriteString('', 'Open with Ace''s Utilities');
+        Reg.WriteString('', 'Open with ' + ExeTitle);
         Reg.WriteString('Icon', AppExe);
         Reg.CloseKey;
       end;
@@ -674,14 +835,29 @@ begin
     end
     else
     begin
-      DeleteShellVerb('.txt');
-      DeleteShellVerb('.md');
-      Reg.DeleteKey('Software\Classes\*\shell\AceUtils\command');
-      Reg.DeleteKey('Software\Classes\*\shell\AceUtils');
+      // 1. Unassociate Extensions
+      UnassociateExtension('.md', 'AceUtils.AssocFile.md');
+      UnassociateExtension('.markdown', 'AceUtils.AssocFile.md');
+      UnassociateExtension('.txt', 'AceUtils.AssocFile.txt');
+
+      // 2. Delete ProgIDs
+      DeleteKeyRecurse('Software\Classes\AceUtils.AssocFile.md');
+      DeleteKeyRecurse('Software\Classes\AceUtils.AssocFile.txt');
+
+      // 3. Delete Application registration
+      DeleteKeyRecurse('Software\Classes\Applications\' + ExtractFileName(AppExe));
+
+      // 4. Delete global context menu
+      DeleteKeyRecurse('Software\Classes\*\shell\AceUtils');
+      DeleteKeyRecurse('Software\Classes\*\shell\AceFileSearch');
     end;
   finally
     Reg.Free;
   end;
+
+  {$IFDEF WINDOWS}
+  SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nil, nil);
+  {$ENDIF}
 end;
 
 procedure TfrmMain.btnRegisterAssocClick(Sender: TObject);
@@ -695,24 +871,25 @@ begin
     if IsReg then
     begin
       if MessageDlg('File Association',
-        '"Open with Ace''s Utilities" is currently enabled.' + sLineBreak +
-        'Would you like to REMOVE it from the Explorer context menu?',
+        '"Open with Ace''s Utilities" and file associations are currently enabled.' + sLineBreak +
+        'Would you like to REMOVE associations for .txt and .md files?',
         mtConfirmation, [mbYes, mbNo], 0) = mrYes then
       begin
         RegisterFileAssociations(False);
         Ini.WriteBool('FileAssociations', 'Registered', False);
-        ShowMessage('Context menu integration removed.');
+        ShowMessage('File associations and context menu integration removed.');
       end;
     end
     else
     begin
       if MessageDlg('File Association',
-        'Would you like to ADD "Open with Ace''s Utilities" to Explorer context menu for .txt, .md, and other files?',
+        'Would you like to associate .txt and .md files with Ace''s Utilities?' + sLineBreak + sLineBreak +
+        'This enables opening .txt and .md files in Ace''s Utilities and overcomes Windows 11 Notepad hijacking.',
         mtConfirmation, [mbYes, mbNo], 0) = mrYes then
       begin
         RegisterFileAssociations(True);
         Ini.WriteBool('FileAssociations', 'Registered', True);
-        ShowMessage('Context menu integration enabled!');
+        ShowMessage('File association enabled!' + sLineBreak + '.txt and .md files will now open in Ace''s Utilities.');
       end;
     end;
   finally

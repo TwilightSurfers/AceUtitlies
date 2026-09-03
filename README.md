@@ -53,10 +53,13 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **One-Click Restore**: Left-clicking the tray icon restores the window to normal view immediately.
 - **Persistent Setting**: Preferences are saved across restarts in `AceUtils.ini`.
 
-### 📂 6. Windows Explorer Shell Integration
-- **"Open with Ace's Utilities"**: Optional one-click registration adds a fast context menu item in Windows Explorer for `.txt` and `.md` files.
-- **Zero Registry Bloat**: Writes to per-user `HKCU\Software\Classes\SystemFileAssociations` without requiring Administrator privileges or disrupting system default associations.
-- **Easy Toggle**: Add or remove the context menu integration at any time directly from the header bar.
+### 📂 6. Windows Explorer Shell Integration & Windows 11 Notepad Override
+- **Full File Associations**: Complete one-click registration associates `.txt`, `.md`, and `.markdown` files with Ace's Utilities.
+- **Windows 11 Notepad Override**: Cleans up Windows 11 `UserChoice` / `UserChoiceLatest` registry hijacking for `.md` and `.txt`, so files double-clicked or opened in Explorer launch directly in Ace's Utilities instead of the modern UWP Notepad.
+- **Context Menu Integration**: Adds "Open with Ace's Utilities" directly to Windows Explorer right-click context menus for instant access.
+- **Zero Admin Privileges Required**: Writes cleanly to per-user `HKCU\Software\Classes` without needing Administrator privileges or modifying system files.
+- **Command-Line Registration**: Supports `/register` and `/unregister` flags for headless setup or automation.
+- **Easy Toggle**: Add or remove all associations and context menu items at any time directly from the header button.
 
 ---
 
