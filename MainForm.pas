@@ -211,6 +211,8 @@ type
     procedure btnApplyRemapClick(Sender: TObject);
     procedure lvContextMenuSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure lvContextMenuCustomDrawItem(Sender: TCustomListView; Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure lvContextMenuColumnClick(Sender: TObject; Column: TListColumn);
+    procedure lvContextMenuCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
 
     // Notepad Tab Events
     procedure btnNewFileClick(Sender: TObject);
@@ -247,6 +249,10 @@ type
     FSelectedPath: string;
     FSortColumn: Integer;
     FSortAscending: Boolean;
+
+    // Context Menu State
+    FContextSortColumn: Integer;
+    FContextSortAscending: Boolean;
 
     // Notepad State
     FCurrentFileName: string;
@@ -510,6 +516,8 @@ begin
   FIsModified := False;
   FSortColumn := -1;
   FSortAscending := True;
+  FContextSortColumn := -1;
+  FContextSortAscending := True;
   FCustomFontColor := clNone;
   FWrapPlugin := nil;
 
@@ -2136,6 +2144,9 @@ begin
     lblContextMenuStatus.Caption := Format('Total: %d entries found (%d STALE / broken targets)', [lvContextMenu.Items.Count, StaleCount])
   else
     lblContextMenuStatus.Caption := Format('Total: %d entries found (all targets valid)', [lvContextMenu.Items.Count]);
+
+  if FContextSortColumn >= 0 then
+    lvContextMenu.AlphaSort;
 end;
 {$ELSE}
 begin
@@ -2175,6 +2186,66 @@ begin
       Sender.Canvas.Font.Color := $000000C8;
   end;
   DefaultDraw := True;
+end;
+
+procedure TfrmMain.lvContextMenuColumnClick(Sender: TObject; Column: TListColumn);
+var
+  i: Integer;
+  BaseCaption: string;
+begin
+  if FContextSortColumn = Column.Index then
+    FContextSortAscending := not FContextSortAscending
+  else
+  begin
+    FContextSortColumn := Column.Index;
+    FContextSortAscending := True;
+  end;
+
+  // Update column header captions with ▲ / ▼
+  for i := 0 to lvContextMenu.Columns.Count - 1 do
+  begin
+    BaseCaption := lvContextMenu.Columns[i].Caption;
+    BaseCaption := StringReplace(BaseCaption, ' ▲', '', [rfReplaceAll]);
+    BaseCaption := StringReplace(BaseCaption, ' ▼', '', [rfReplaceAll]);
+    if i = FContextSortColumn then
+    begin
+      if FContextSortAscending then
+        BaseCaption := BaseCaption + ' ▲'
+      else
+        BaseCaption := BaseCaption + ' ▼';
+    end;
+    lvContextMenu.Columns[i].Caption := BaseCaption;
+  end;
+
+  // Sort list view using OnCompare
+  lvContextMenu.AlphaSort;
+end;
+
+procedure TfrmMain.lvContextMenuCompare(Sender: TObject; Item1, Item2: TListItem;
+  Data: Integer; var Compare: Integer);
+var
+  S1, S2: string;
+  Idx: Integer;
+begin
+  Compare := 0;
+  if (Item1 = nil) or (Item2 = nil) then Exit;
+
+  if FContextSortColumn = 0 then
+  begin
+    S1 := Item1.Caption;
+    S2 := Item2.Caption;
+  end
+  else
+  begin
+    Idx := FContextSortColumn - 1;
+    if Idx < Item1.SubItems.Count then S1 := Item1.SubItems[Idx] else S1 := '';
+    if Idx < Item2.SubItems.Count then S2 := Item2.SubItems[Idx] else S2 := '';
+  end;
+
+  Compare := CompareText(S1, S2);
+
+  if not FContextSortAscending then
+    Compare := -Compare;
 end;
 
 procedure TfrmMain.btnDeleteContextVerbClick(Sender: TObject);
