@@ -907,7 +907,7 @@ object frmMain: TfrmMain
           object edtExpPath: TEdit
             Left = 254
             Height = 26
-            Top = 5
+            Top = 7
             Width = 506
             Anchors = [akTop, akLeft, akRight]
             TabOrder = 5
@@ -1090,6 +1090,8 @@ object frmMain: TfrmMain
             TabOrder = 0
             ViewStyle = vsReport
             PopupMenu = popExplorer
+            OnColumnClick = ShellListViewExplorerColumnClick
+            OnCompare = ShellListViewExplorerCompare
             OnDblClick = ShellListViewExplorerDblClick
             OnSelectItem = ShellListViewExplorerSelectItem
             OnKeyDown = ShellListViewExplorerKeyDown

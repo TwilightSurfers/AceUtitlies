@@ -289,6 +289,9 @@ type
     procedure miExpCopyNameClick(Sender: TObject);
     procedure miExpRenameClick(Sender: TObject);
     procedure miExpDeleteClick(Sender: TObject);
+    procedure ShellListViewExplorerColumnClick(Sender: TObject; Column: TListColumn);
+    procedure ShellListViewExplorerCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+    procedure ShellListViewExplorerFileAdded(Sender: TObject; Item: TListItem);
 
     // Header & Tray Events
     procedure btnToggleDarkModeClick(Sender: TObject);
@@ -466,6 +469,8 @@ type
     FExpHistory: TStringList;
     FExpHistoryIndex: Integer;
     FExpNavigating: Boolean;
+    FExpSortColumn: Integer;
+    FExpSortAscending: Boolean;
 
     procedure NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
     procedure UpdateExplorerNavButtons;
@@ -486,7 +491,7 @@ implementation
 
 uses
   {$IFDEF WINDOWS}
-  Windows, ShellAPI,
+  Windows, ShellAPI, ShlObj,
   {$ENDIF}
   LResources, DateUtils, PreviewForm;
 
@@ -568,12 +573,22 @@ var
   Ini: TIniFile;
   UserPrefersDark: Boolean;
   ColorStr: string;
+  i: Integer;
 begin
   Ini := TIniFile.Create(GetIniPath);
   try
     // General Options
     UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
     cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
+
+    // Active Tab (defaults to The Real Explorer on initial launch)
+    ColorStr := Ini.ReadString('General', 'ActiveTab', 'The Real Explorer');
+    for i := 0 to PageControl1.PageCount - 1 do
+      if PageControl1.Pages[i].Caption = ColorStr then
+      begin
+        PageControl1.ActivePageIndex := i;
+        Break;
+      end;
 
     // Search Options
     cbSubfolders.Checked := Ini.ReadBool('Search', 'Subfolders', True);
@@ -601,8 +616,8 @@ begin
       FCustomFontColor := clNone;
 
     // Explorer Options
-    FExpDefaultFolder := Ini.ReadString('Explorer', 'DefaultFolder', GetUserDesktopPath);
-    if not DirectoryExists(FExpDefaultFolder) then
+    FExpDefaultFolder := Ini.ReadString('Explorer', 'DefaultFolder', '');
+    if (FExpDefaultFolder = '') or (not DirectoryExists(FExpDefaultFolder)) then
       FExpDefaultFolder := GetUserDesktopPath;
     NavigateExplorerTo(FExpDefaultFolder);
 
@@ -638,6 +653,8 @@ begin
     // General Options
     Ini.WriteBool('General', 'DarkMode', FDarkMode);
     Ini.WriteBool('General', 'RunInTray', cbRunInTray.Checked);
+    if Assigned(PageControl1.ActivePage) then
+      Ini.WriteString('General', 'ActiveTab', PageControl1.ActivePage.Caption);
 
     // Search Options
     Ini.WriteBool('Search', 'Subfolders', cbSubfolders.Checked);
@@ -732,8 +749,25 @@ begin
   FExpHistory := TStringList.Create;
   FExpHistoryIndex := -1;
   FExpNavigating := False;
+  FExpSortColumn := -1;
+  FExpSortAscending := True;
   FExpDefaultFolder := GetUserDesktopPath;
   ShellTreeViewExplorer.ShellListView := ShellListViewExplorer;
+
+  // Ensure Explorer has 4 standard columns: Name, Size, Type, Date Modified
+  while ShellListViewExplorer.Columns.Count < 4 do
+    ShellListViewExplorer.Columns.Add;
+  ShellListViewExplorer.Columns[0].Caption := 'Name';
+  ShellListViewExplorer.Columns[0].Width := 260;
+  ShellListViewExplorer.Columns[1].Caption := 'Size';
+  ShellListViewExplorer.Columns[1].Width := 90;
+  ShellListViewExplorer.Columns[1].Alignment := taRightJustify;
+  ShellListViewExplorer.Columns[2].Caption := 'Type';
+  ShellListViewExplorer.Columns[2].Width := 100;
+  ShellListViewExplorer.Columns[3].Caption := 'Date Modified';
+  ShellListViewExplorer.Columns[3].Width := 140;
+
+  ShellListViewExplorer.OnFileAdded := @ShellListViewExplorerFileAdded;
 
   LoadAboutContent;
   UpdateKeyboardAndTimerStatus;
@@ -3658,16 +3692,22 @@ end;
   ---------------------------------------------------------------------------- }
 
 function TfrmMain.GetUserDesktopPath: string;
+{$IFDEF WINDOWS}
+var
+  PathBuf: array[0..MAX_PATH] of Char;
+{$ENDIF}
 begin
+  Result := '';
   {$IFDEF WINDOWS}
-  Result := SysUtils.GetEnvironmentVariable('USERPROFILE') + '\Desktop';
+  if SHGetFolderPath(0, CSIDL_DESKTOPDIRECTORY, 0, 0, PathBuf) = S_OK then
+    Result := PathBuf;
+  if (Result = '') or (not DirectoryExists(Result)) then
+    Result := SysUtils.GetEnvironmentVariable('USERPROFILE') + '\Desktop';
   if not DirectoryExists(Result) then
     Result := SysUtils.GetEnvironmentVariable('ONEDRIVE') + '\Desktop';
-  if not DirectoryExists(Result) then
-    Result := GetUserDir + 'Desktop';
-  {$ELSE}
-  Result := GetUserDir + 'Desktop';
   {$ENDIF}
+  if (Result = '') or (not DirectoryExists(Result)) then
+    Result := GetUserDir + 'Desktop';
   if not DirectoryExists(Result) then
     Result := GetUserDir;
 end;
@@ -3737,6 +3777,9 @@ begin
 
     UpdateExplorerNavButtons;
     SetStatus(' Explorer: ' + CleanPath);
+
+    if FExpSortColumn >= 0 then
+      ShellListViewExplorer.AlphaSort;
   finally
     FExpNavigating := False;
   end;
@@ -3777,6 +3820,8 @@ begin
     ShellTreeViewExplorer.Refresh(ShellTreeViewExplorer.Selected);
   except
   end;
+  if FExpSortColumn >= 0 then
+    ShellListViewExplorer.AlphaSort;
 end;
 
 procedure TfrmMain.btnExpDefaultClick(Sender: TObject);
@@ -4115,6 +4160,143 @@ begin
     DeleteFile(SelPath);
   {$ENDIF}
   ShellListViewExplorer.UpdateView;
+end;
+
+procedure TfrmMain.ShellListViewExplorerFileAdded(Sender: TObject; Item: TListItem);
+var
+  ItemPath: string;
+  FTime: LongInt;
+begin
+  if Item = nil then Exit;
+  if Item is TShellListItem then
+    FTime := TShellListItem(Item).FileInfo.Time
+  else
+  begin
+    ItemPath := ShellListViewExplorer.GetPathFromItem(Item);
+    FTime := FileAge(ItemPath);
+  end;
+
+  if FTime <> -1 then
+    Item.SubItems.Add(FormatDateTime('yyyy-mm-dd hh:nn', SafeFileDateToDateTime(FTime)))
+  else
+    Item.SubItems.Add('');
+end;
+
+procedure TfrmMain.ShellListViewExplorerColumnClick(Sender: TObject; Column: TListColumn);
+var
+  i: Integer;
+  BaseCaption: string;
+begin
+  if Column = nil then Exit;
+  if FExpSortColumn = Column.Index then
+    FExpSortAscending := not FExpSortAscending
+  else
+  begin
+    FExpSortColumn := Column.Index;
+    FExpSortAscending := True;
+  end;
+
+  for i := 0 to ShellListViewExplorer.Columns.Count - 1 do
+  begin
+    BaseCaption := ShellListViewExplorer.Columns[i].Caption;
+    BaseCaption := StringReplace(BaseCaption, '  ▲', '', [rfReplaceAll]);
+    BaseCaption := StringReplace(BaseCaption, '  ▼', '', [rfReplaceAll]);
+    if i = FExpSortColumn then
+    begin
+      if FExpSortAscending then
+        BaseCaption := BaseCaption + '  ▲'
+      else
+        BaseCaption := BaseCaption + '  ▼';
+    end;
+    ShellListViewExplorer.Columns[i].Caption := BaseCaption;
+  end;
+
+  ShellListViewExplorer.AlphaSort;
+end;
+
+procedure TfrmMain.ShellListViewExplorerCompare(Sender: TObject; Item1, Item2: TListItem;
+  Data: Integer; var Compare: Integer);
+var
+  IsFold1, IsFold2: Boolean;
+  Size1, Size2: Int64;
+  Time1, Time2: LongInt;
+begin
+  Compare := 0;
+  if (Item1 = nil) or (Item2 = nil) then Exit;
+
+  if (Item1 is TShellListItem) then
+    IsFold1 := TShellListItem(Item1).isFolder
+  else
+    IsFold1 := False;
+
+  if (Item2 is TShellListItem) then
+    IsFold2 := TShellListItem(Item2).isFolder
+  else
+    IsFold2 := False;
+
+  // Folders always grouped first!
+  if IsFold1 and (not IsFold2) then
+  begin
+    Compare := -1;
+    Exit;
+  end;
+  if (not IsFold1) and IsFold2 then
+  begin
+    Compare := 1;
+    Exit;
+  end;
+
+  // Compare according to active column
+  case FExpSortColumn of
+    0: // Name
+    begin
+      Compare := CompareText(Item1.Caption, Item2.Caption);
+    end;
+    1: // Size
+    begin
+      if (Item1 is TShellListItem) and (Item2 is TShellListItem) then
+      begin
+        Size1 := TShellListItem(Item1).FileInfo.Size;
+        Size2 := TShellListItem(Item2).FileInfo.Size;
+        if Size1 < Size2 then Compare := -1
+        else if Size1 > Size2 then Compare := 1
+        else Compare := 0;
+      end
+      else if (Item1.SubItems.Count > 0) and (Item2.SubItems.Count > 0) then
+        Compare := CompareText(Item1.SubItems[0], Item2.SubItems[0])
+      else
+        Compare := 0;
+    end;
+    2: // Type
+    begin
+      if (Item1.SubItems.Count > 1) and (Item2.SubItems.Count > 1) then
+        Compare := CompareText(Item1.SubItems[1], Item2.SubItems[1])
+      else
+        Compare := 0;
+      if Compare = 0 then
+        Compare := CompareText(Item1.Caption, Item2.Caption);
+    end;
+    3: // Date Modified
+    begin
+      if (Item1 is TShellListItem) and (Item2 is TShellListItem) then
+      begin
+        Time1 := TShellListItem(Item1).FileInfo.Time;
+        Time2 := TShellListItem(Item2).FileInfo.Time;
+        if Time1 < Time2 then Compare := -1
+        else if Time1 > Time2 then Compare := 1
+        else Compare := 0;
+      end
+      else if (Item1.SubItems.Count > 2) and (Item2.SubItems.Count > 2) then
+        Compare := CompareText(Item1.SubItems[2], Item2.SubItems[2])
+      else
+        Compare := 0;
+    end
+    else
+      Compare := CompareText(Item1.Caption, Item2.Caption);
+  end;
+
+  if not FExpSortAscending then
+    Compare := -Compare;
 end;
 
 initialization
