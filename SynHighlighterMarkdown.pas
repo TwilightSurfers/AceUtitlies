@@ -441,7 +441,12 @@ end;
 
 procedure TSynMarkdownSyn.ScanText;
 begin
-  while not (fLine[Run] in [#0..#32, '`', '*', '_', '[', '!', '<', '>', '#', '-', '+', '~']) do
+  if not (fLine[Run] in [#0..#32, '`', '*', '_', '[', '!', '<', '>', '#', '-', '+', '~']) then
+  begin
+    while not (fLine[Run] in [#0..#32, '`', '*', '_', '[', '!', '<', '>', '#', '-', '+', '~']) do
+      Inc(Run);
+  end
+  else
     Inc(Run);
   FTokenID := tkText;
 end;
@@ -604,6 +609,8 @@ begin
 
   // 14. Regular text
   ScanText;
+  if Run <= fTokenPos then
+    Inc(Run);
 end;
 
 end.
