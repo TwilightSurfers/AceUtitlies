@@ -66,6 +66,7 @@ type
     procedure ScanLink;
     procedure ScanTagOrComment;
     procedure ScanText;
+    procedure NextInternal;
   protected
     function GetIdentChars: TSynIdentChars; override;
     function GetSampleSource: string; override;
@@ -220,7 +221,7 @@ end;
 
 function TSynMarkdownSyn.GetEol: Boolean;
 begin
-  Result := (fLine = nil) or (fLine[Run] = #0);
+  Result := (FTokenID = tkNull);
 end;
 
 function TSynMarkdownSyn.GetRange: Pointer;
@@ -451,15 +452,8 @@ begin
   FTokenID := tkText;
 end;
 
-procedure TSynMarkdownSyn.Next;
+procedure TSynMarkdownSyn.NextInternal;
 begin
-  fTokenPos := Run;
-  if (fLine = nil) or (fLine[Run] = #0) then
-  begin
-    FTokenID := tkNull;
-    Exit;
-  end;
-
   // 1. Inside multi-line code block?
   if fRange = rsCodeBlock then
   begin
@@ -611,6 +605,27 @@ begin
   ScanText;
   if Run <= fTokenPos then
     Inc(Run);
+end;
+
+procedure TSynMarkdownSyn.Next;
+begin
+  fTokenPos := Run;
+  if (fLine = nil) or (fLine[Run] = #0) then
+  begin
+    FTokenID := tkNull;
+    Exit;
+  end;
+
+  NextInternal;
+
+  // ABSOLUTE SAFETY GUARANTEE:
+  // Run MUST advance past fTokenPos on every call unless at end-of-line (#0).
+  // This completely eliminates any possibility of an infinite loop.
+  if (Run <= fTokenPos) and (fLine <> nil) and (fLine[Run] <> #0) then
+  begin
+    Inc(Run);
+    FTokenID := tkText;
+  end;
 end;
 
 end.

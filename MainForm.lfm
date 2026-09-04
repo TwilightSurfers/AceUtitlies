@@ -1657,17 +1657,14 @@ object frmMain: TfrmMain
     end
     object miCut: TMenuItem
       Caption = 'Cut'
-      ShortCut = 16472
       OnClick = miCutClick
     end
     object miCopy: TMenuItem
       Caption = 'Copy'
-      ShortCut = 16451
       OnClick = miCopyClick
     end
     object miPaste: TMenuItem
       Caption = 'Paste'
-      ShortCut = 16470
       OnClick = miPasteClick
     end
     object miDelete: TMenuItem

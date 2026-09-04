@@ -1691,8 +1691,11 @@ begin
   end;
 
   SearchPath := Trim(edtSearchPath.Text);
-  if (Length(SearchPath) >= 2) and (SearchPath[1] = '"') and (SearchPath[Length(SearchPath)] = '"') then
-    SearchPath := Trim(Copy(SearchPath, 2, Length(SearchPath) - 2));
+  while (Length(SearchPath) > 0) and (SearchPath[1] in ['"', '''']) do
+    Delete(SearchPath, 1, 1);
+  while (Length(SearchPath) > 0) and (SearchPath[Length(SearchPath)] in ['"', '''']) do
+    Delete(SearchPath, Length(SearchPath), 1);
+  SearchPath := Trim(SearchPath);
 
   if SearchPath = '' then
     SearchPath := FSelectedPath;
@@ -3694,7 +3697,9 @@ begin
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.3.1] - 2026-09-04');
   mmoAboutBuildLog.Lines.Add('  * Smart File Path Handling: Pasting full file paths or filenames into Explorer address bar automatically resolves to parent folder, selects target item, and previews it.');
-  mmoAboutBuildLog.Lines.Add('  * Support for quoted file/folder paths (e.g. Windows Explorer "Copy as path").');
+  mmoAboutBuildLog.Lines.Add('  * Robust Path Normalization: Strips single, double, and mismatched quotes across Explorer and Search inputs.');
+  mmoAboutBuildLog.Lines.Add('  * SynHighlighterMarkdown & Live Preview: Fixed highlighter GetEol contract and token loop advancement that caused TLazSynEditLineWrapPlugin to hang when previewing Markdown files.');
+  mmoAboutBuildLog.Lines.Add('  * Clipboard Shortcut Fix: Removed global form shortcuts from popNotepad menu items so all edit fields natively handle Windows paste.');
   mmoAboutBuildLog.Lines.Add('  * Instant Search Cancellation: Fixed Stop button hang during long scans by pumping messages every 50ms / 32 items regardless of match state.');
   mmoAboutBuildLog.Lines.Add('  * Search Optimization: Search patterns are pre-parsed once per search instead of allocating/freeing TStringList on every enumerated file.');
   mmoAboutBuildLog.Lines.Add('  * Race Condition Guard: Stop button disables immediately on click and pending queued clicks are drained to prevent phantom actions.');
@@ -3829,8 +3834,11 @@ var
   i: Integer;
 begin
   CleanPath := Trim(APath);
-  if (Length(CleanPath) >= 2) and (CleanPath[1] = '"') and (CleanPath[Length(CleanPath)] = '"') then
-    CleanPath := Trim(Copy(CleanPath, 2, Length(CleanPath) - 2));
+  while (Length(CleanPath) > 0) and (CleanPath[1] in ['"', '''']) do
+    Delete(CleanPath, 1, 1);
+  while (Length(CleanPath) > 0) and (CleanPath[Length(CleanPath)] in ['"', '''']) do
+    Delete(CleanPath, Length(CleanPath), 1);
+  CleanPath := Trim(CleanPath);
 
   if CleanPath = '' then Exit;
 

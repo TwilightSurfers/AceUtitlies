@@ -4,7 +4,7 @@
     <Version Value="12"/>
     <General>
       <SessionStorage Value="InProjectDir"/>
-      <Title Value="Ace's Utilities"/>
+      <Title Value="Ace&apos;s Utilities"/>
       <Scaled Value="True"/>
       <ResourceType Value="res"/>
       <UseXPManifest Value="True"/>
@@ -12,6 +12,15 @@
         <DpiAware Value="True/PM"/>
       </XPManifest>
     </General>
+    <VersionInfo>
+      <UseVersionInfo Value="True"/>
+      <AutoIncrementBuild Value="True"/>
+      <MajorVersionNr Value="1"/>
+      <MinorVersionNr Value="3"/>
+      <RevisionNr Value="1"/>
+      <BuildNr Value="4"/>
+      <StringTable CompanyName="Twilight Surfers Development" FileDescription="Ace&apos;s Utilities - Real Windows Search, Explorer, Notepad, &amp; Shell Tools" InternalName="AceUtils" LegalCopyright="Copyright (c) 2026 Twilight Surfers Development. MIT License." OriginalFilename="AceUtils.exe" ProductName="Ace&apos;s Utilities" ProductVersion="1.3.1"/>
+    </VersionInfo>
     <BuildModes>
       <Item Name="Default" Default="True"/>
     </BuildModes>
@@ -54,15 +63,6 @@
         <IsPartOfProject Value="True"/>
       </Unit>
     </Units>
-    <VersionInfo>
-      <UseVersionInfo Value="True"/>
-      <AutoIncrementBuild Value="True"/>
-      <MajorVersionNr Value="1"/>
-      <MinorVersionNr Value="3"/>
-      <RevisionNr Value="1"/>
-      <BuildNr Value="1"/>
-      <StringTable CompanyName="Twilight Surfers Development" FileDescription="Ace's Utilities - Real Windows Search, Explorer, Notepad, &amp; Shell Tools" InternalName="AceUtils" LegalCopyright="Copyright (c) 2026 Twilight Surfers Development. MIT License." OriginalFilename="AceUtils.exe" ProductName="Ace's Utilities" ProductVersion="1.3.1"/>
-    </VersionInfo>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>
@@ -71,7 +71,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <CodeGeneration>
       <Optimizations>
