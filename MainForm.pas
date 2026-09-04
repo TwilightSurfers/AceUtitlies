@@ -12,7 +12,7 @@ uses
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, LConvEncoding, LazUTF8, LCLType,
-  ImgList, LCLIntf, SynHighlighterMarkdown;
+  ImgList, LCLIntf, SynHighlighterMarkdown, LMessages;
 
 type
   PResultInfo = ^TResultInfo;
@@ -464,6 +464,9 @@ type
     procedure UpdateKeyboardAndTimerStatus;
     procedure LoadAboutContent;
 
+  protected
+    procedure WndProc(var Message: TLMessage); override;
+
   private
     // The Real Explorer State & Helpers
     FExpDefaultFolder: string;
@@ -501,6 +504,9 @@ const
 
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
+
+var
+  WM_ACEUTILS_RESTORE: UINT = 0;
 
 { ----------------------------------------------------------------------------
   Lifecycle & Initialization
@@ -681,6 +687,9 @@ end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
+  {$IFDEF WINDOWS}
+  WM_ACEUTILS_RESTORE := RegisterWindowMessage('AceUtils_Restore_SingleInstance');
+  {$ENDIF}
   FStopSearch := False;
   FSearching := False;
   FSelectedPath := 'C:\';
@@ -878,6 +887,38 @@ procedure TfrmMain.miTrayExitClick(Sender: TObject);
 begin
   FAllowClose := True;
   Close;
+end;
+
+procedure TfrmMain.WndProc(var Message: TLMessage);
+{$IFDEF WINDOWS}
+var
+  FWI: FLASHWINFO;
+{$ENDIF}
+begin
+{$IFDEF WINDOWS}
+  if (WM_ACEUTILS_RESTORE <> 0) and (Message.Msg = WM_ACEUTILS_RESTORE) then
+  begin
+    // Restore window even if minimized or hidden in the system tray
+    Show;
+    WindowState := wsNormal;
+    Application.Restore;
+    BringToFront;
+    SetForegroundWindow(Handle);
+
+    // Flash the window title and taskbar to alert the user
+    FillChar(FWI, SizeOf(FWI), 0);
+    FWI.cbSize := SizeOf(FWI);
+    FWI.hwnd := Handle;
+    FWI.dwFlags := FLASHW_ALL or FLASHW_TIMERNOFG;
+    FWI.uCount := 4;
+    FWI.dwTimeout := 0;
+    FlashWindowEx(@FWI);
+
+    Message.Result := 1;
+    Exit;
+  end;
+{$ENDIF}
+  inherited WndProc(Message);
 end;
 
 function TfrmMain.GetIniPath: string;
@@ -3704,6 +3745,7 @@ begin
   mmoAboutBuildLog.Lines.Add('  * Search Optimization: Search patterns are pre-parsed once per search instead of allocating/freeing TStringList on every enumerated file.');
   mmoAboutBuildLog.Lines.Add('  * Race Condition Guard: Stop button disables immediately on click and pending queued clicks are drained to prevent phantom actions.');
   mmoAboutBuildLog.Lines.Add('  * Search Path Smart Detection: Search tab path input also auto-extracts directory if a file path is pasted.');
+  mmoAboutBuildLog.Lines.Add('  * Single Instance Guard & Tray Restore: Enforces single-instance execution via named mutex. Duplicate launches wake up and restore the existing window from the system tray and flash the title bar.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.3.0] - 2026-09-03');
   mmoAboutBuildLog.Lines.Add('  * Added "The Real Explorer" tab with permanent Details view and folders first.');

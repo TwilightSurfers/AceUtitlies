@@ -124,3 +124,12 @@ Before considering any fix complete:
 2. **CPU Verification**: Ensure CPU usage returns to 0% after actions (no runaway thread spinning on a core).
 3. **Quoted & Edge-Case Inputs**: Test paths with quotes (`"C:\..."`), double quotes (`""C:\...""`), single quotes, and trailing delimiters.
 4. **Git Tree Cleanliness**: Ensure no temporary test executables (`test_*.exe`), crash dumps (`*.dmp`), or stray `.o`/`.ppu` files remain untracked.
+
+---
+
+## 7. Single Instance Enforcement & System Tray Wake-up
+
+To prevent duplicate processes and resource contention, Ace's Utilities strictly allows only one instance to run:
+- **Named Mutex**: `CreateMutex(nil, True, 'AceUtils_SingleInstance_Mutex')` in `AceUtils.lpr` checks for an existing instance before initializing LCL forms.
+- **Secondary Instance Termination**: If `GetLastError = ERROR_ALREADY_EXISTS`, the second process signals the running instance and exits immediately.
+- **System Tray Restoration & Window Flashing**: The second process posts a registered message (`RegisterWindowMessage('AceUtils_Restore_SingleInstance')`) and calls `ShowWindow(..., SW_RESTORE)` / `SetForegroundWindow`. When `TfrmMain.WndProc` receives this message, it calls `Show`, sets `WindowState := wsNormal`, brings the form to the front (unhiding it if minimized to the system tray), and calls `FlashWindowEx` to flash the window title bar and taskbar.
