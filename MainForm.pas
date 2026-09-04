@@ -417,6 +417,7 @@ type
     procedure SetActivity(const AMsg: string);
     procedure SetCounts;
     procedure SetSearching(AValue: Boolean);
+    function MatchesParsedPattern(const AFileName: string; APatterns: TStrings; ACaseSensitive: Boolean): Boolean;
     function MatchesPattern(const AFileName, APattern: string; ACaseSensitive: Boolean): Boolean;
     function MatchWildcard(const AStr, APattern: string): Boolean;
     function FileContainsText(const AFilePath, AText: string; ACaseSensitive: Boolean): Boolean;
@@ -818,6 +819,11 @@ end;
 
 procedure TfrmMain.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
+  if FSearching then
+  begin
+    FStopSearch := True;
+    Application.ProcessMessages;
+  end;
   if cbRunInTray.Checked and (not FAllowClose) then
   begin
     CanClose := False;
@@ -1685,10 +1691,20 @@ begin
   end;
 
   SearchPath := Trim(edtSearchPath.Text);
+  if (Length(SearchPath) >= 2) and (SearchPath[1] = '"') and (SearchPath[Length(SearchPath)] = '"') then
+    SearchPath := Trim(Copy(SearchPath, 2, Length(SearchPath) - 2));
+
   if SearchPath = '' then
     SearchPath := FSelectedPath;
   if SearchPath = '' then
     SearchPath := 'C:\';
+
+  // If user pasted a file path instead of folder, extract directory
+  if FileExists(SearchPath) and (not DirectoryExists(SearchPath)) then
+  begin
+    SearchPath := ExtractFileDir(SearchPath);
+    edtSearchPath.Text := SearchPath;
+  end;
 
   SearchPath := IncludeTrailingPathDelimiter(SearchPath);
 
@@ -1720,6 +1736,7 @@ begin
     DoSearch(SearchPath, Pattern, Content, cbSubfolders.Checked,
       cbCaseSensitive.Checked, cbIncludeFolders.Checked);
   finally
+    Application.ProcessMessages; // Drain any clicks queued while search was running
     SetSearching(False);
     SetCounts;
     if FStopSearch then
@@ -1741,7 +1758,9 @@ end;
 procedure TfrmMain.btnStopClick(Sender: TObject);
 begin
   FStopSearch := True;
-  SetActivity('Stopping...');
+  btnStop.Enabled := False;
+  SetActivity('Stopping search...');
+  SetStatus(' Stopping...');
 end;
 
 procedure TfrmMain.btnClearClick(Sender: TObject);
@@ -2698,16 +2717,23 @@ procedure TfrmMain.DoSearch(const APath, APattern, AContent: string;
   ARecursive, ACaseSensitive, AIncludeFolders: Boolean);
 var
   DirQueue: TStringList;
+  PatternList: TStringList;
   SR: TSearchRec;
   CurrentDir, FullFilePath: string;
   QueueIndex: Integer;
   TickCount, LastTick: QWord;
   HasContentFilter: Boolean;
   IsFolder, NameMatches: Boolean;
+  FilesScannedInDir: Integer;
 begin
   HasContentFilter := (AContent <> '');
   DirQueue := TStringList.Create;
+  PatternList := TStringList.Create;
   try
+    PatternList.Delimiter := ';';
+    PatternList.StrictDelimiter := True;
+    PatternList.DelimitedText := APattern;
+
     DirQueue.Add(APath);
     QueueIndex := 0;
     LastTick := GetTickCount64;
@@ -2718,15 +2744,20 @@ begin
       Inc(QueueIndex);
       Inc(FDirCount);
 
-      // Periodically update UI
+      // Periodically update UI and process cancellation
       TickCount := GetTickCount64;
-      if (TickCount - LastTick) >= 80 then
+      if (TickCount - LastTick) >= 50 then
       begin
         LastTick := TickCount;
         SetActivity('Scanning: ' + CurrentDir + ' (' + IntToStr(FFileCount) + ' found)');
         SetCounts;
         Application.ProcessMessages;
+        if FStopSearch then Break;
       end;
+
+      if FStopSearch then Break;
+
+      FilesScannedInDir := 0;
 
       // Scan folder
       if FindFirst(CurrentDir + '*', faAnyFile, SR) = 0 then
@@ -2734,6 +2765,21 @@ begin
         try
           repeat
             if FStopSearch then Break;
+
+            // Keep UI responsive during folder enumeration even when files do not match
+            Inc(FilesScannedInDir);
+            if (FilesScannedInDir and 31 = 0) then
+            begin
+              TickCount := GetTickCount64;
+              if (TickCount - LastTick) >= 50 then
+              begin
+                LastTick := TickCount;
+                SetActivity('Scanning: ' + CurrentDir + ' (' + IntToStr(FFileCount) + ' found)');
+                SetCounts;
+                Application.ProcessMessages;
+                if FStopSearch then Break;
+              end;
+            end;
 
             // Skip '.' and '..'
             if (SR.Name = '.') or (SR.Name = '..') then
@@ -2746,7 +2792,7 @@ begin
               // Check folder name if user requested folder inclusion
               if AIncludeFolders and (not HasContentFilter) then
               begin
-                if MatchesPattern(SR.Name, APattern, ACaseSensitive) then
+                if MatchesParsedPattern(SR.Name, PatternList, ACaseSensitive) then
                 begin
                   AddResult(SR.Name, CurrentDir, 0, SafeFileDateToDateTime(SR.Time), 'Folder');
                   Inc(FFileCount);
@@ -2762,9 +2808,10 @@ begin
             else
             begin
               // File checks
-              NameMatches := MatchesPattern(SR.Name, APattern, ACaseSensitive);
+              NameMatches := MatchesParsedPattern(SR.Name, PatternList, ACaseSensitive);
               if NameMatches then
               begin
+                if FStopSearch then Break;
                 FullFilePath := CurrentDir + SR.Name;
                 if (not HasContentFilter) or FileContainsText(FullFilePath, AContent, ACaseSensitive) then
                 begin
@@ -2773,12 +2820,13 @@ begin
 
                   // Keep UI responsive during frequent finds
                   TickCount := GetTickCount64;
-                  if (TickCount - LastTick) >= 100 then
+                  if (TickCount - LastTick) >= 50 then
                   begin
                     LastTick := TickCount;
                     SetActivity('Scanning: ' + CurrentDir + ' (' + IntToStr(FFileCount) + ' found)');
                     SetCounts;
                     Application.ProcessMessages;
+                    if FStopSearch then Break;
                   end;
                 end;
               end;
@@ -2791,6 +2839,7 @@ begin
       end;
     end;
   finally
+    PatternList.Free;
     DirQueue.Free;
   end;
 end;
@@ -2879,53 +2928,61 @@ begin
     Screen.Cursor := crDefault;
 end;
 
-function TfrmMain.MatchesPattern(const AFileName, APattern: string;
-  ACaseSensitive: Boolean): Boolean;
+function TfrmMain.MatchesParsedPattern(const AFileName: string;
+  APatterns: TStrings; ACaseSensitive: Boolean): Boolean;
 var
-  Patterns: TStringList;
   i: Integer;
   FN, Pat: string;
 begin
   Result := False;
+  if (APatterns = nil) or (APatterns.Count = 0) then Exit(True);
+
+  if ACaseSensitive then
+    FN := AFileName
+  else
+    FN := LowerCase(AFileName);
+
+  for i := 0 to APatterns.Count - 1 do
+  begin
+    if ACaseSensitive then
+      Pat := Trim(APatterns[i])
+    else
+      Pat := LowerCase(Trim(APatterns[i]));
+
+    if Pat = '' then Continue;
+
+    // Smart match: If no wildcards (* or ?) are used, treat as a "contains" substring search
+    if (Pos('*', Pat) = 0) and (Pos('?', Pat) = 0) then
+    begin
+      if Pos(Pat, FN) > 0 then
+      begin
+        Result := True;
+        Exit;
+      end;
+    end
+    else
+    begin
+      // Full wildcard match
+      if MatchWildcard(FN, Pat) then
+      begin
+        Result := True;
+        Exit;
+      end;
+    end;
+  end;
+end;
+
+function TfrmMain.MatchesPattern(const AFileName, APattern: string;
+  ACaseSensitive: Boolean): Boolean;
+var
+  Patterns: TStringList;
+begin
   Patterns := TStringList.Create;
   try
     Patterns.Delimiter := ';';
     Patterns.StrictDelimiter := True;
     Patterns.DelimitedText := APattern;
-
-    if ACaseSensitive then
-      FN := AFileName
-    else
-      FN := LowerCase(AFileName);
-
-    for i := 0 to Patterns.Count - 1 do
-    begin
-      if ACaseSensitive then
-        Pat := Trim(Patterns[i])
-      else
-        Pat := LowerCase(Trim(Patterns[i]));
-
-      if Pat = '' then Continue;
-
-      // Smart match: If no wildcards (* or ?) are used, treat as a "contains" substring search
-      if (Pos('*', Pat) = 0) and (Pos('?', Pat) = 0) then
-      begin
-        if Pos(Pat, FN) > 0 then
-        begin
-          Result := True;
-          Exit;
-        end;
-      end
-      else
-      begin
-        // Full wildcard match
-        if MatchWildcard(FN, Pat) then
-        begin
-          Result := True;
-          Exit;
-        end;
-      end;
-    end;
+    Result := MatchesParsedPattern(AFileName, Patterns, ACaseSensitive);
   finally
     Patterns.Free;
   end;
@@ -2985,20 +3042,26 @@ var
 begin
   Result := False;
   Buffer := '';
-  if AText = '' then Exit(True);
+  if FStopSearch or (AText = '') then Exit(False);
 
   try
     FS := TFileStream.Create(AFilePath, fmOpenRead or fmShareDenyNone);
     try
+      if FStopSearch then Exit(False);
+
       // Limit text search on files larger than 30MB for responsiveness
       if FS.Size > 30 * 1024 * 1024 then
         MaxRead := 30 * 1024 * 1024
       else
         MaxRead := FS.Size;
 
+      if MaxRead <= 0 then Exit(False);
+
       SetLength(Buffer, MaxRead);
       ReadBytes := FS.Read(Buffer[1], MaxRead);
       SetLength(Buffer, ReadBytes);
+
+      if FStopSearch then Exit(False);
 
       if ACaseSensitive then
         Result := (Pos(AText, Buffer) > 0)
@@ -3599,19 +3662,26 @@ begin
   mmoAboutFeatures.Lines.Add('   - Results list multi-column sorting by Name, Folder, True Byte Size, Date, Type.');
   mmoAboutFeatures.Lines.Add('   - Copy Filename Only, Copy File Path Only, Copy File Path and Name.');
   mmoAboutFeatures.Lines.Add('');
-  mmoAboutFeatures.Lines.Add('3. FLOATING LIVE PREVIEW:');
+  mmoAboutFeatures.Lines.Add('3. THE REAL EXPLORER:');
+  mmoAboutFeatures.Lines.Add('   - Full classic Explorer view with folders first and permanent Details columns.');
+  mmoAboutFeatures.Lines.Add('   - Smart Address Bar: Automatically detects pasted file paths (with or without quotes), navigates to the parent folder, selects the file, and previews it.');
+  mmoAboutFeatures.Lines.Add('   - Full navigation history (Back/Forward/Up/Refresh) and quick jump chips for Desktop, Downloads, Docs, Pics, C:\, Home.');
+  mmoAboutFeatures.Lines.Add('   - Configurable default start folder with 1-click Set Default.');
+  mmoAboutFeatures.Lines.Add('   - Instant Preview toggle and comprehensive context menus.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('4. FLOATING LIVE PREVIEW:');
   mmoAboutFeatures.Lines.Add('   - Modeless floating preview window updating in real-time as results are clicked.');
   mmoAboutFeatures.Lines.Add('   - Image scaling preview (.png, .jpg, .bmp, .ico, .gif) with dimension readouts.');
   mmoAboutFeatures.Lines.Add('   - TSynEdit code preview with line numbers and syntax coloring.');
   mmoAboutFeatures.Lines.Add('   - High-res shell icon rendering and 16-column Hex + ASCII byte peek.');
   mmoAboutFeatures.Lines.Add('');
-  mmoAboutFeatures.Lines.Add('4. NOTEPAD REPLACEMENT:');
+  mmoAboutFeatures.Lines.Add('5. NOTEPAD REPLACEMENT:');
   mmoAboutFeatures.Lines.Add('   - Tabbed editor powered by TSynEdit with dirty tracking.');
   mmoAboutFeatures.Lines.Add('   - Dedicated custom Markdown highlighter (headers, code blocks, lists, links).');
   mmoAboutFeatures.Lines.Add('   - Highlighters for Pascal, Python, HTML, XML, CSS, JS, SQL, Batch, INI, Diff.');
   mmoAboutFeatures.Lines.Add('   - Slide-down Find & Replace bar with regex, match case, and whole words.');
   mmoAboutFeatures.Lines.Add('');
-  mmoAboutFeatures.Lines.Add('5. NATIVE WINDOWS 11 POLISH:');
+  mmoAboutFeatures.Lines.Add('6. NATIVE WINDOWS 11 POLISH:');
   mmoAboutFeatures.Lines.Add('   - Native DWM dark title bar via dwmapi.dll Desktop Window Manager attribute.');
   mmoAboutFeatures.Lines.Add('   - System tray minimize/close with quick actions context menu.');
   mmoAboutFeatures.Lines.Add('   - Live keyboard status (CAPS, NUM, INS) and ticking System Clock in status bar.');
@@ -3621,6 +3691,14 @@ begin
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.3.1] - 2026-09-04');
+  mmoAboutBuildLog.Lines.Add('  * Smart File Path Handling: Pasting full file paths or filenames into Explorer address bar automatically resolves to parent folder, selects target item, and previews it.');
+  mmoAboutBuildLog.Lines.Add('  * Support for quoted file/folder paths (e.g. Windows Explorer "Copy as path").');
+  mmoAboutBuildLog.Lines.Add('  * Instant Search Cancellation: Fixed Stop button hang during long scans by pumping messages every 50ms / 32 items regardless of match state.');
+  mmoAboutBuildLog.Lines.Add('  * Search Optimization: Search patterns are pre-parsed once per search instead of allocating/freeing TStringList on every enumerated file.');
+  mmoAboutBuildLog.Lines.Add('  * Race Condition Guard: Stop button disables immediately on click and pending queued clicks are drained to prevent phantom actions.');
+  mmoAboutBuildLog.Lines.Add('  * Search Path Smart Detection: Search tab path input also auto-extracts directory if a file path is pasted.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.3.0] - 2026-09-03');
   mmoAboutBuildLog.Lines.Add('  * Added "The Real Explorer" tab with permanent Details view and folders first.');
@@ -3747,10 +3825,29 @@ end;
 
 procedure TfrmMain.NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
 var
-  CleanPath: string;
+  CleanPath, TargetFile, TargetName: string;
+  i: Integer;
 begin
   CleanPath := Trim(APath);
+  if (Length(CleanPath) >= 2) and (CleanPath[1] = '"') and (CleanPath[Length(CleanPath)] = '"') then
+    CleanPath := Trim(Copy(CleanPath, 2, Length(CleanPath) - 2));
+
   if CleanPath = '' then Exit;
+
+  TargetFile := '';
+  // Smart detection: if user pasted a file path, navigate to parent directory and preview the file
+  if FileExists(CleanPath) and (not DirectoryExists(CleanPath)) then
+  begin
+    TargetFile := CleanPath;
+    CleanPath := ExtractFileDir(CleanPath);
+  end
+  else if (not DirectoryExists(CleanPath)) and DirectoryExists(ExtractFileDir(CleanPath)) and (ExtractFileName(CleanPath) <> '') then
+  begin
+    if FileExists(CleanPath) then
+      TargetFile := CleanPath;
+    CleanPath := ExtractFileDir(CleanPath);
+  end;
+
   if not DirectoryExists(CleanPath) then
   begin
     MessageDlg('Cannot Find Folder', 'The path "' + CleanPath + '" does not exist.', mtError, [mbOK], 0);
@@ -3780,6 +3877,25 @@ begin
 
     if FExpSortColumn >= 0 then
       ShellListViewExplorer.AlphaSort;
+
+    // If a target file was identified, select it in the explorer list and preview it
+    if TargetFile <> '' then
+    begin
+      TargetName := ExtractFileName(TargetFile);
+      for i := 0 to ShellListViewExplorer.Items.Count - 1 do
+      begin
+        if SameText(ShellListViewExplorer.Items[i].Caption, TargetName) then
+        begin
+          ShellListViewExplorer.ItemIndex := i;
+          ShellListViewExplorer.Selected := ShellListViewExplorer.Items[i];
+          ShellListViewExplorer.Items[i].MakeVisible(False);
+          Break;
+        end;
+      end;
+
+      if FileExists(TargetFile) then
+        PreviewExplorerFile(TargetFile);
+    end;
   finally
     FExpNavigating := False;
   end;
@@ -3866,7 +3982,6 @@ var
   SizeStr, DateStr, TypeStr, FileName: string;
 begin
   if not FileExists(APath) then Exit;
-  if not IsPreviewableFile(APath) then Exit;
   if Assigned(frmPreview) and frmPreview.Visible and (frmPreview.CurrentPath = APath) then Exit;
 
   FileName := ExtractFileName(APath);

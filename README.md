@@ -27,14 +27,26 @@ Microsoft keeps hijacking file associations in Windows 11 using hidden `UserChoi
 ### 🔍 2. Real Windows File Search (That Actually Works)
 Tired of Windows Search indexing freezes, search loops, or failing to find files that are right in front of you?
 - **Fast Traversal Engine**: Safe Breadth-First Search (BFS) directory walker.
+- **Instant & Non-Blocking Stop**: Responsive UI polling every 50ms ensures clicking "Stop" cancels deep searches instantaneously without freezes or Windows "(Not Responding)" lockups.
+- **Pre-Parsed Pattern Engine**: Pattern lists are compiled once per search, eliminating per-file memory churn and boosting traversal speeds.
+- **Smart Directory Detection**: Pasting a full file path (or quoted path) into the search directory field automatically resolves to its parent folder.
 - **Junction Point & Symlink Protection**: Automatically skips NTFS reparse points (`FILE_ATTRIBUTE_REPARSE_POINT` `$400`), avoiding endless recursion loops common in Windows 11 user directories (e.g. `Application Data`).
-- **Flexible Pattern Matching**: Type `*.pas` or simply `MainForm`—terms without explicit wildcards automatically perform substring searches.
-- **Content Search**: Full-text scanning inside files with configurable case sensitivity.
+- **Flexible Pattern Matching**: Type `*.pas` or simply `MainForm`—terms without explicit wildcards automatically perform substring searches. Multiple patterns can be delimited by semicolons (`*.pas;*.lpr;*.md`).
+- **Content Search**: Full-text scanning inside files with configurable case sensitivity and graceful stopping.
 - **Interactive Multi-Column Header Sorting**: Click any column (**File Name**, **Folder**, **Size**, **Modified Date**, **Type**) to sort Ascending (`▲`) or Descending (`▼`). File sizes sort by true numeric byte count (so 10 MB correctly sorts higher than 2 KB).
 - **Directory Tree & Quick Buttons**: Includes a full `TShellTreeView`, directory browse dialog, and one-click quick jump buttons for `C:\`, User Home, and Desktop.
 - **Rich Results Context Menu**: Right-click any search result to Open in Notepad, Reveal in Explorer, Open / Run File, **Copy Filename Only**, **Copy File Path Only**, or **Copy File Path and Name** (with multi-item selection clipboard support).
 
-### 👁️ 3. Floating Live File Preview Window
+### 📁 3. The Real Explorer
+Frustrated by modern Windows Explorer hiding folders or switching views? The Real Explorer provides a fast, permanent classic file manager:
+- **Folders First & Permanent Details View**: Reliable directory navigation where folders always stay grouped at the top and detailed columns (Name, Size, Modified, Type) stay fixed.
+- **Smart Address Bar**: Paste full file paths, filenames, or quoted paths (e.g. `"C:\Users\User\Desktop\unfollow-day1.md"` or `C:\file.txt`) directly into the path edit. The Explorer intelligently detects whether the input is a file or folder, navigates to the parent directory, auto-selects the file in the list, and opens it in the floating Live Preview window.
+- **Full Navigation Stack**: Back, Forward, Up, and Refresh buttons with dynamic history management.
+- **Quick Jump Chips**: One-click jump buttons for Desktop, Downloads, Documents, Pictures, Drive `C:\`, and User Home.
+- **Custom Default Startup Folder**: Set your favorite starting location (e.g., Desktop or Project root) with a single click of "Set Default".
+- **Floating Preview & Context Actions**: Dedicated Preview button, Recycle Bin deletion, in-place rename, and seamless "Open in Notepad" tab routing.
+
+### 👁️ 4. Floating Live File Preview Window
 Preview files dynamically on a single click without blocking the main search window:
 - **Modeless Floating Window**: Stays open side-by-side with your search list; click any result and the preview updates instantaneously.
 - **Image Previews**: Seamless native rendering for `.png`, `.jpg`, `.jpeg`, `.bmp`, `.ico`, and `.gif` with proportional scaling, dimension readouts (`Width x Height`), and file size.
@@ -43,7 +55,7 @@ Preview files dynamically on a single click without blocking the main search win
 - **"Open in Editor" Quick Action**: One click jumps straight into the built-in Notepad editor tab.
 - **Enable / Disable Toggle**: Easily toggle live preview on or off with the search option checkbox.
 
-### 📝 4. Windows 11 Notepad Replacement
+### 📝 5. Windows 11 Notepad Replacement
 A complete, tabbed text and code editor powered by `TSynEdit`:
 - **File Management**: New, Open, Save, and Save As with dirty-tracking prompts so you never lose unsaved changes.
 - **Multi-Language Syntax Highlighting**: Includes syntax highlighters for Pascal (`.pas`, `.pp`, `.lpr`), Python (`.py`), HTML/XML (`.html`, `.xml`), CSS (`.css`), JavaScript/JSON (`.js`, `.json`), SQL (`.sql`), Batch (`.bat`, `.cmd`), INI/Config (`.ini`, `.cfg`), and a **dedicated custom Markdown syntax highlighter** (`.md`, `.markdown`) with header, code block, list, blockquote, link, and formatting styles for both dark and light modes.
@@ -51,12 +63,12 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
 - **Status Bar**: Live line number, column number, character position, and modified state tracker.
 
-### 🌙 5. Native Windows 11 Dark Mode
+### 🌙 6. Native Windows 11 Dark Mode
 - **Native DWM Titlebar**: Integrates directly with Windows 11 Desktop Window Manager (`DwmSetWindowAttribute` via `dwmapi.dll`) for a true dark window frame.
 - **Automatic System Detection**: Detects your Windows theme preference (`AppsUseLightTheme`) on startup.
 - **One-Click Toggle**: Switch between Dark and Light mode anytime via the header toggle button.
 
-### 📥 6. System Tray Integration
+### 📥 7. System Tray Integration
 - **Run in System Tray**: Check the "Run in System Tray" option to keep Ace's Utilities running quietly in your Windows notification area.
 - **Minimize & Close to Tray**: Minimizing or closing the window cleanly hides it to the tray.
 - **Tray Context Menu**: Right-click the tray icon for quick actions:
