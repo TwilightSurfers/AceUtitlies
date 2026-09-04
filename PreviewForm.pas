@@ -42,6 +42,9 @@ type
     memHex: TMemo;
 
     popPreview: TPopupMenu;
+    miPrevOpenAssociated: TMenuItem;
+    miPrevOpenNotepad: TMenuItem;
+    miPrevSep0: TMenuItem;
     miPrevCopy: TMenuItem;
     miPrevSep: TMenuItem;
     miPrevSelectAll: TMenuItem;
@@ -51,6 +54,8 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure btnOpenInNotepadClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
+    procedure miPrevOpenAssociatedClick(Sender: TObject);
+    procedure miPrevOpenNotepadClick(Sender: TObject);
     procedure miPrevCopyClick(Sender: TObject);
     procedure miPrevSelectAllClick(Sender: TObject);
     procedure popPreviewPopup(Sender: TObject);
@@ -105,14 +110,59 @@ uses
   {$IFDEF WINDOWS}
   Windows, ShellAPI,
   {$ENDIF}
-  MainForm;
+  MainForm, lazsynedittext;
 
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
 
+type
+  TSynTextViewsManagerCracker = class
+  public
+    FTextViewsList: TList;
+    FTextBuffer: TSynEditStringListBase;
+    FTopViewChangedCallback: TNotifyEvent;
+  end;
+
+procedure SafelyFreeWrapPlugin(var APlugin: TLazSynEditLineWrapPlugin; AEditor: TCustomSynEdit);
+var
+  ViewToRemove: TSynEditStringsLinked;
+  Mgr: TSynTextViewsManager;
+  Cracker: TSynTextViewsManagerCracker;
+  Idx: Integer;
+begin
+  if APlugin = nil then Exit;
+  try
+    if (AEditor <> nil) and (not (csDestroying in AEditor.ComponentState)) then
+    begin
+      ViewToRemove := APlugin.FLineMapView;
+      if ViewToRemove <> nil then
+      begin
+        APlugin.FLineMapView := nil; // Detach from plugin so its destructor won't call buggy RemoveSynTextView
+        Mgr := AEditor.TextViewsManager;
+        if Mgr <> nil then
+        begin
+          Cracker := TSynTextViewsManagerCracker(Pointer(Mgr));
+          if Cracker.FTextViewsList <> nil then
+          begin
+            Idx := Cracker.FTextViewsList.IndexOf(ViewToRemove);
+            if Idx >= 0 then
+            begin
+              Cracker.FTextViewsList.Delete(Idx);
+              Mgr.ReconnectViews;
+            end;
+          end;
+        end;
+        ViewToRemove.Free;
+      end;
+    end;
+  finally
+    FreeAndNil(APlugin);
+  end;
+end;
+
 destructor TfrmPreview.Destroy;
 begin
-  FreeAndNil(FWrapPlugin);
+  SafelyFreeWrapPlugin(FWrapPlugin, synPreview);
   inherited Destroy;
 end;
 
@@ -223,9 +273,32 @@ begin
 end;
 
 procedure TfrmPreview.popPreviewPopup(Sender: TObject);
+var
+  HasPath, HasSel: Boolean;
 begin
-  miPrevCopy.Enabled := (synPreview.SelText <> '');
+  HasPath := (FCurrentPath <> '') and FileExists(FCurrentPath);
+  HasSel := (synPreview.SelText <> '');
+  miPrevOpenAssociated.Enabled := HasPath;
+  miPrevOpenNotepad.Enabled := HasPath and IsTextFile(FCurrentPath);
+  miPrevCopy.Enabled := HasSel;
   miPrevSelectAll.Enabled := (synPreview.Lines.Count > 0);
+end;
+
+procedure TfrmPreview.miPrevOpenAssociatedClick(Sender: TObject);
+begin
+  if (FCurrentPath <> '') and FileExists(FCurrentPath) then
+  begin
+    {$IFDEF WINDOWS}
+    ShellExecute(0, 'open', PChar(FCurrentPath), nil, nil, SW_SHOWNORMAL);
+    {$ELSE}
+    OpenDocument(FCurrentPath);
+    {$ENDIF}
+  end;
+end;
+
+procedure TfrmPreview.miPrevOpenNotepadClick(Sender: TObject);
+begin
+  btnOpenInNotepadClick(Sender);
 end;
 
 procedure TfrmPreview.miPrevCopyClick(Sender: TObject);

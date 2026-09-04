@@ -623,10 +623,31 @@ object frmMain: TfrmMain
           OnClick = btnCloseFindClick
         end
       end
+      object pnlEditorHeader: TPanel
+        Left = 0
+        Height = 28
+        Top = 72
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 28
+        ClientWidth = 1042
+        TabOrder = 2
+        object btnCloseFile: TButton
+          Left = 960
+          Height = 24
+          Top = 2
+          Width = 76
+          Anchors = [akTop, akRight]
+          Caption = 'Close File'
+          TabOrder = 0
+          OnClick = btnCloseFileClick
+        end
+      end
       object SynEdit1: TSynEdit
         Left = 0
-        Height = 465
-        Top = 72
+        Height = 437
+        Top = 100
         Width = 1042
         Align = alClient
         Font.Height = -13
@@ -1055,10 +1076,12 @@ object frmMain: TfrmMain
             Top = 0
             Width = 230
             Align = alClient
-            FileSortType = fstAlphabet
+            AutoExpand = True
+            FileSortType = fstFoldersFirst
             TabOrder = 0
-            ObjectTypes = [otFolders]
-            OnChange = ShellTreeViewExplorerChange
+            ObjectTypes = [otFolders, otHidden]
+            OnSelectionChanged = ShellTreeViewExplorerSelectionChanged
+            Options = [tvoAutoItemHeight, tvoKeepCollapsedNodes, tvoReadOnly, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
           end
         end
         object splExplorer: TSplitter
@@ -1083,6 +1106,7 @@ object frmMain: TfrmMain
             Top = 0
             Width = 807
             Align = alClient
+            AutoSizeColumns = False
             MultiSelect = True
             ObjectTypes = [otFolders, otNonFolders]
             ReadOnly = True
@@ -1592,7 +1616,7 @@ object frmMain: TfrmMain
       OnClick = miRevealInExplorerClick
     end
     object miOpenFile: TMenuItem
-      Caption = 'Open / Run File'
+      Caption = 'Open with Associated Program'
       OnClick = miOpenFileClick
     end
     object miSepResults1: TMenuItem
@@ -1652,6 +1676,10 @@ object frmMain: TfrmMain
       ShortCut = 49235
       OnClick = btnSaveAsClick
     end
+    object miNotepadClose: TMenuItem
+      Caption = 'Close File'
+      OnClick = btnCloseFileClick
+    end
     object miSepNotepad0: TMenuItem
       Caption = '-'
     end
@@ -1701,6 +1729,10 @@ object frmMain: TfrmMain
       Caption = 'Open'
       Default = True
       OnClick = miExpOpenClick
+    end
+    object miExpOpenAssociated: TMenuItem
+      Caption = 'Open with Associated Program'
+      OnClick = miExpOpenAssociatedClick
     end
     object miExpNotepad: TMenuItem
       Caption = 'Open in Notepad Tab'

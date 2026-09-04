@@ -18,7 +18,7 @@
       <MajorVersionNr Value="1"/>
       <MinorVersionNr Value="3"/>
       <RevisionNr Value="1"/>
-      <BuildNr Value="6"/>
+      <BuildNr Value="21"/>
       <StringTable CompanyName="Twilight Surfers Development" FileDescription="Ace&apos;s Utilities - Real Windows Search, Explorer, Notepad, &amp; Shell Tools" InternalName="AceUtils" LegalCopyright="Copyright (c) 2026 Twilight Surfers Development. MIT License." OriginalFilename="AceUtils.exe" ProductName="Ace&apos;s Utilities" ProductVersion="1.3.1"/>
     </VersionInfo>
     <BuildModes>

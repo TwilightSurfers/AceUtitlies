@@ -99,6 +99,9 @@ type
     cbWholeWord: TCheckBox;
     btnCloseFind: TButton;
 
+    pnlEditorHeader: TPanel;
+    btnCloseFile: TButton;
+
     SynEdit1: TSynEdit;
 
     pnlNotepadStatus: TPanel;
@@ -132,6 +135,7 @@ type
     popNotepad: TPopupMenu;
     miNotepadSave: TMenuItem;
     miNotepadSaveAs: TMenuItem;
+    miNotepadClose: TMenuItem;
     miSepNotepad0: TMenuItem;
     miCut: TMenuItem;
     miCopy: TMenuItem;
@@ -192,6 +196,7 @@ type
     ShellListViewExplorer: TShellListView;
     popExplorer: TPopupMenu;
     miExpOpen: TMenuItem;
+    miExpOpenAssociated: TMenuItem;
     miExpNotepad: TMenuItem;
     miExpPreview: TMenuItem;
     miExpReveal: TMenuItem;
@@ -277,12 +282,13 @@ type
     procedure btnJumpPicturesClick(Sender: TObject);
     procedure btnJumpDriveCClick(Sender: TObject);
     procedure btnJumpUserHomeClick(Sender: TObject);
-    procedure ShellTreeViewExplorerChange(Sender: TObject; Node: TTreeNode);
+    procedure ShellTreeViewExplorerSelectionChanged(Sender: TObject);
     procedure ShellListViewExplorerDblClick(Sender: TObject);
     procedure ShellListViewExplorerSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure ShellListViewExplorerKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure popExplorerPopup(Sender: TObject);
     procedure miExpOpenClick(Sender: TObject);
+    procedure miExpOpenAssociatedClick(Sender: TObject);
     procedure miExpNotepadClick(Sender: TObject);
     procedure miExpRevealClick(Sender: TObject);
     procedure miExpCopyPathClick(Sender: TObject);
@@ -356,6 +362,7 @@ type
     procedure btnReplaceNextClick(Sender: TObject);
     procedure btnReplaceAllClick(Sender: TObject);
     procedure btnCloseFindClick(Sender: TObject);
+    procedure btnCloseFileClick(Sender: TObject);
     procedure SynEdit1Change(Sender: TObject);
     procedure SynEdit1Enter(Sender: TObject);
     procedure SynEdit1Exit(Sender: TObject);
@@ -422,7 +429,7 @@ type
     function MatchWildcard(const AStr, APattern: string): Boolean;
     function FileContainsText(const AFilePath, AText: string; ACaseSensitive: Boolean): Boolean;
     function SafeFileDateToDateTime(ATime: LongInt): TDateTime;
-    function FormatFileSize(ASize: Int64): string;
+    function FormatFileSize(ASize: Int64; IsFolder: Boolean = False): string;
     function IsImageFile(const APath: string): Boolean;
     function IsTextFile(const APath: string): Boolean;
     function IsPreviewableFile(const APath: string): Boolean;
@@ -476,6 +483,7 @@ type
     FExpSortColumn: Integer;
     FExpSortAscending: Boolean;
 
+    procedure EnsureExplorerSystemImageList;
     procedure NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
     procedure UpdateExplorerNavButtons;
     procedure PreviewExplorerFile(const APath: string);
@@ -483,6 +491,7 @@ type
     function GetUserDesktopPath: string;
     function GetUserSpecialPath(const AFoId: string): string;
   public
+    procedure AutoFitListViewColumns(ALV: TWinControl; AColumns: TListColumns; MaxColWidth: Integer = 450);
     procedure OpenFileInNotepad(const AFileName: string);
   end;
 
@@ -495,15 +504,60 @@ implementation
 
 uses
   {$IFDEF WINDOWS}
-  Windows, ShellAPI, ShlObj,
+  Windows, ShellAPI, ShlObj, CommCtrl,
   {$ENDIF}
-  LResources, DateUtils, PreviewForm;
+  LResources, DateUtils, Math, PreviewForm, lazsynedittext;
 
 const
   FILE_ATTRIBUTE_REPARSE_POINT = $00000400;
 
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
+
+type
+  TSynTextViewsManagerCracker = class
+  public
+    FTextViewsList: TList;
+    FTextBuffer: TSynEditStringListBase;
+    FTopViewChangedCallback: TNotifyEvent;
+  end;
+
+procedure SafelyFreeWrapPlugin(var APlugin: TLazSynEditLineWrapPlugin; AEditor: TCustomSynEdit);
+var
+  ViewToRemove: TSynEditStringsLinked;
+  Mgr: TSynTextViewsManager;
+  Cracker: TSynTextViewsManagerCracker;
+  Idx: Integer;
+begin
+  if APlugin = nil then Exit;
+  try
+    if (AEditor <> nil) and (not (csDestroying in AEditor.ComponentState)) then
+    begin
+      ViewToRemove := APlugin.FLineMapView;
+      if ViewToRemove <> nil then
+      begin
+        APlugin.FLineMapView := nil; // Detach from plugin so its destructor won't call buggy RemoveSynTextView
+        Mgr := AEditor.TextViewsManager;
+        if Mgr <> nil then
+        begin
+          Cracker := TSynTextViewsManagerCracker(Pointer(Mgr));
+          if Cracker.FTextViewsList <> nil then
+          begin
+            Idx := Cracker.FTextViewsList.IndexOf(ViewToRemove);
+            if Idx >= 0 then
+            begin
+              Cracker.FTextViewsList.Delete(Idx);
+              Mgr.ReconnectViews;
+            end;
+          end;
+        end;
+        ViewToRemove.Free;
+      end;
+    end;
+  finally
+    FreeAndNil(APlugin);
+  end;
+end;
 
 var
   WM_ACEUTILS_RESTORE: UINT = 0;
@@ -641,7 +695,7 @@ begin
   end
   else
   begin
-    FreeAndNil(FWrapPlugin);
+    SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
     SynEdit1.ScrollBars := ssBoth;
   end;
 
@@ -762,7 +816,8 @@ begin
   FExpSortColumn := -1;
   FExpSortAscending := True;
   FExpDefaultFolder := GetUserDesktopPath;
-  ShellTreeViewExplorer.ShellListView := ShellListViewExplorer;
+
+  ShellListViewExplorer.AutoSizeColumns := False;
 
   // Ensure Explorer has 4 standard columns: Name, Size, Type, Date Modified
   while ShellListViewExplorer.Columns.Count < 4 do
@@ -815,14 +870,17 @@ begin
   CheckAndPromptFileAssociation;
 
   {$IFDEF WINDOWS}
+  EnsureExplorerSystemImageList;
   ScanContextMenuEntries;
+  AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
+  AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
   {$ENDIF}
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(FExpHistory);
-  FreeAndNil(FWrapPlugin);
+  SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
   SaveAllOptions;
 end;
 
@@ -899,11 +957,22 @@ begin
   if (WM_ACEUTILS_RESTORE <> 0) and (Message.Msg = WM_ACEUTILS_RESTORE) then
   begin
     // Restore window even if minimized or hidden in the system tray
+    if not Visible then
+      Show;
+    if WindowState = wsMinimized then
+      WindowState := wsNormal;
+    Application.Restore;
     Show;
     WindowState := wsNormal;
-    Application.Restore;
     BringToFront;
+
+    // Force to the front of the screen stack (Z-order)
+    SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
+      SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+    SetWindowPos(Handle, HWND_NOTOPMOST, 0, 0, 0, 0,
+      SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
     SetForegroundWindow(Handle);
+    BringWindowToTop(Handle);
 
     // Flash the window title and taskbar to alert the user
     FillChar(FWI, SizeOf(FWI), 0);
@@ -1327,6 +1396,7 @@ begin
   pnlRight.Color := PanelColor;
   pnlNotepadToolbar.Color := HeaderBg;
   pnlFindReplace.Color := PanelColor;
+  pnlEditorHeader.Color := HeaderBg;
   pnlNotepadStatus.Color := HeaderBg;
 
   // Context Menu Management Tab
@@ -1783,6 +1853,8 @@ begin
     Application.ProcessMessages; // Drain any clicks queued while search was running
     SetSearching(False);
     SetCounts;
+    if lvResults.Items.Count > 0 then
+      AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
     if FStopSearch then
     begin
       SetActivity(Format('Search stopped. Found %d item(s) across %d folder(s).', [FFileCount, FDirCount]));
@@ -1815,6 +1887,7 @@ begin
   finally
     lvResults.Items.EndUpdate;
   end;
+  AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
   FFileCount := 0;
   FDirCount := 0;
   SetCounts;
@@ -2000,6 +2073,7 @@ begin
 
   // Sort list view using OnCompare
   lvResults.AlphaSort;
+  AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
 end;
 
 procedure TfrmMain.lvResultsCompare(Sender: TObject; Item1, Item2: TListItem;
@@ -2114,13 +2188,15 @@ procedure TfrmMain.miOpenFileClick(Sender: TObject);
 var
   FullPath: string;
 begin
-  {$IFDEF WINDOWS}
   if lvResults.Selected <> nil then
   begin
     FullPath := IncludeTrailingPathDelimiter(lvResults.Selected.SubItems[0]) + lvResults.Selected.Caption;
+    {$IFDEF WINDOWS}
     ShellExecute(0, 'open', PChar(FullPath), nil, nil, SW_SHOWNORMAL);
+    {$ELSE}
+    OpenDocument(FullPath);
+    {$ENDIF}
   end;
-  {$ENDIF}
 end;
 
 procedure TfrmMain.lvResultsContextPopup(Sender: TObject; MousePos: TPoint;
@@ -2261,6 +2337,15 @@ begin
   begin
     if lvContextMenu.Items.Count = 0 then
       ScanContextMenuEntries;
+  end
+  else if PageControl1.ActivePage = tabExplorer then
+  begin
+    EnsureExplorerSystemImageList;
+    AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
+  end
+  else if PageControl1.ActivePage = tabSearch then
+  begin
+    AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
   end;
   {$ENDIF}
 end;
@@ -2897,16 +2982,45 @@ begin
   end;
 end;
 
-function TfrmMain.FormatFileSize(ASize: Int64): string;
+function TfrmMain.FormatFileSize(ASize: Int64; IsFolder: Boolean = False): string;
+var
+  Val: Double;
 begin
+  if IsFolder then
+  begin
+    Result := '';
+    Exit;
+  end;
+
+  if ASize <= 0 then
+  begin
+    Result := '0 KB';
+    Exit;
+  end;
+
   if ASize < 1024 then
-    Result := Format('%d B', [ASize])
-  else if ASize < 1024 * 1024 then
-    Result := Format('%.1f KB', [ASize / 1024.0])
+  begin
+    Val := ASize / 1024.0;
+    Result := Format('%.2f KB', [Val]);
+  end
+  else if ASize < 100 * 1024 then
+  begin
+    Val := ASize / 1024.0;
+    if Val >= 10.0 then
+      Result := Format('%.1f KB', [Val])
+    else
+      Result := Format('%.2f KB', [Val]);
+  end
   else if ASize < 1024 * 1024 * 1024 then
-    Result := Format('%.1f MB', [ASize / (1024.0 * 1024.0)])
+  begin
+    Val := ASize / (1024.0 * 1024.0);
+    Result := Format('%.2f MB', [Val]);
+  end
   else
-    Result := Format('%.2f GB', [ASize / (1024.0 * 1024.0 * 1024.0)]);
+  begin
+    Val := ASize / (1024.0 * 1024.0 * 1024.0);
+    Result := Format('%.2f GB', [Val]);
+  end;
 end;
 
 procedure TfrmMain.AddResult(const AFileName, AFolder: string; ASize: Int64;
@@ -2931,9 +3045,9 @@ begin
   Item.Caption := AFileName;
   Item.SubItems.Add(ExcludeTrailingPathDelimiter(AFolder));
   if AType = 'Folder' then
-    Item.SubItems.Add('<DIR>')
+    Item.SubItems.Add('')
   else
-    Item.SubItems.Add(FormatFileSize(ASize));
+    Item.SubItems.Add(FormatFileSize(ASize, False));
   Item.SubItems.Add(DateStr);
   Item.SubItems.Add(AType);
 end;
@@ -3146,11 +3260,14 @@ begin
     CleanStr := ConvertToUTF8(RawBytes);
     AutoDetectHighlighter(AFileName);
     SynEdit1.Text := CleanStr;
+    SynEdit1.Modified := False;
+    SynEdit1.ClearUndo;
     SynEdit1.Invalidate;
 
     FCurrentFileName := AFileName;
     FIsModified := False;
     lblCurrentFile.Caption := ExtractFileName(AFileName) + ' (' + AFileName + ')';
+    PageControl1.ActivePage := tabNotepad;
     UpdateNotepadStatus;
     UpdateSaveButtonState;
     SetStatus(' Opened file: ' + AFileName);
@@ -3219,23 +3336,31 @@ var
   HasContent: Boolean;
   CanSave: Boolean;
   CanSaveAs: Boolean;
+  CanClose: Boolean;
 begin
   OnNotepadTab := (PageControl1.ActivePage = tabNotepad);
-  HasContent := (Trim(SynEdit1.Text) <> '');
+  HasContent := (SynEdit1.Lines.Count > 1) or ((SynEdit1.Lines.Count = 1) and (Trim(SynEdit1.Lines[0]) <> ''));
 
   // Save is enabled if on Notepad tab, document has modifications, and is not empty
   CanSave := OnNotepadTab and HasContent and FIsModified;
 
-  // Save As is enabled if on Notepad tab and document has content
-  CanSaveAs := OnNotepadTab and HasContent;
+  // Save As is enabled if on Notepad tab and document has content or an open file
+  CanSaveAs := OnNotepadTab and (HasContent or (FCurrentFileName <> ''));
+
+  // Close is enabled whenever a file is open or editor has content (regardless of whether modified)
+  CanClose := (FCurrentFileName <> '') or HasContent;
 
   btnSaveFile.Enabled := CanSave;
   btnSaveAs.Enabled := CanSaveAs;
+  if Assigned(btnCloseFile) then
+    btnCloseFile.Enabled := CanClose;
 
   if Assigned(miNotepadSave) then
     miNotepadSave.Enabled := CanSave;
   if Assigned(miNotepadSaveAs) then
     miNotepadSaveAs.Enabled := CanSaveAs;
+  if Assigned(miNotepadClose) then
+    miNotepadClose.Enabled := CanClose;
 end;
 
 procedure TfrmMain.AutoDetectHighlighter(const AFileName: string);
@@ -3321,6 +3446,21 @@ begin
   UpdateSaveButtonState;
 end;
 
+procedure TfrmMain.btnCloseFileClick(Sender: TObject);
+begin
+  if not PromptSaveIfModified then Exit;
+
+  SynEdit1.Clear;
+  FCurrentFileName := '';
+  FIsModified := False;
+  lblCurrentFile.Caption := 'Untitled';
+  cmbSyntax.ItemIndex := 0;
+  ApplySyntax(0);
+  UpdateNotepadStatus;
+  UpdateSaveButtonState;
+  SetStatus(' Closed file.');
+end;
+
 procedure TfrmMain.btnOpenFileClick(Sender: TObject);
 begin
   if OpenDialog1.Execute then
@@ -3370,7 +3510,7 @@ begin
   end
   else
   begin
-    FreeAndNil(FWrapPlugin);
+    SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
     SynEdit1.ScrollBars := ssBoth;
   end;
   SaveAllOptions;
@@ -3552,6 +3692,8 @@ begin
   miSelectAll.Enabled := (SynEdit1.Lines.Count > 0);
   miNotepadSave.Enabled := btnSaveFile.Enabled;
   miNotepadSaveAs.Enabled := btnSaveAs.Enabled;
+  if Assigned(miNotepadClose) and Assigned(btnCloseFile) then
+    miNotepadClose.Enabled := btnCloseFile.Enabled;
 end;
 
 procedure TfrmMain.miCutClick(Sender: TObject);
@@ -3870,6 +4012,82 @@ begin
   btnExpForward.Enabled := (FExpHistoryIndex < FExpHistory.Count - 1);
 end;
 
+procedure TfrmMain.EnsureExplorerSystemImageList;
+{$IFDEF WINDOWS}
+var
+  SFI: TSHFileInfoW;
+  SysImageList: HIMAGELIST;
+  OldStyle: NativeInt;
+begin
+  if ShellListViewExplorer.HandleAllocated then
+  begin
+    SysImageList := HIMAGELIST(SHGetFileInfoW('', 0, SFI, SizeOf(SFI),
+      SHGFI_SYSICONINDEX or SHGFI_SMALLICON));
+    if SysImageList <> 0 then
+    begin
+      OldStyle := GetWindowLongPtr(ShellListViewExplorer.Handle, GWL_STYLE);
+      SetWindowLongPtr(ShellListViewExplorer.Handle, GWL_STYLE, OldStyle or LVS_SHAREIMAGELISTS);
+      ListView_SetImageList(ShellListViewExplorer.Handle, SysImageList, LVSIL_SMALL);
+    end;
+  end;
+end;
+{$ELSE}
+begin
+end;
+{$ENDIF}
+
+procedure TfrmMain.AutoFitListViewColumns(ALV: TWinControl; AColumns: TListColumns; MaxColWidth: Integer = 450);
+var
+  i, ItemW, HdrW, FinalW: Integer;
+  Cap: string;
+  LV: TCustomListView;
+begin
+  if (ALV = nil) or (AColumns = nil) or (AColumns.Count = 0) then Exit;
+  {$IFDEF WINDOWS}
+  if not ALV.HandleAllocated then Exit;
+
+  if ALV is TCustomListView then
+    LV := TCustomListView(ALV)
+  else
+    LV := nil;
+
+  SendMessage(ALV.Handle, WM_SETREDRAW, WPARAM(False), 0);
+  try
+    for i := 0 to AColumns.Count - 1 do
+    begin
+      if (LV <> nil) and (LV.Items.Count > 0) then
+      begin
+        SendMessage(ALV.Handle, LVM_SETCOLUMNWIDTH, WPARAM(i), LPARAM(LVSCW_AUTOSIZE));
+        ItemW := SendMessage(ALV.Handle, LVM_GETCOLUMNWIDTH, WPARAM(i), 0);
+      end
+      else
+        ItemW := 0;
+
+      Cap := AColumns[i].Caption;
+      if LV <> nil then
+        HdrW := LV.Canvas.TextWidth(Cap) + 24
+      else
+        HdrW := Length(Cap) * 8 + 24;
+
+      FinalW := Max(ItemW, HdrW);
+
+      // Ensure first column has enough space for icon and caption
+      if (i = 0) and (FinalW < 60) then
+        FinalW := 60;
+
+      if (MaxColWidth > 0) and (FinalW > MaxColWidth) then
+        FinalW := MaxColWidth;
+
+      SendMessage(ALV.Handle, LVM_SETCOLUMNWIDTH, WPARAM(i), LPARAM(FinalW));
+      AColumns[i].Width := FinalW;
+    end;
+  finally
+    SendMessage(ALV.Handle, WM_SETREDRAW, WPARAM(True), 0);
+    ALV.Invalidate;
+  end;
+  {$ENDIF}
+end;
+
 procedure TfrmMain.NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
 var
   CleanPath, TargetFile, TargetName: string;
@@ -3908,6 +4126,7 @@ begin
   try
     ShellListViewExplorer.Root := CleanPath;
     edtExpPath.Text := CleanPath;
+    EnsureExplorerSystemImageList;
 
     try
       ShellTreeViewExplorer.Path := CleanPath;
@@ -3949,6 +4168,9 @@ begin
   finally
     FExpNavigating := False;
   end;
+
+  Application.ProcessMessages;
+  AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
 end;
 
 procedure TfrmMain.btnExpBackClick(Sender: TObject);
@@ -3980,14 +4202,16 @@ begin
 end;
 
 procedure TfrmMain.btnExpRefreshClick(Sender: TObject);
+var
+  CurPath: string;
 begin
+  CurPath := ShellListViewExplorer.Root;
+  if not DirectoryExists(CurPath) then Exit;
   ShellListViewExplorer.UpdateView;
-  try
-    ShellTreeViewExplorer.Refresh(ShellTreeViewExplorer.Selected);
-  except
-  end;
   if FExpSortColumn >= 0 then
     ShellListViewExplorer.AlphaSort;
+  AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
+  SetStatus(' Refreshed: ' + CurPath);
 end;
 
 procedure TfrmMain.btnExpDefaultClick(Sender: TObject);
@@ -4122,13 +4346,16 @@ begin
   NavigateExplorerTo(edtExpPath.Text);
 end;
 
-procedure TfrmMain.ShellTreeViewExplorerChange(Sender: TObject; Node: TTreeNode);
+procedure TfrmMain.ShellTreeViewExplorerSelectionChanged(Sender: TObject);
+var
+  NodePath: string;
 begin
   if FExpNavigating then Exit;
-  if (Node <> nil) and DirectoryExists(ShellTreeViewExplorer.Path) then
+  if ShellTreeViewExplorer.Selected <> nil then
   begin
-    if ShellListViewExplorer.Root <> ShellTreeViewExplorer.Path then
-      NavigateExplorerTo(ShellTreeViewExplorer.Path);
+    NodePath := ShellTreeViewExplorer.GetPathFromNode(ShellTreeViewExplorer.Selected);
+    if (NodePath <> '') and DirectoryExists(NodePath) then
+      NavigateExplorerTo(NodePath);
   end;
 end;
 
@@ -4203,6 +4430,7 @@ var
 begin
   HasSel := (ShellListViewExplorer.Selected <> nil);
   miExpOpen.Enabled := HasSel;
+  miExpOpenAssociated.Enabled := HasSel;
   miExpNotepad.Enabled := HasSel;
   miExpPreview.Enabled := HasSel;
   miExpReveal.Enabled := True;
@@ -4215,6 +4443,20 @@ end;
 procedure TfrmMain.miExpOpenClick(Sender: TObject);
 begin
   ShellListViewExplorerDblClick(Sender);
+end;
+
+procedure TfrmMain.miExpOpenAssociatedClick(Sender: TObject);
+var
+  SelPath: string;
+begin
+  SelPath := GetExplorerSelectedPath;
+  if SelPath = '' then Exit;
+
+  {$IFDEF WINDOWS}
+  ShellExecute(0, 'open', PChar(SelPath), nil, nil, SW_SHOWNORMAL);
+  {$ELSE}
+  OpenDocument(SelPath);
+  {$ENDIF}
 end;
 
 procedure TfrmMain.miExpNotepadClick(Sender: TObject);
@@ -4331,20 +4573,45 @@ procedure TfrmMain.ShellListViewExplorerFileAdded(Sender: TObject; Item: TListIt
 var
   ItemPath: string;
   FTime: LongInt;
+  {$IFDEF WINDOWS}
+  SFI: TSHFileInfoW;
+  Res: DWORD_PTR;
+  {$ENDIF}
 begin
   if Item = nil then Exit;
+  ItemPath := ShellListViewExplorer.GetPathFromItem(Item);
   if Item is TShellListItem then
     FTime := TShellListItem(Item).FileInfo.Time
   else
-  begin
-    ItemPath := ShellListViewExplorer.GetPathFromItem(Item);
     FTime := FileAge(ItemPath);
+
+  // Modernize Size column (Column 1, SubItems[0]): blank if folder, consistent KB/MB/GB format
+  if Item.SubItems.Count > 0 then
+  begin
+    if (Item is TShellListItem) and TShellListItem(Item).isFolder then
+      Item.SubItems[0] := ''
+    else if (Item is TShellListItem) then
+      Item.SubItems[0] := FormatFileSize(TShellListItem(Item).FileInfo.Size, False)
+    else if DirectoryExists(ItemPath) then
+      Item.SubItems[0] := ''
+    else
+      Item.SubItems[0] := FormatFileSize(0, False);
   end;
 
   if FTime <> -1 then
     Item.SubItems.Add(FormatDateTime('yyyy-mm-dd hh:nn', SafeFileDateToDateTime(FTime)))
   else
     Item.SubItems.Add('');
+
+  {$IFDEF WINDOWS}
+  if ItemPath <> '' then
+  begin
+    Res := SHGetFileInfoW(PWideChar(UTF8Decode(ItemPath)), 0, SFI, SizeOf(SFI),
+      SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+    if Res <> 0 then
+      Item.ImageIndex := SFI.iIcon;
+  end;
+  {$ENDIF}
 end;
 
 procedure TfrmMain.ShellListViewExplorerColumnClick(Sender: TObject; Column: TListColumn);
@@ -4377,6 +4644,7 @@ begin
   end;
 
   ShellListViewExplorer.AlphaSort;
+  AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
 end;
 
 procedure TfrmMain.ShellListViewExplorerCompare(Sender: TObject; Item1, Item2: TListItem;

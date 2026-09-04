@@ -208,9 +208,19 @@ object frmPreview: TfrmPreview
     OnPopup = popPreviewPopup
     Left = 480
     Top = 80
+    object miPrevOpenAssociated: TMenuItem
+      Caption = 'Open with Associated Program'
+      OnClick = miPrevOpenAssociatedClick
+    end
+    object miPrevOpenNotepad: TMenuItem
+      Caption = 'Open in Notepad Tab'
+      OnClick = miPrevOpenNotepadClick
+    end
+    object miPrevSep0: TMenuItem
+      Caption = '-'
+    end
     object miPrevCopy: TMenuItem
       Caption = 'Copy'
-      ShortCut = 16451
       OnClick = miPrevCopyClick
     end
     object miPrevSep: TMenuItem
@@ -218,7 +228,6 @@ object frmPreview: TfrmPreview
     end
     object miPrevSelectAll: TMenuItem
       Caption = 'Select All'
-      ShortCut = 16449
       OnClick = miPrevSelectAllClick
     end
   end

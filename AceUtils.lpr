@@ -15,11 +15,14 @@ uses
 {$R *.res}
 
 {$IFDEF WINDOWS}
+const
+  ASFW_ANY = DWORD(-1);
+function AllowSetForegroundWindow(dwProcessId: DWORD): BOOL; stdcall; external 'user32.dll';
+
 var
   hMutex: THandle;
   hPrevWnd: HWND;
   WMRestore: UINT;
-  FWI: FLASHWINFO;
 {$ENDIF}
 
 begin
@@ -31,6 +34,7 @@ begin
     if hMutex <> 0 then
       CloseHandle(hMutex);
 
+    AllowSetForegroundWindow(ASFW_ANY);
     WMRestore := RegisterWindowMessage('AceUtils_Restore_SingleInstance');
     hPrevWnd := FindWindow(nil, 'Ace''s Utilities');
     if hPrevWnd <> 0 then
@@ -39,20 +43,10 @@ begin
       PostMessage(hPrevWnd, WMRestore, 0, 0);
       ShowWindow(hPrevWnd, SW_RESTORE);
       SetForegroundWindow(hPrevWnd);
-
-      // Flash window title bar to alert user
-      FillChar(FWI, SizeOf(FWI), 0);
-      FWI.cbSize := SizeOf(FWI);
-      FWI.hwnd := hPrevWnd;
-      FWI.dwFlags := FLASHW_ALL or FLASHW_TIMERNOFG;
-      FWI.uCount := 4;
-      FlashWindowEx(@FWI);
-    end
-    else
-    begin
-      // Broadcast if handle not resolved by exact caption
-      PostMessage(HWND_BROADCAST, WMRestore, 0, 0);
+      BringWindowToTop(hPrevWnd);
     end;
+    // Broadcast to ensure all top-level windows of the instance receive the restore signal
+    PostMessage(HWND_BROADCAST, WMRestore, 0, 0);
 
     // Terminate the duplicate instance immediately
     Exit;
