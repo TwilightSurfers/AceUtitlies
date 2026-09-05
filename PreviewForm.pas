@@ -12,7 +12,7 @@ uses
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
-  SynHighlighterMarkdown, LConvEncoding;
+  SynHighlighterMarkdown, LConvEncoding, LMessages;
 
 type
 
@@ -53,6 +53,7 @@ type
     procedure FormHide(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormWindowStateChange(Sender: TObject);
     procedure btnOpenInNotepadClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure miPrevOpenAssociatedClick(Sender: TObject);
@@ -60,6 +61,9 @@ type
     procedure miPrevCopyClick(Sender: TObject);
     procedure miPrevSelectAllClick(Sender: TObject);
     procedure popPreviewPopup(Sender: TObject);
+
+  protected
+    procedure WndProc(var Message: TLMessage); override;
 
   private
     FCurrentPath: string;
@@ -278,6 +282,24 @@ begin
         end;
     end;
   end;
+end;
+
+procedure TfrmPreview.FormWindowStateChange(Sender: TObject);
+begin
+  if WindowState = wsMinimized then
+    WindowState := wsNormal;
+end;
+
+procedure TfrmPreview.WndProc(var Message: TLMessage);
+begin
+  {$IFDEF WINDOWS}
+  if (Message.Msg = WM_SYSCOMMAND) and ((Message.wParam and $FFF0) = SC_MINIMIZE) then
+  begin
+    Message.Result := 0;
+    Exit;
+  end;
+  {$ENDIF}
+  inherited WndProc(Message);
 end;
 
 procedure TfrmPreview.popPreviewPopup(Sender: TObject);
@@ -742,6 +764,11 @@ begin
   lblFileName.Caption := AName;
   lblFileMeta.Caption := Format('%s | %s | %s', [ATypeStr, ASizeStr, ADateStr]);
   Caption := 'Preview - ' + AName;
+
+  // Always stay on top and prevent minimized state
+  FormStyle := fsStayOnTop;
+  if WindowState = wsMinimized then
+    WindowState := wsNormal;
 
   // Center on main form if not already visible
   if not Visible then

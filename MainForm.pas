@@ -609,11 +609,14 @@ type
     FMemoryIdCounter: Integer;
     FNotesModified: Boolean;
 
-    procedure CheckAndCollectClipboard;
+    {$IFDEF WINDOWS}
+    function GetWinClipboardText(out AText: string; out AOpened: Boolean): Boolean;
+    {$ENDIF}
+    function CheckAndCollectClipboard: Boolean;
     procedure AddMemoryFragment(const AText: string);
     procedure DeleteMemoryFragmentInternal(AIndex: Integer);
     procedure PruneMemoryFragments;
-    procedure RefreshMemoryListView;
+    procedure RefreshMemoryListView(ASelectFirst: Boolean = False);
     procedure UpdateMemoryStatusUI;
     procedure UpdateMemoryButtonStates;
     procedure TransferMemoryToNotepad(const AText: string; AMode: TMemoryTransferMode = mtmInsertOrCaret);
@@ -1001,7 +1004,7 @@ begin
   FMemoryIdCounter := 0;
   FNotesModified := False;
   {$IFDEF WINDOWS}
-  FLastClipboardSeq := GetClipboardSequenceNumber;
+  FLastClipboardSeq := 0;
   {$ENDIF}
   tmrClipboard.Enabled := True;
 
@@ -1036,6 +1039,16 @@ begin
 
   // Load and apply all saved settings
   LoadAllOptions;
+
+  // Synchronize initial clipboard fragment if active
+  if FMemoryLimit > 0 then
+  begin
+    CheckAndCollectClipboard;
+    {$IFDEF WINDOWS}
+    FLastClipboardSeq := GetClipboardSequenceNumber;
+    {$ENDIF}
+  end;
+
   UpdateSaveButtonState;
 end;
 
@@ -2692,6 +2705,7 @@ begin
   UpdateSaveButtonState;
   if PageControl1.ActivePage = tabMemory then
   begin
+    CheckAndCollectClipboard;
     UpdateMemoryStatusUI;
     UpdateMemoryButtonStates;
   end;
@@ -4023,6 +4037,9 @@ begin
         begin
           SynEdit1.CopyToClipboard;
           CheckAndCollectClipboard;
+          {$IFDEF WINDOWS}
+          FLastClipboardSeq := GetClipboardSequenceNumber;
+          {$ENDIF}
           Key := 0;
         end;
       VK_X:
@@ -4030,6 +4047,9 @@ begin
         begin
           SynEdit1.CutToClipboard;
           CheckAndCollectClipboard;
+          {$IFDEF WINDOWS}
+          FLastClipboardSeq := GetClipboardSequenceNumber;
+          {$ENDIF}
           Key := 0;
         end;
       VK_V:
@@ -4053,7 +4073,11 @@ begin
   UpdateSaveButtonState;
   miCut.Enabled := (SynEdit1.SelText <> '');
   miCopy.Enabled := (SynEdit1.SelText <> '');
-  miPaste.Enabled := Clipboard.HasFormat(CF_TEXT);
+  {$IFDEF WINDOWS}
+  miPaste.Enabled := IsClipboardFormatAvailable(CF_UNICODETEXT) or IsClipboardFormatAvailable(CF_TEXT);
+  {$ELSE}
+  miPaste.Enabled := Clipboard.HasFormat(PredefinedClipboardFormat(pcfText));
+  {$ENDIF}
   miDelete.Enabled := (SynEdit1.SelText <> '');
   miUndo.Enabled := SynEdit1.CanUndo;
   miRedo.Enabled := SynEdit1.CanRedo;
@@ -4068,12 +4092,18 @@ procedure TfrmMain.miCutClick(Sender: TObject);
 begin
   SynEdit1.CutToClipboard;
   CheckAndCollectClipboard;
+  {$IFDEF WINDOWS}
+  FLastClipboardSeq := GetClipboardSequenceNumber;
+  {$ENDIF}
 end;
 
 procedure TfrmMain.miCopyClick(Sender: TObject);
 begin
   SynEdit1.CopyToClipboard;
   CheckAndCollectClipboard;
+  {$IFDEF WINDOWS}
+  FLastClipboardSeq := GetClipboardSequenceNumber;
+  {$ENDIF}
 end;
 
 procedure TfrmMain.miPasteClick(Sender: TObject);
@@ -4197,25 +4227,100 @@ begin
   end;
 end;
 
-procedure TfrmMain.CheckAndCollectClipboard;
+{$IFDEF WINDOWS}
+function TfrmMain.GetWinClipboardText(out AText: string; out AOpened: Boolean): Boolean;
+var
+  hData: HANDLE;
+  pData: Pointer;
+  Retries: Integer;
+begin
+  Result := False;
+  AOpened := False;
+  AText := '';
+  for Retries := 1 to 5 do
+  begin
+    if OpenClipboard(0) then
+    begin
+      AOpened := True;
+      try
+        if IsClipboardFormatAvailable(CF_UNICODETEXT) then
+        begin
+          hData := GetClipboardData(CF_UNICODETEXT);
+          if hData <> 0 then
+          begin
+            pData := GlobalLock(hData);
+            if pData <> nil then
+            begin
+              try
+                AText := UTF8Encode(WideString(PWideChar(pData)));
+                Result := (AText <> '');
+              finally
+                GlobalUnlock(hData);
+              end;
+            end;
+          end;
+        end
+        else if IsClipboardFormatAvailable(CF_TEXT) then
+        begin
+          hData := GetClipboardData(CF_TEXT);
+          if hData <> 0 then
+          begin
+            pData := GlobalLock(hData);
+            if pData <> nil then
+            begin
+              try
+                AText := AnsiToUTF8(PAnsiChar(pData));
+                Result := (AText <> '');
+              finally
+                GlobalUnlock(hData);
+              end;
+            end;
+          end;
+        end;
+      finally
+        CloseClipboard;
+      end;
+      Exit;
+    end;
+    Sleep(15);
+  end;
+end;
+{$ENDIF}
+
+function TfrmMain.CheckAndCollectClipboard: Boolean;
 var
   ClipText: string;
+  {$IFDEF WINDOWS}
+  Opened: Boolean;
+  HasText: Boolean;
+  {$ENDIF}
 begin
+  Result := True;
   if FMemoryLimit <= 0 then Exit;
-  if not Clipboard.HasFormat(CF_TEXT) then Exit;
+
+  {$IFDEF WINDOWS}
+  HasText := GetWinClipboardText(ClipText, Opened);
+  if not Opened then
+    Exit(False); // Clipboard is currently locked by copying process; retry on next tick
+  if not HasText then
+    Exit(True);  // Opened successfully but format is not text; sequence can advance
+  {$ELSE}
   try
+    if not Clipboard.HasFormat(PredefinedClipboardFormat(pcfText)) then Exit(True);
     ClipText := Clipboard.AsText;
   except
-    Exit;
+    Exit(True);
   end;
+  {$ENDIF}
 
-  if Trim(ClipText) = '' then Exit;
+  if Trim(ClipText) = '' then Exit(True);
 
   // Ignore if identical to the most recent fragment
   if (Length(FMemoryFragments) > 0) and (FMemoryFragments[0].Content = ClipText) then
-    Exit;
+    Exit(True);
 
   AddMemoryFragment(ClipText);
+  Result := True;
 end;
 
 procedure TfrmMain.AddMemoryFragment(const AText: string);
@@ -4254,8 +4359,8 @@ begin
   // Prune to limit
   PruneMemoryFragments;
 
-  // Refresh UI list view
-  RefreshMemoryListView;
+  // Refresh UI list view selecting the new fragment
+  RefreshMemoryListView(True);
   UpdateMemoryStatusUI;
 end;
 
@@ -4279,7 +4384,7 @@ begin
   end;
 end;
 
-procedure TfrmMain.RefreshMemoryListView;
+procedure TfrmMain.RefreshMemoryListView(ASelectFirst: Boolean);
 var
   i: Integer;
   Item: TListItem;
@@ -4288,7 +4393,7 @@ begin
   lvMemory.Items.BeginUpdate;
   try
     SavedSel := -1;
-    if lvMemory.Selected <> nil then
+    if (not ASelectFirst) and (lvMemory.Selected <> nil) then
       SavedSel := lvMemory.Selected.Index;
 
     lvMemory.Items.Clear;
@@ -4304,7 +4409,14 @@ begin
       Item.SubItems.Add(FMemoryFragments[i].Preview);
     end;
 
-    if (SavedSel >= 0) and (SavedSel < lvMemory.Items.Count) then
+    if ASelectFirst and (lvMemory.Items.Count > 0) then
+    begin
+      lvMemory.Selected := lvMemory.Items[0];
+      lvMemory.ItemIndex := 0;
+      mmoMemPreview.Text := FMemoryFragments[0].Content;
+      lblMemPreviewInfo.Caption := Format('%d chars | %d lines', [FMemoryFragments[0].CharCount, FMemoryFragments[0].LineCount]);
+    end
+    else if (SavedSel >= 0) and (SavedSel < lvMemory.Items.Count) then
     begin
       lvMemory.Selected := lvMemory.Items[SavedSel];
       lvMemory.ItemIndex := SavedSel;
@@ -4632,8 +4744,8 @@ begin
     CurSeq := GetClipboardSequenceNumber;
     if CurSeq <> FLastClipboardSeq then
     begin
-      FLastClipboardSeq := CurSeq;
-      CheckAndCollectClipboard;
+      if CheckAndCollectClipboard then
+        FLastClipboardSeq := CurSeq;
     end;
   except
     // ignore

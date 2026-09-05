@@ -13,8 +13,9 @@ AceUtils.exe
 AceUtils
 *.exe
 
-# Configuration files
+# Configuration and user data files
 *.ini
+AceUtils_Notes.txt
 
 # IDE session
 *.lps
