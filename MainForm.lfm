@@ -12,6 +12,7 @@ object frmMain: TfrmMain
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   OnKeyUp = FormKeyUp
+  OnResize = FormResize
   OnShow = FormShow
   Position = poScreenCenter
   LCLVersion = '3.6.0.0'
@@ -1575,9 +1576,11 @@ object frmMain: TfrmMain
     Height = 25
     Top = 625
     Width = 1050
+    Align = alBottom
+    SimplePanel = False
     Panels = <    
       item
-        Width = 460
+        Width = 566
       end    
       item
         Alignment = taRightJustify
@@ -1590,21 +1593,21 @@ object frmMain: TfrmMain
       item
         Alignment = taCenter
         Text = 'CAPS'
-        Width = 55
+        Width = 50
       end    
       item
         Alignment = taCenter
         Text = 'NUM'
-        Width = 55
+        Width = 50
       end    
       item
         Alignment = taCenter
         Text = 'INS'
-        Width = 55
+        Width = 50
       end    
       item
         Alignment = taCenter
-        Width = 120
+        Width = 130
       end>
   end
   object OpenDialog1: TOpenDialog

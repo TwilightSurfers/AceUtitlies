@@ -160,3 +160,25 @@ Whenever modifying `PageControl.Style` dynamically at runtime:
    Application.ProcessMessages;
    ```
 6. Similarly, when toggling `TabHeight` or custom caption indicators (like active dot markers), ensure `Invalidate` and `Repaint` are explicitly called so changes reflect immediately without user interaction delays.
+
+---
+
+## 9. Lazarus LCL `TStatusBar` Multi-Panel Initialization (`MainForm.pas` / `MainForm.lfm`)
+
+### The `SimplePanel` Trap (CRITICAL)
+In Delphi VCL, `TStatusBar.SimplePanel` defaults to `False`. In Lazarus LCL, however, `TStatusBar.FSimplePanel` is initialized to `True` by default (`statusbar.inc`).
+- **The Symptom**: If an LFM defines items under `Panels = < item ... item ... >` but omits `SimplePanel = False`, the control remains in `SimplePanel = True` mode. The native Win32 `SysStatus32` control receives `SB_SIMPLE = 1` and renders a single monolithic text bar. Furthermore, `TStatusBar.UpdateHandleObject` explicitly drops all updates to `PanelIndex > 0` when `SimplePanel` is `True`, causing all secondary panels (such as CAPS, NUM, INS, file/directory counts, and system clock) to be completely invisible and unresponsive.
+- **The Rule**:
+  1. Always explicitly specify `SimplePanel = False` and `Align = alBottom` in the `.lfm`.
+  2. Always enforce `StatusBar.SimplePanel := False;` in `FormCreate`.
+  3. Auto-fit Panel 0 dynamically on `FormResize`:
+     ```pascal
+     procedure TfrmMain.FormResize(Sender: TObject);
+     const
+       RightPanelsWidth = 90 + 90 + 50 + 50 + 50 + 130 + 24;
+     begin
+       if (StatusBar1 <> nil) and (StatusBar1.Panels.Count > 0) then
+         StatusBar1.Panels[0].Width := Max(200, StatusBar1.ClientWidth - RightPanelsWidth);
+     end;
+     ```
+     This keeps the right-aligned status panels (Files, Dirs, CAPS, NUM, INS, Clock) cleanly docked to the right edge across all monitor resolutions and window sizes.

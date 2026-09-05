@@ -265,6 +265,7 @@ type
     procedure FormShow(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormResize(Sender: TObject);
     procedure tmrStatusTimer(Sender: TObject);
 
     // About Tab Events
@@ -840,6 +841,8 @@ begin
   ProgressBar1.Style := pbstMarquee;
   ProgressBar1.Visible := False;
   lblActivity.Caption := 'Ready.';
+  StatusBar1.SimplePanel := False;
+  FormResize(Self);
   StatusBar1.Panels[0].Text := ' Ready. Enter pattern or select folder to search.';
   StatusBar1.Panels[1].Text := 'Files: 0';
   StatusBar1.Panels[2].Text := 'Dirs: 0';
@@ -3926,6 +3929,14 @@ begin
   UpdateKeyboardAndTimerStatus;
 end;
 
+procedure TfrmMain.FormResize(Sender: TObject);
+const
+  RightPanelsWidth = 90 + 90 + 50 + 50 + 50 + 130 + 24; // 484
+begin
+  if (StatusBar1 <> nil) and (StatusBar1.Panels.Count > 0) then
+    StatusBar1.Panels[0].Width := Max(200, StatusBar1.ClientWidth - RightPanelsWidth);
+end;
+
 procedure TfrmMain.UpdateKeyboardAndTimerStatus;
 {$IFDEF WINDOWS}
 var
@@ -3933,7 +3944,10 @@ var
 begin
   CapsLockOn := (GetKeyState(VK_CAPITAL) and 1) <> 0;
   NumLockOn  := (GetKeyState(VK_NUMLOCK) and 1) <> 0;
-  InsertOn   := (GetKeyState(VK_INSERT) and 1) <> 0;
+  if (PageControl1 <> nil) and (PageControl1.ActivePage = tabNotepad) and (SynEdit1 <> nil) then
+    InsertOn := not SynEdit1.InsertMode
+  else
+    InsertOn := (GetKeyState(VK_INSERT) and 1) <> 0;
 
   if CapsLockOn then
     StatusBar1.Panels[3].Text := 'CAPS'
@@ -4068,7 +4082,9 @@ begin
   mmoAboutBuildLog.Lines.Add('[v1.3.2] - 2026-09-05');
   mmoAboutBuildLog.Lines.Add('  * Dynamic Tab Style Switcher: Fixed runtime tab style switcher (Classic Tabs, Modern Flat Buttons, Push Buttons) by recreating native Win32 window handle and forcing real-time repaint.');
   mmoAboutBuildLog.Lines.Add('  * Tab Layout Live Refresh: Realigned notebook pages, preserved active tab index, and added immediate form/control invalidation when changing tab style, height, or active dot.');
-  mmoAboutBuildLog.Lines.Add('  * Documentation & Developer Guidelines: Added Section 8 to AGENTS.md documenting Lazarus LCL Win32 tab control handle recreation invariants.');
+  mmoAboutBuildLog.Lines.Add('  * Global Status Bar Multi-Panel Initialization: Fixed missing status bar panels by disabling SimplePanel, properly aligning to alBottom, and adding auto-fitting FormResize layout.');
+  mmoAboutBuildLog.Lines.Add('  * Live Keyboard & Clock Indicators: Enabled real-time display of CAPS, NUM, INS/OVR states and ticking system clock across all 7 status bar panels.');
+  mmoAboutBuildLog.Lines.Add('  * Documentation & Developer Guidelines: Added Sections 8 and 9 to AGENTS.md documenting Lazarus LCL tab control recreation and TStatusBar SimplePanel invariants.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.3.1] - 2026-09-04');
   mmoAboutBuildLog.Lines.Add('  * Smart File Path Handling: Pasting full file paths or filenames into Explorer address bar automatically resolves to parent folder, selects target item, and previews it.');
