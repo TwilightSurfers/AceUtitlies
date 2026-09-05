@@ -696,11 +696,386 @@ object frmMain: TfrmMain
         end
       end
     end
+    object tabMemory: TTabSheet
+      Caption = 'Memory & Notes'
+      ClientHeight = 561
+      ClientWidth = 1042
+      ImageIndex = 2
+      object pnlMemoryTop: TPanel
+        Left = 0
+        Height = 42
+        Top = 0
+        Width = 1042
+        Align = alTop
+        BevelOuter = bvNone
+        ClientHeight = 42
+        ClientWidth = 1042
+        TabOrder = 0
+        object lblMemoryManager: TLabel
+          Left = 12
+          Height = 15
+          Top = 13
+          Width = 51
+          Caption = 'Manager:'
+          Font.Style = [fsBold]
+          ParentFont = False
+        end
+        object cmbMemoryLimit: TComboBox
+          Left = 68
+          Height = 23
+          Top = 9
+          Width = 130
+          ItemHeight = 15
+          ItemIndex = 1
+          Items.Strings = (
+            'None'
+            'Last 5 memory'
+            'Last 4 memory'
+            'Last 3 memory'
+            'Last 2 memory'
+            'Only one'
+          )
+          OnChange = cmbMemoryLimitChange
+          Style = csDropDownList
+          TabOrder = 0
+          Text = 'Last 5 memory'
+        end
+        object lblMemoryBadge: TLabel
+          Left = 208
+          Height = 15
+          Top = 13
+          Width = 145
+          Caption = '● Active (Collecting last 5)'
+          Font.Color = clGreen
+          ParentColor = False
+          ParentFont = False
+        end
+        object btnMemoryTransferNotepad: TButton
+          Left = 510
+          Height = 26
+          Top = 8
+          Width = 145
+          Anchors = [akTop, akRight]
+          Caption = '📝 Transfer to Notepad'
+          OnClick = btnMemoryTransferNotepadClick
+          TabOrder = 1
+        end
+        object btnMemoryCopy: TButton
+          Left = 660
+          Height = 26
+          Top = 8
+          Width = 70
+          Anchors = [akTop, akRight]
+          Caption = '📋 Copy'
+          OnClick = btnMemoryCopyClick
+          TabOrder = 2
+        end
+        object btnMemorySendToNotes: TButton
+          Left = 735
+          Height = 26
+          Top = 8
+          Width = 110
+          Anchors = [akTop, akRight]
+          Caption = '📌 Send to Notes'
+          OnClick = btnMemorySendToNotesClick
+          TabOrder = 3
+        end
+        object btnMemoryDelete: TButton
+          Left = 850
+          Height = 26
+          Top = 8
+          Width = 85
+          Anchors = [akTop, akRight]
+          Caption = '✕ Remove'
+          OnClick = btnMemoryDeleteClick
+          TabOrder = 4
+        end
+        object btnClearMemory: TButton
+          Left = 940
+          Height = 26
+          Top = 8
+          Width = 90
+          Anchors = [akTop, akRight]
+          Caption = '🗑 Clear All'
+          OnClick = btnClearMemoryClick
+          TabOrder = 5
+        end
+      end
+      object pnlMemoryClient: TPanel
+        Left = 0
+        Height = 519
+        Top = 42
+        Width = 1042
+        Align = alClient
+        BevelOuter = bvNone
+        ClientHeight = 519
+        ClientWidth = 1042
+        TabOrder = 1
+        object pnlMemoryLeft: TPanel
+          Left = 0
+          Height = 519
+          Top = 0
+          Width = 530
+          Align = alLeft
+          BevelOuter = bvNone
+          ClientHeight = 519
+          ClientWidth = 530
+          TabOrder = 0
+          object pnlMemListHeader: TPanel
+            Left = 0
+            Height = 26
+            Top = 0
+            Width = 530
+            Align = alTop
+            BevelOuter = bvNone
+            ClientHeight = 26
+            ClientWidth = 530
+            TabOrder = 0
+            object lblMemListTitle: TLabel
+              Left = 8
+              Height = 15
+              Top = 5
+              Width = 220
+              Caption = 'Memory Fragments (Clipboard History)'
+              Font.Style = [fsBold]
+              ParentFont = False
+            end
+            object lblMemCount: TLabel
+              Left = 430
+              Height = 15
+              Top = 5
+              Width = 90
+              Alignment = taRightJustify
+              Anchors = [akTop, akRight]
+              Caption = '0 fragments'
+              Font.Color = clGray
+              ParentColor = False
+              ParentFont = False
+            end
+          end
+          object lvMemory: TListView
+            Left = 0
+            Height = 353
+            Top = 26
+            Width = 530
+            Align = alClient
+            Columns = <            
+              item
+                Alignment = taCenter
+                Caption = '#'
+                Width = 32
+              end            
+              item
+                Caption = 'Time'
+                Width = 72
+              end            
+              item
+                Alignment = taRightJustify
+                Caption = 'Size'
+                Width = 65
+              end            
+              item
+                Caption = 'Preview Snippet'
+                Width = 340
+              end>
+            GridLines = True
+            HideSelection = False
+            PopupMenu = popMemory
+            ReadOnly = True
+            RowSelect = True
+            TabOrder = 1
+            ViewStyle = vsReport
+            OnDblClick = lvMemoryDblClick
+            OnSelectItem = lvMemorySelectItem
+          end
+          object splMemPreview: TSplitter
+            Cursor = crVSplit
+            Left = 0
+            Height = 5
+            Top = 379
+            Width = 530
+            Align = alBottom
+            ResizeAnchor = akBottom
+          end
+          object pnlMemPreview: TPanel
+            Left = 0
+            Height = 135
+            Top = 384
+            Width = 530
+            Align = alBottom
+            BevelOuter = bvNone
+            ClientHeight = 135
+            ClientWidth = 530
+            TabOrder = 3
+            object pnlMemPreviewHeader: TPanel
+              Left = 0
+              Height = 24
+              Top = 0
+              Width = 530
+              Align = alTop
+              BevelOuter = bvNone
+              ClientHeight = 24
+              ClientWidth = 530
+              TabOrder = 0
+              object lblMemPreviewTitle: TLabel
+                Left = 8
+                Height = 15
+                Top = 4
+                Width = 145
+                Caption = 'Selected Fragment Detail'
+                Font.Style = [fsBold]
+                ParentFont = False
+              end
+              object lblMemPreviewInfo: TLabel
+                Left = 380
+                Height = 15
+                Top = 4
+                Width = 140
+                Alignment = taRightJustify
+                Anchors = [akTop, akRight]
+                Caption = '0 chars | 0 lines'
+                Font.Color = clGray
+                ParentColor = False
+                ParentFont = False
+              end
+            end
+            object mmoMemPreview: TMemo
+              Left = 0
+              Height = 111
+              Top = 24
+              Width = 530
+              Align = alClient
+              Font.Height = -12
+              Font.Name = 'Consolas'
+              ParentFont = False
+              ReadOnly = True
+              ScrollBars = ssAutoBoth
+              TabOrder = 1
+            end
+          end
+        end
+        object splMemoryNotes: TSplitter
+          Left = 530
+          Height = 519
+          Top = 0
+          Width = 5
+        end
+        object pnlMemoryRight: TPanel
+          Left = 535
+          Height = 519
+          Top = 0
+          Width = 507
+          Align = alClient
+          BevelOuter = bvNone
+          ClientHeight = 519
+          ClientWidth = 507
+          TabOrder = 2
+          object pnlNotesHeader: TPanel
+            Left = 0
+            Height = 26
+            Top = 0
+            Width = 507
+            Align = alTop
+            BevelOuter = bvNone
+            ClientHeight = 26
+            ClientWidth = 507
+            TabOrder = 0
+            object lblNotesTitle: TLabel
+              Left = 8
+              Height = 15
+              Top = 5
+              Width = 155
+              Caption = 'Quick Notes & Scratchpad'
+              Font.Style = [fsBold]
+              ParentFont = False
+            end
+            object btnNotesTransferNotepad: TButton
+              Left = 240
+              Height = 22
+              Top = 2
+              Width = 135
+              Anchors = [akTop, akRight]
+              Caption = '📝 Transfer Note'
+              OnClick = btnNotesTransferNotepadClick
+              TabOrder = 0
+            end
+            object btnNotesCopy: TButton
+              Left = 380
+              Height = 22
+              Top = 2
+              Width = 60
+              Anchors = [akTop, akRight]
+              Caption = '📋 Copy'
+              OnClick = btnNotesCopyClick
+              TabOrder = 1
+            end
+            object btnNotesClear: TButton
+              Left = 445
+              Height = 22
+              Top = 2
+              Width = 55
+              Anchors = [akTop, akRight]
+              Caption = '🗑 Clear'
+              OnClick = btnNotesClearClick
+              TabOrder = 2
+            end
+          end
+          object pnlNotesInfo: TPanel
+            Left = 0
+            Height = 22
+            Top = 26
+            Width = 507
+            Align = alTop
+            BevelOuter = bvNone
+            ClientHeight = 22
+            ClientWidth = 507
+            TabOrder = 1
+            object lblNotesStatus: TLabel
+              Left = 8
+              Height = 13
+              Top = 4
+              Width = 230
+              Caption = 'Auto-saved scratchpad. Persistent across sessions.'
+              Font.Height = -11
+              Font.Color = clGray
+              ParentColor = False
+              ParentFont = False
+            end
+            object lblNotesStats: TLabel
+              Left = 380
+              Height = 13
+              Top = 4
+              Width = 115
+              Alignment = taRightJustify
+              Anchors = [akTop, akRight]
+              Caption = '0 chars | 1 lines'
+              Font.Height = -11
+              Font.Color = clGray
+              ParentColor = False
+              ParentFont = False
+            end
+          end
+          object mmoQuickNotes: TMemo
+            Left = 0
+            Height = 471
+            Top = 48
+            Width = 507
+            Align = alClient
+            Font.Height = -12
+            Font.Name = 'Consolas'
+            OnChange = mmoQuickNotesChange
+            ParentFont = False
+            ScrollBars = ssAutoBoth
+            TabOrder = 2
+          end
+        end
+      end
+    end
     object tabContextMenu: TTabSheet
       Caption = 'Context Menu Mgtmt'
       ClientHeight = 561
       ClientWidth = 1042
-      ImageIndex = 2
+      ImageIndex = 3
       object pnlContextMenuToolbar: TPanel
         Left = 0
         Height = 40
@@ -871,7 +1246,7 @@ object frmMain: TfrmMain
       Caption = 'The Real Explorer'
       ClientHeight = 561
       ClientWidth = 1042
-      ImageIndex = 3
+      ImageIndex = 4
       object pnlExplorerTop: TPanel
         Left = 0
         Height = 70
@@ -1149,7 +1524,7 @@ object frmMain: TfrmMain
       Caption = 'About'
       ClientHeight = 561
       ClientWidth = 1042
-      ImageIndex = 4
+      ImageIndex = 5
       object pnlAboutHeader: TPanel
         Left = 0
         Height = 85
@@ -1850,5 +2225,49 @@ object frmMain: TfrmMain
       Caption = 'Modern Tab Height (28px)'
       OnClick = miTabTallHeightClick
     end
+  end
+  object popMemory: TPopupMenu
+    Left = 460
+    Top = 8
+    object miMemTransferNotepad: TMenuItem
+      Caption = '📝 Transfer to Notepad (Insert at Caret)'
+      OnClick = miMemTransferNotepadClick
+    end
+    object miMemTransferNotepadAppend: TMenuItem
+      Caption = '➕ Append to Notepad Document'
+      OnClick = miMemTransferNotepadAppendClick
+    end
+    object miMemTransferNotepadNew: TMenuItem
+      Caption = '📄 Open as New Notepad Document'
+      OnClick = miMemTransferNotepadNewClick
+    end
+    object miMemSep1: TMenuItem
+      Caption = '-'
+    end
+    object miMemCopyToClip: TMenuItem
+      Caption = '📋 Copy to Clipboard'
+      OnClick = miMemCopyToClipClick
+    end
+    object miMemSendToNotes: TMenuItem
+      Caption = '📌 Send to Quick Notes'
+      OnClick = miMemSendToNotesClick
+    end
+    object miMemSep2: TMenuItem
+      Caption = '-'
+    end
+    object miMemDelete: TMenuItem
+      Caption = '✕ Delete Selected Fragment'
+      OnClick = miMemDeleteClick
+    end
+    object miMemClearAll: TMenuItem
+      Caption = '🗑 Clear All Memory Fragments'
+      OnClick = miMemClearAllClick
+    end
+  end
+  object tmrClipboard: TTimer
+    Interval = 250
+    OnTimer = tmrClipboardTimer
+    Left = 520
+    Top = 8
   end
 end

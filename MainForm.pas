@@ -22,6 +22,17 @@ type
     IsFolder: Boolean;
   end;
 
+  TMemoryTransferMode = (mtmInsertOrCaret, mtmAppend, mtmNewDocument);
+
+  TMemoryFragment = record
+    ID: Integer;
+    Content: string;
+    Timestamp: TDateTime;
+    CharCount: Integer;
+    LineCount: Integer;
+    Preview: string;
+  end;
+
   { TfrmMain }
 
   TfrmMain = class(TForm)
@@ -154,6 +165,56 @@ type
     miSepNotepad2: TMenuItem;
     miUndo: TMenuItem;
     miRedo: TMenuItem;
+
+    // Tab 3: Memory & Notes Controls
+    tabMemory: TTabSheet;
+    pnlMemoryTop: TPanel;
+    lblMemoryManager: TLabel;
+    cmbMemoryLimit: TComboBox;
+    lblMemoryBadge: TLabel;
+    btnMemoryTransferNotepad: TButton;
+    btnMemoryCopy: TButton;
+    btnMemorySendToNotes: TButton;
+    btnMemoryDelete: TButton;
+    btnClearMemory: TButton;
+
+    pnlMemoryClient: TPanel;
+    pnlMemoryLeft: TPanel;
+    pnlMemListHeader: TPanel;
+    lblMemListTitle: TLabel;
+    lblMemCount: TLabel;
+    lvMemory: TListView;
+    splMemPreview: TSplitter;
+    pnlMemPreview: TPanel;
+    pnlMemPreviewHeader: TPanel;
+    lblMemPreviewTitle: TLabel;
+    lblMemPreviewInfo: TLabel;
+    mmoMemPreview: TMemo;
+
+    splMemoryNotes: TSplitter;
+    pnlMemoryRight: TPanel;
+    pnlNotesHeader: TPanel;
+    lblNotesTitle: TLabel;
+    btnNotesTransferNotepad: TButton;
+    btnNotesCopy: TButton;
+    btnNotesClear: TButton;
+    pnlNotesInfo: TPanel;
+    lblNotesStatus: TLabel;
+    lblNotesStats: TLabel;
+    mmoQuickNotes: TMemo;
+
+    popMemory: TPopupMenu;
+    miMemTransferNotepad: TMenuItem;
+    miMemTransferNotepadAppend: TMenuItem;
+    miMemTransferNotepadNew: TMenuItem;
+    miMemSep1: TMenuItem;
+    miMemCopyToClip: TMenuItem;
+    miMemSendToNotes: TMenuItem;
+    miMemSep2: TMenuItem;
+    miMemDelete: TMenuItem;
+    miMemClearAll: TMenuItem;
+
+    tmrClipboard: TTimer;
 
     // Context Menu Tab Components
     tabContextMenu: TTabSheet;
@@ -393,6 +454,28 @@ type
     procedure miRedoClick(Sender: TObject);
     procedure popNotepadPopup(Sender: TObject);
 
+    // Memory & Notes Handlers
+    procedure cmbMemoryLimitChange(Sender: TObject);
+    procedure btnMemoryTransferNotepadClick(Sender: TObject);
+    procedure btnMemoryCopyClick(Sender: TObject);
+    procedure btnMemorySendToNotesClick(Sender: TObject);
+    procedure btnMemoryDeleteClick(Sender: TObject);
+    procedure btnClearMemoryClick(Sender: TObject);
+    procedure lvMemorySelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+    procedure lvMemoryDblClick(Sender: TObject);
+    procedure btnNotesTransferNotepadClick(Sender: TObject);
+    procedure btnNotesCopyClick(Sender: TObject);
+    procedure btnNotesClearClick(Sender: TObject);
+    procedure mmoQuickNotesChange(Sender: TObject);
+    procedure miMemTransferNotepadClick(Sender: TObject);
+    procedure miMemTransferNotepadAppendClick(Sender: TObject);
+    procedure miMemTransferNotepadNewClick(Sender: TObject);
+    procedure miMemCopyToClipClick(Sender: TObject);
+    procedure miMemSendToNotesClick(Sender: TObject);
+    procedure miMemDeleteClick(Sender: TObject);
+    procedure miMemClearAllClick(Sender: TObject);
+    procedure tmrClipboardTimer(Sender: TObject);
+
   private
     // Search Engine State
     FStopSearch: Boolean;
@@ -517,6 +600,30 @@ type
     function GetExplorerSelectedPath: string;
     function GetUserDesktopPath: string;
     function GetUserSpecialPath(const AFoId: string): string;
+
+  private
+    // Memory & Notes State & Helpers
+    FMemoryFragments: array of TMemoryFragment;
+    FMemoryLimit: Integer;
+    FLastClipboardSeq: DWORD;
+    FMemoryIdCounter: Integer;
+    FNotesModified: Boolean;
+
+    procedure CheckAndCollectClipboard;
+    procedure AddMemoryFragment(const AText: string);
+    procedure DeleteMemoryFragmentInternal(AIndex: Integer);
+    procedure PruneMemoryFragments;
+    procedure RefreshMemoryListView;
+    procedure UpdateMemoryStatusUI;
+    procedure UpdateMemoryButtonStates;
+    procedure TransferMemoryToNotepad(const AText: string; AMode: TMemoryTransferMode = mtmInsertOrCaret);
+    function GetMemoryCapacityFromIndex(AIndex: Integer): Integer;
+    function GetMemoryIndexFromCapacity(ACapacity: Integer): Integer;
+    function GetNotesPath: string;
+    procedure LoadQuickNotes;
+    procedure SaveQuickNotes;
+    function CountLines(const S: string): Integer;
+    function MakeSnippet(const S: string): string;
   public
     procedure AutoFitListViewColumns(ALV: TWinControl; AColumns: TListColumns; MaxColWidth: Integer = 450);
     procedure OpenFileInNotepad(const AFileName: string);
@@ -540,6 +647,10 @@ const
 
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
+
+{$IFDEF WINDOWS}
+function GetClipboardSequenceNumber: DWORD; stdcall; external 'user32.dll';
+{$ENDIF}
 
 type
   TSynTextViewsManagerCracker = class
@@ -736,6 +847,11 @@ begin
     cbExpPreviewAlways.Checked := Ini.ReadBool('Explorer', 'PreviewAlways', False);
     NavigateExplorerTo(FExpDefaultFolder);
 
+    // Memory & Notes Options
+    FMemoryLimit := Ini.ReadInteger('Memory', 'ManagerLimit', 5);
+    cmbMemoryLimit.ItemIndex := GetMemoryIndexFromCapacity(FMemoryLimit);
+    FMemoryLimit := GetMemoryCapacityFromIndex(cmbMemoryLimit.ItemIndex);
+
   finally
     Ini.Free;
   end;
@@ -759,6 +875,8 @@ begin
   ApplyTheme(UserPrefersDark);
   UpdateTabHighlight;
   UpdateTabOptionsMenu;
+  UpdateMemoryStatusUI;
+  LoadQuickNotes;
 end;
 
 procedure TfrmMain.SaveAllOptions;
@@ -794,9 +912,13 @@ begin
     // Explorer Options
     Ini.WriteString('Explorer', 'DefaultFolder', FExpDefaultFolder);
     Ini.WriteBool('Explorer', 'PreviewAlways', cbExpPreviewAlways.Checked);
+
+    // Memory & Notes Options
+    Ini.WriteInteger('Memory', 'ManagerLimit', FMemoryLimit);
   finally
     Ini.Free;
   end;
+  SaveQuickNotes;
 end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
@@ -859,17 +981,29 @@ begin
   ImageList1.Clear;
   ImageList1.Width := 16;
   ImageList1.Height := 16;
-  ImageList1.AddLazarusResource('chaicon-search');
-  ImageList1.AddLazarusResource('chaicon-page-edit');
-  ImageList1.AddLazarusResource('chaicon-settings');
-  ImageList1.AddLazarusResource('chaicon-folder-open');
-  ImageList1.AddLazarusResource('chaicon-info');
+  ImageList1.AddLazarusResource('chaicon-search');      // 0
+  ImageList1.AddLazarusResource('chaicon-page-edit');   // 1
+  ImageList1.AddLazarusResource('chaicon-clipboard');   // 2
+  ImageList1.AddLazarusResource('chaicon-settings');    // 3
+  ImageList1.AddLazarusResource('chaicon-folder-open'); // 4
+  ImageList1.AddLazarusResource('chaicon-info');        // 5
   PageControl1.Images := ImageList1;
   tabSearch.ImageIndex := 0;
   tabNotepad.ImageIndex := 1;
-  tabContextMenu.ImageIndex := 2;
-  tabExplorer.ImageIndex := 3;
-  tabAbout.ImageIndex := 4;
+  tabMemory.ImageIndex := 2;
+  tabContextMenu.ImageIndex := 3;
+  tabExplorer.ImageIndex := 4;
+  tabAbout.ImageIndex := 5;
+
+  // Initialize Memory & Notes state
+  SetLength(FMemoryFragments, 0);
+  FMemoryLimit := 5;
+  FMemoryIdCounter := 0;
+  FNotesModified := False;
+  {$IFDEF WINDOWS}
+  FLastClipboardSeq := GetClipboardSequenceNumber;
+  {$ENDIF}
+  tmrClipboard.Enabled := True;
 
   // Initialize The Real Explorer state
   FExpHistory := TStringList.Create;
@@ -1576,6 +1710,49 @@ begin
   pnlFindReplace.Color := PanelColor;
   pnlEditorHeader.Color := HeaderBg;
   pnlNotepadStatus.Color := HeaderBg;
+
+  // Memory & Notes Tab
+  pnlMemoryTop.Color := HeaderBg;
+  pnlMemoryClient.Color := PanelColor;
+  pnlMemoryLeft.Color := PanelColor;
+  pnlMemListHeader.Color := HeaderBg;
+  pnlMemPreview.Color := PanelColor;
+  pnlMemPreviewHeader.Color := HeaderBg;
+  pnlMemoryRight.Color := PanelColor;
+  pnlNotesHeader.Color := HeaderBg;
+  pnlNotesInfo.Color := PanelColor;
+  lvMemory.Color := EditBg;
+  lvMemory.Font.Color := TextColor;
+  mmoMemPreview.Color := EditBg;
+  mmoMemPreview.Font.Color := TextColor;
+  mmoQuickNotes.Color := EditBg;
+  mmoQuickNotes.Font.Color := TextColor;
+  lblMemoryManager.Font.Color := TextColor;
+  lblMemListTitle.Font.Color := TextColor;
+  lblMemPreviewTitle.Font.Color := TextColor;
+  lblNotesTitle.Font.Color := TextColor;
+  if ADark then
+  begin
+    lblMemCount.Font.Color := $00A0A0A0;
+    lblMemPreviewInfo.Font.Color := $00A0A0A0;
+    lblNotesStatus.Font.Color := $00A0A0A0;
+    lblNotesStats.Font.Color := $00A0A0A0;
+    if FMemoryLimit > 0 then
+      lblMemoryBadge.Font.Color := $0034D399
+    else
+      lblMemoryBadge.Font.Color := $00808080;
+  end
+  else
+  begin
+    lblMemCount.Font.Color := clGray;
+    lblMemPreviewInfo.Font.Color := clGray;
+    lblNotesStatus.Font.Color := clGray;
+    lblNotesStats.Font.Color := clGray;
+    if FMemoryLimit > 0 then
+      lblMemoryBadge.Font.Color := $00059669
+    else
+      lblMemoryBadge.Font.Color := clGray;
+  end;
 
   // Context Menu Management Tab
   pnlContextMenuToolbar.Color := HeaderBg;
@@ -2513,6 +2690,11 @@ procedure TfrmMain.PageControl1Change(Sender: TObject);
 begin
   UpdateTabHighlight;
   UpdateSaveButtonState;
+  if PageControl1.ActivePage = tabMemory then
+  begin
+    UpdateMemoryStatusUI;
+    UpdateMemoryButtonStates;
+  end;
   {$IFDEF WINDOWS}
   if PageControl1.ActivePage = tabContextMenu then
   begin
@@ -3840,12 +4022,14 @@ begin
         if SynEdit1.Focused and (SynEdit1.SelText <> '') then
         begin
           SynEdit1.CopyToClipboard;
+          CheckAndCollectClipboard;
           Key := 0;
         end;
       VK_X:
         if SynEdit1.Focused and (SynEdit1.SelText <> '') then
         begin
           SynEdit1.CutToClipboard;
+          CheckAndCollectClipboard;
           Key := 0;
         end;
       VK_V:
@@ -3883,11 +4067,13 @@ end;
 procedure TfrmMain.miCutClick(Sender: TObject);
 begin
   SynEdit1.CutToClipboard;
+  CheckAndCollectClipboard;
 end;
 
 procedure TfrmMain.miCopyClick(Sender: TObject);
 begin
   SynEdit1.CopyToClipboard;
+  CheckAndCollectClipboard;
 end;
 
 procedure TfrmMain.miPasteClick(Sender: TObject);
@@ -3914,6 +4100,551 @@ procedure TfrmMain.miRedoClick(Sender: TObject);
 begin
   SynEdit1.Redo;
 end;
+
+{ ----------------------------------------------------------------------------
+  Memory & Notes Tab Implementation
+  ---------------------------------------------------------------------------- }
+
+function TfrmMain.GetMemoryCapacityFromIndex(AIndex: Integer): Integer;
+begin
+  case AIndex of
+    1: Result := 5;
+    2: Result := 4;
+    3: Result := 3;
+    4: Result := 2;
+    5: Result := 1;
+    else Result := 0; // 0 = None
+  end;
+end;
+
+function TfrmMain.GetMemoryIndexFromCapacity(ACapacity: Integer): Integer;
+begin
+  case ACapacity of
+    5: Result := 1;
+    4: Result := 2;
+    3: Result := 3;
+    2: Result := 4;
+    1: Result := 5;
+    else Result := 0; // 0 = None
+  end;
+end;
+
+function TfrmMain.CountLines(const S: string): Integer;
+var
+  i, Cnt: Integer;
+begin
+  if S = '' then
+  begin
+    Result := 0;
+    Exit;
+  end;
+  Cnt := 1;
+  for i := 1 to Length(S) do
+    if S[i] = #10 then
+      Inc(Cnt);
+  Result := Cnt;
+end;
+
+function TfrmMain.MakeSnippet(const S: string): string;
+var
+  i: Integer;
+  Res: string;
+begin
+  Res := '';
+  for i := 1 to Length(S) do
+  begin
+    if (S[i] = #13) or (S[i] = #10) or (S[i] = #9) then
+      Res := Res + ' '
+    else
+      Res := Res + S[i];
+    if Length(Res) >= 80 then Break;
+  end;
+  Result := Trim(Res);
+end;
+
+function TfrmMain.GetNotesPath: string;
+begin
+  Result := ExtractFilePath(Application.ExeName) + 'AceUtils_Notes.txt';
+end;
+
+procedure TfrmMain.LoadQuickNotes;
+var
+  Path: string;
+begin
+  Path := GetNotesPath;
+  if FileExists(Path) then
+  begin
+    try
+      mmoQuickNotes.Lines.LoadFromFile(Path);
+      lblNotesStats.Caption := Format('%d chars | %d lines', [Length(mmoQuickNotes.Text), mmoQuickNotes.Lines.Count]);
+      FNotesModified := False;
+    except
+      // ignore
+    end;
+  end;
+end;
+
+procedure TfrmMain.SaveQuickNotes;
+var
+  Path: string;
+begin
+  Path := GetNotesPath;
+  try
+    mmoQuickNotes.Lines.SaveToFile(Path);
+    FNotesModified := False;
+  except
+    // ignore
+  end;
+end;
+
+procedure TfrmMain.CheckAndCollectClipboard;
+var
+  ClipText: string;
+begin
+  if FMemoryLimit <= 0 then Exit;
+  if not Clipboard.HasFormat(CF_TEXT) then Exit;
+  try
+    ClipText := Clipboard.AsText;
+  except
+    Exit;
+  end;
+
+  if Trim(ClipText) = '' then Exit;
+
+  // Ignore if identical to the most recent fragment
+  if (Length(FMemoryFragments) > 0) and (FMemoryFragments[0].Content = ClipText) then
+    Exit;
+
+  AddMemoryFragment(ClipText);
+end;
+
+procedure TfrmMain.AddMemoryFragment(const AText: string);
+var
+  Frag: TMemoryFragment;
+  i: Integer;
+begin
+  if FMemoryLimit <= 0 then Exit;
+  if Trim(AText) = '' then Exit;
+
+  // If this exact text already exists elsewhere in the list, remove it so we can push it to the top
+  for i := 0 to High(FMemoryFragments) do
+  begin
+    if FMemoryFragments[i].Content = AText then
+    begin
+      DeleteMemoryFragmentInternal(i);
+      Break;
+    end;
+  end;
+
+  // Build fragment record
+  Inc(FMemoryIdCounter);
+  Frag.ID := FMemoryIdCounter;
+  Frag.Content := AText;
+  Frag.Timestamp := Now;
+  Frag.CharCount := Length(AText);
+  Frag.LineCount := CountLines(AText);
+  Frag.Preview := MakeSnippet(AText);
+
+  // Insert at top (index 0)
+  SetLength(FMemoryFragments, Length(FMemoryFragments) + 1);
+  for i := High(FMemoryFragments) downto 1 do
+    FMemoryFragments[i] := FMemoryFragments[i - 1];
+  FMemoryFragments[0] := Frag;
+
+  // Prune to limit
+  PruneMemoryFragments;
+
+  // Refresh UI list view
+  RefreshMemoryListView;
+  UpdateMemoryStatusUI;
+end;
+
+procedure TfrmMain.DeleteMemoryFragmentInternal(AIndex: Integer);
+var
+  i: Integer;
+begin
+  if (AIndex < 0) or (AIndex > High(FMemoryFragments)) then Exit;
+  for i := AIndex to High(FMemoryFragments) - 1 do
+    FMemoryFragments[i] := FMemoryFragments[i + 1];
+  SetLength(FMemoryFragments, Length(FMemoryFragments) - 1);
+end;
+
+procedure TfrmMain.PruneMemoryFragments;
+begin
+  if (FMemoryLimit > 0) and (Length(FMemoryFragments) > FMemoryLimit) then
+  begin
+    SetLength(FMemoryFragments, FMemoryLimit);
+    RefreshMemoryListView;
+    UpdateMemoryStatusUI;
+  end;
+end;
+
+procedure TfrmMain.RefreshMemoryListView;
+var
+  i: Integer;
+  Item: TListItem;
+  SavedSel: Integer;
+begin
+  lvMemory.Items.BeginUpdate;
+  try
+    SavedSel := -1;
+    if lvMemory.Selected <> nil then
+      SavedSel := lvMemory.Selected.Index;
+
+    lvMemory.Items.Clear;
+    for i := 0 to High(FMemoryFragments) do
+    begin
+      Item := lvMemory.Items.Add;
+      Item.Caption := IntToStr(i + 1);
+      Item.SubItems.Add(FormatDateTime('hh:nn:ss', FMemoryFragments[i].Timestamp));
+      if FMemoryFragments[i].LineCount > 1 then
+        Item.SubItems.Add(Format('%d c, %d L', [FMemoryFragments[i].CharCount, FMemoryFragments[i].LineCount]))
+      else
+        Item.SubItems.Add(Format('%d chars', [FMemoryFragments[i].CharCount]));
+      Item.SubItems.Add(FMemoryFragments[i].Preview);
+    end;
+
+    if (SavedSel >= 0) and (SavedSel < lvMemory.Items.Count) then
+    begin
+      lvMemory.Selected := lvMemory.Items[SavedSel];
+      lvMemory.ItemIndex := SavedSel;
+    end
+    else if lvMemory.Items.Count > 0 then
+    begin
+      lvMemory.Selected := lvMemory.Items[0];
+      lvMemory.ItemIndex := 0;
+      mmoMemPreview.Text := FMemoryFragments[0].Content;
+      lblMemPreviewInfo.Caption := Format('%d chars | %d lines', [FMemoryFragments[0].CharCount, FMemoryFragments[0].LineCount]);
+    end
+    else
+    begin
+      mmoMemPreview.Text := '';
+      lblMemPreviewInfo.Caption := '0 chars | 0 lines';
+    end;
+
+    lblMemCount.Caption := Format('%d fragment(s)', [Length(FMemoryFragments)]);
+  finally
+    lvMemory.Items.EndUpdate;
+  end;
+  UpdateMemoryButtonStates;
+end;
+
+procedure TfrmMain.UpdateMemoryStatusUI;
+begin
+  if FMemoryLimit <= 0 then
+  begin
+    lblMemoryBadge.Caption := '○ Disabled (Not collecting)';
+    if FDarkMode then
+      lblMemoryBadge.Font.Color := $00808080
+    else
+      lblMemoryBadge.Font.Color := clGray;
+  end
+  else if FMemoryLimit = 1 then
+  begin
+    lblMemoryBadge.Caption := '● Active (Collecting only 1 fragment)';
+    if FDarkMode then
+      lblMemoryBadge.Font.Color := $0034D399
+    else
+      lblMemoryBadge.Font.Color := $00059669;
+  end
+  else
+  begin
+    lblMemoryBadge.Caption := Format('● Active (Collecting last %d fragments)', [FMemoryLimit]);
+    if FDarkMode then
+      lblMemoryBadge.Font.Color := $0034D399
+    else
+      lblMemoryBadge.Font.Color := $00059669;
+  end;
+  UpdateMemoryButtonStates;
+end;
+
+procedure TfrmMain.UpdateMemoryButtonStates;
+var
+  HasSelection: Boolean;
+  HasItems: Boolean;
+  HasNotes: Boolean;
+begin
+  HasSelection := (lvMemory.Selected <> nil);
+  HasItems := (Length(FMemoryFragments) > 0);
+  HasNotes := (Trim(mmoQuickNotes.Text) <> '');
+
+  btnMemoryTransferNotepad.Enabled := HasSelection or HasItems or HasNotes;
+  btnMemoryCopy.Enabled := HasSelection or (Trim(mmoMemPreview.Text) <> '');
+  btnMemorySendToNotes.Enabled := HasSelection or (Trim(mmoMemPreview.Text) <> '');
+  btnMemoryDelete.Enabled := HasSelection;
+  btnClearMemory.Enabled := HasItems;
+
+  btnNotesTransferNotepad.Enabled := HasNotes;
+  btnNotesCopy.Enabled := HasNotes;
+  btnNotesClear.Enabled := HasNotes;
+
+  if Assigned(miMemTransferNotepad) then
+    miMemTransferNotepad.Enabled := HasSelection or HasItems;
+  if Assigned(miMemTransferNotepadAppend) then
+    miMemTransferNotepadAppend.Enabled := HasSelection or HasItems;
+  if Assigned(miMemTransferNotepadNew) then
+    miMemTransferNotepadNew.Enabled := HasSelection or HasItems;
+  if Assigned(miMemCopyToClip) then
+    miMemCopyToClip.Enabled := HasSelection;
+  if Assigned(miMemSendToNotes) then
+    miMemSendToNotes.Enabled := HasSelection;
+  if Assigned(miMemDelete) then
+    miMemDelete.Enabled := HasSelection;
+  if Assigned(miMemClearAll) then
+    miMemClearAll.Enabled := HasItems;
+end;
+
+procedure TfrmMain.TransferMemoryToNotepad(const AText: string; AMode: TMemoryTransferMode);
+var
+  TargetText: string;
+begin
+  TargetText := AText;
+  if TargetText = '' then
+  begin
+    if (lvMemory.Selected <> nil) and (lvMemory.Selected.Index < Length(FMemoryFragments)) then
+      TargetText := FMemoryFragments[lvMemory.Selected.Index].Content
+    else if Trim(mmoMemPreview.Text) <> '' then
+      TargetText := mmoMemPreview.Text
+    else if Trim(mmoQuickNotes.Text) <> '' then
+      TargetText := mmoQuickNotes.Text;
+  end;
+
+  if TargetText = '' then
+  begin
+    MessageDlg('Transfer to Notepad', 'No memory fragment or note content selected to transfer.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  case AMode of
+    mtmNewDocument:
+    begin
+      if not PromptSaveIfModified then Exit;
+      SynEdit1.Lines.Clear;
+      SynEdit1.Text := TargetText;
+      FCurrentFileName := '';
+    end;
+    mtmAppend:
+    begin
+      if (SynEdit1.Lines.Count = 0) or ((SynEdit1.Lines.Count = 1) and (SynEdit1.Lines[0] = '')) then
+        SynEdit1.Text := TargetText
+      else
+      begin
+        SynEdit1.Lines.Add('');
+        SynEdit1.Lines.Add(TargetText);
+      end;
+    end;
+    mtmInsertOrCaret:
+    begin
+      if (SynEdit1.Lines.Count = 0) or ((SynEdit1.Lines.Count = 1) and (SynEdit1.Lines[0] = '')) then
+        SynEdit1.Text := TargetText
+      else
+        SynEdit1.SelText := TargetText;
+    end;
+  end;
+
+  // Mark document as modified / unsaved
+  SynEdit1.Modified := True;
+  FIsModified := True;
+  if FCurrentFileName <> '' then
+    lblCurrentFile.Caption := '*' + ExtractFileName(FCurrentFileName) + ' (' + FCurrentFileName + ')'
+  else
+    lblCurrentFile.Caption := '*Untitled Document';
+
+  PageControl1.ActivePage := tabNotepad;
+  UpdateTabHighlight;
+  UpdateNotepadStatus;
+  UpdateSaveButtonState;
+  SetStatus(' Memory fragment transferred to Notepad (marked unsaved)');
+  SynEdit1.SetFocus;
+end;
+
+procedure TfrmMain.cmbMemoryLimitChange(Sender: TObject);
+begin
+  FMemoryLimit := GetMemoryCapacityFromIndex(cmbMemoryLimit.ItemIndex);
+  PruneMemoryFragments;
+  UpdateMemoryStatusUI;
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.btnMemoryTransferNotepadClick(Sender: TObject);
+begin
+  TransferMemoryToNotepad('', mtmInsertOrCaret);
+end;
+
+procedure TfrmMain.btnMemoryCopyClick(Sender: TObject);
+var
+  Target: string;
+begin
+  if (lvMemory.Selected <> nil) and (lvMemory.Selected.Index < Length(FMemoryFragments)) then
+    Target := FMemoryFragments[lvMemory.Selected.Index].Content
+  else
+    Target := mmoMemPreview.Text;
+
+  if Target <> '' then
+  begin
+    Clipboard.AsText := Target;
+    SetStatus(' Fragment copied to clipboard');
+  end;
+end;
+
+procedure TfrmMain.btnMemorySendToNotesClick(Sender: TObject);
+var
+  Target: string;
+begin
+  if (lvMemory.Selected <> nil) and (lvMemory.Selected.Index < Length(FMemoryFragments)) then
+    Target := FMemoryFragments[lvMemory.Selected.Index].Content
+  else
+    Target := mmoMemPreview.Text;
+
+  if Target <> '' then
+  begin
+    if (mmoQuickNotes.Lines.Count = 0) or ((mmoQuickNotes.Lines.Count = 1) and (mmoQuickNotes.Lines[0] = '')) then
+      mmoQuickNotes.Text := Target
+    else
+    begin
+      mmoQuickNotes.Lines.Add('');
+      mmoQuickNotes.Lines.Add('--- Fragment (' + FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + ') ---');
+      mmoQuickNotes.Lines.Add(Target);
+    end;
+    SaveQuickNotes;
+    SetStatus(' Fragment appended to Quick Notes');
+  end;
+end;
+
+procedure TfrmMain.btnMemoryDeleteClick(Sender: TObject);
+begin
+  if (lvMemory.Selected <> nil) and (lvMemory.Selected.Index < Length(FMemoryFragments)) then
+  begin
+    DeleteMemoryFragmentInternal(lvMemory.Selected.Index);
+    RefreshMemoryListView;
+    SetStatus(' Memory fragment removed');
+  end;
+end;
+
+procedure TfrmMain.btnClearMemoryClick(Sender: TObject);
+begin
+  if Length(FMemoryFragments) = 0 then Exit;
+  if MessageDlg('Clear Memory', 'Are you sure you want to clear all memory fragments?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    SetLength(FMemoryFragments, 0);
+    RefreshMemoryListView;
+    SetStatus(' All memory fragments cleared');
+  end;
+end;
+
+procedure TfrmMain.lvMemorySelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+var
+  Idx: Integer;
+begin
+  if Selected and (Item <> nil) then
+  begin
+    Idx := Item.Index;
+    if (Idx >= 0) and (Idx < Length(FMemoryFragments)) then
+    begin
+      mmoMemPreview.Text := FMemoryFragments[Idx].Content;
+      lblMemPreviewInfo.Caption := Format('%d chars | %d lines', [FMemoryFragments[Idx].CharCount, FMemoryFragments[Idx].LineCount]);
+    end;
+  end;
+  UpdateMemoryButtonStates;
+end;
+
+procedure TfrmMain.lvMemoryDblClick(Sender: TObject);
+begin
+  btnMemoryTransferNotepadClick(Sender);
+end;
+
+procedure TfrmMain.btnNotesTransferNotepadClick(Sender: TObject);
+begin
+  if Trim(mmoQuickNotes.Text) = '' then Exit;
+  TransferMemoryToNotepad(mmoQuickNotes.Text, mtmInsertOrCaret);
+end;
+
+procedure TfrmMain.btnNotesCopyClick(Sender: TObject);
+begin
+  if mmoQuickNotes.Text <> '' then
+  begin
+    Clipboard.AsText := mmoQuickNotes.Text;
+    SetStatus(' Quick Notes copied to clipboard');
+  end;
+end;
+
+procedure TfrmMain.btnNotesClearClick(Sender: TObject);
+begin
+  if Trim(mmoQuickNotes.Text) = '' then Exit;
+  if MessageDlg('Clear Notes', 'Are you sure you want to clear the Quick Notes scratchpad?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    mmoQuickNotes.Clear;
+    SaveQuickNotes;
+    SetStatus(' Quick Notes cleared');
+  end;
+end;
+
+procedure TfrmMain.mmoQuickNotesChange(Sender: TObject);
+begin
+  FNotesModified := True;
+  lblNotesStats.Caption := Format('%d chars | %d lines', [Length(mmoQuickNotes.Text), mmoQuickNotes.Lines.Count]);
+  SaveQuickNotes;
+  UpdateMemoryButtonStates;
+end;
+
+procedure TfrmMain.miMemTransferNotepadClick(Sender: TObject);
+begin
+  TransferMemoryToNotepad('', mtmInsertOrCaret);
+end;
+
+procedure TfrmMain.miMemTransferNotepadAppendClick(Sender: TObject);
+begin
+  TransferMemoryToNotepad('', mtmAppend);
+end;
+
+procedure TfrmMain.miMemTransferNotepadNewClick(Sender: TObject);
+begin
+  TransferMemoryToNotepad('', mtmNewDocument);
+end;
+
+procedure TfrmMain.miMemCopyToClipClick(Sender: TObject);
+begin
+  btnMemoryCopyClick(Sender);
+end;
+
+procedure TfrmMain.miMemSendToNotesClick(Sender: TObject);
+begin
+  btnMemorySendToNotesClick(Sender);
+end;
+
+procedure TfrmMain.miMemDeleteClick(Sender: TObject);
+begin
+  btnMemoryDeleteClick(Sender);
+end;
+
+procedure TfrmMain.miMemClearAllClick(Sender: TObject);
+begin
+  btnClearMemoryClick(Sender);
+end;
+
+procedure TfrmMain.tmrClipboardTimer(Sender: TObject);
+{$IFDEF WINDOWS}
+var
+  CurSeq: DWORD;
+begin
+  if FMemoryLimit <= 0 then Exit;
+  try
+    CurSeq := GetClipboardSequenceNumber;
+    if CurSeq <> FLastClipboardSeq then
+    begin
+      FLastClipboardSeq := CurSeq;
+      CheckAndCollectClipboard;
+    end;
+  except
+    // ignore
+  end;
+end;
+{$ELSE}
+begin
+  if FMemoryLimit <= 0 then Exit;
+  CheckAndCollectClipboard;
+end;
+{$ENDIF}
 
 { ----------------------------------------------------------------------------
   Keyboard Status, Timer, and About Tab Implementation
@@ -4073,11 +4804,26 @@ begin
   mmoAboutFeatures.Lines.Add('   - Active tab highlight dot indicator (●) for fast visual reference.');
   mmoAboutFeatures.Lines.Add('   - Modern 28px tab height toggle for comfortable desktop and touch ergonomics.');
   mmoAboutFeatures.Lines.Add('   - Instant live Win32 window recreation ensuring real-time style rendering.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('8. MEMORY & NOTES CLIPBOARD MANAGER:');
+  mmoAboutFeatures.Lines.Add('   - Configurable memory fragment collector with modes: None, Last 5, Last 4, Last 3, Last 2, Only 1.');
+  mmoAboutFeatures.Lines.Add('   - Non-blocking Windows clipboard monitoring for cut/copy operations across all applications.');
+  mmoAboutFeatures.Lines.Add('   - One-click Transfer to Notepad: inserts at caret or appends, and marks file as unsaved (*).');
+  mmoAboutFeatures.Lines.Add('   - Embedded persistent Quick Notes scratchpad automatically saved across sessions.');
+  mmoAboutFeatures.Lines.Add('   - Right-click context menu for quick copy, transfer to Notepad, and pinning to notes.');
 
   mmoAboutBuildLog.Lines.Clear;
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.4.0] - 2026-09-05');
+  mmoAboutBuildLog.Lines.Add('  * New Tab "Memory & Notes": Added clipboard memory manager and persistent scratchpad.');
+  mmoAboutBuildLog.Lines.Add('  * Configurable Memory Limits: Dropdown manager with options: None (Off), Last 5 memory, Last 4, Last 3, Last 2, Only one.');
+  mmoAboutBuildLog.Lines.Add('  * Non-Blocking Cut/Copy Capture: Sequence-tracked clipboard capture without thread lockup or UI stalls.');
+  mmoAboutBuildLog.Lines.Add('  * Transfer to Notepad: Seamlessly transfers fragments or notes into Notepad tab and flags document as unsaved (*).');
+  mmoAboutBuildLog.Lines.Add('  * Persistent Quick Notes: Auto-saves scratchpad to AceUtils_Notes.txt and reloads on startup.');
+  mmoAboutBuildLog.Lines.Add('  * UI Context Menu & Quick Actions: Copy, delete, clear, pin to notes, and transfer options.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.3.2] - 2026-09-05');
   mmoAboutBuildLog.Lines.Add('  * Dynamic Tab Style Switcher: Fixed runtime tab style switcher (Classic Tabs, Modern Flat Buttons, Push Buttons) by recreating native Win32 window handle and forcing real-time repaint.');

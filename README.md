@@ -85,6 +85,16 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Instant Live Refresh**: Seamless Win32 window recreation ensures visual style changes render immediately without requiring an application restart.
 - **Persistent Preferences**: Saves tab styles, heights, and indicator preferences across sessions in `AceUtils.ini`.
 
+### 📋 9. Memory Management & Notes (Clipboard History & Scratchpad)
+- **Configurable Manager Dropdown**: Easily choose how many clipboard fragments to collect:
+  - `None`: Manager is disabled; cuts and copies are not collected.
+  - `Last 5 memory` (Default): Automatically retains the 5 most recent fragments.
+  - `Last 4 memory`, `Last 3 memory`, `Last 2 memory`, or `Only one`: Keeps precisely the requested history depth.
+- **Non-Blocking Clipboard Tracking**: Uses Windows clipboard sequence monitoring (`GetClipboardSequenceNumber`) to detect system-wide cuts and copies without hooks, thread contention, or UI hangs.
+- **One-Click Transfer to Notepad**: Transfer any memory fragment or note directly into the Notepad tab (inserts at cursor, replaces selection, or appends). Automatically flags the document as **unsaved** (`*Filename.txt` or `*Untitled Document` and `Modified` status) so changes are never lost.
+- **Persistent Quick Notes Scratchpad**: A dedicated notes memo on the right side auto-saves directly to `AceUtils_Notes.txt` and reloads on startup.
+- **Rich Context Menu & Actions**: Right-click menu and toolbar buttons provide quick options to copy fragments back to the clipboard, append to Quick Notes, delete individual items, clear memory, or transfer to Notepad.
+
 ---
 
 ## 🛠️ Visual Form Designer & Lazarus IDE Compatibility
