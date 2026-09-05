@@ -866,8 +866,8 @@ object frmMain: TfrmMain
                 Width = 32
               end            
               item
-                Caption = 'Time'
-                Width = 72
+                Caption = 'Date / Time'
+                Width = 145
               end            
               item
                 Alignment = taRightJustify

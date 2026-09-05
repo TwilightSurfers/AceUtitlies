@@ -4401,7 +4401,7 @@ begin
     begin
       Item := lvMemory.Items.Add;
       Item.Caption := IntToStr(i + 1);
-      Item.SubItems.Add(FormatDateTime('hh:nn:ss', FMemoryFragments[i].Timestamp));
+      Item.SubItems.Add(FormatDateTime('m/d/yyyy h:nn:ss am/pm', FMemoryFragments[i].Timestamp));
       if FMemoryFragments[i].LineCount > 1 then
         Item.SubItems.Add(Format('%d c, %d L', [FMemoryFragments[i].CharCount, FMemoryFragments[i].LineCount]))
       else
@@ -4414,19 +4414,33 @@ begin
       lvMemory.Selected := lvMemory.Items[0];
       lvMemory.ItemIndex := 0;
       mmoMemPreview.Text := FMemoryFragments[0].Content;
-      lblMemPreviewInfo.Caption := Format('%d chars | %d lines', [FMemoryFragments[0].CharCount, FMemoryFragments[0].LineCount]);
+      lblMemPreviewInfo.Caption := Format('%s | %d chars | %d lines', [
+        FormatDateTime('m/d/yyyy h:nn:ss am/pm', FMemoryFragments[0].Timestamp),
+        FMemoryFragments[0].CharCount,
+        FMemoryFragments[0].LineCount
+      ]);
     end
     else if (SavedSel >= 0) and (SavedSel < lvMemory.Items.Count) then
     begin
       lvMemory.Selected := lvMemory.Items[SavedSel];
       lvMemory.ItemIndex := SavedSel;
+      mmoMemPreview.Text := FMemoryFragments[SavedSel].Content;
+      lblMemPreviewInfo.Caption := Format('%s | %d chars | %d lines', [
+        FormatDateTime('m/d/yyyy h:nn:ss am/pm', FMemoryFragments[SavedSel].Timestamp),
+        FMemoryFragments[SavedSel].CharCount,
+        FMemoryFragments[SavedSel].LineCount
+      ]);
     end
     else if lvMemory.Items.Count > 0 then
     begin
       lvMemory.Selected := lvMemory.Items[0];
       lvMemory.ItemIndex := 0;
       mmoMemPreview.Text := FMemoryFragments[0].Content;
-      lblMemPreviewInfo.Caption := Format('%d chars | %d lines', [FMemoryFragments[0].CharCount, FMemoryFragments[0].LineCount]);
+      lblMemPreviewInfo.Caption := Format('%s | %d chars | %d lines', [
+        FormatDateTime('m/d/yyyy h:nn:ss am/pm', FMemoryFragments[0].Timestamp),
+        FMemoryFragments[0].CharCount,
+        FMemoryFragments[0].LineCount
+      ]);
     end
     else
     begin
@@ -4615,7 +4629,7 @@ begin
     else
     begin
       mmoQuickNotes.Lines.Add('');
-      mmoQuickNotes.Lines.Add('--- Fragment (' + FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + ') ---');
+      mmoQuickNotes.Lines.Add('--- Fragment (' + FormatDateTime('m/d/yyyy h:nn:ss am/pm', Now) + ') ---');
       mmoQuickNotes.Lines.Add(Target);
     end;
     SaveQuickNotes;
@@ -4654,7 +4668,11 @@ begin
     if (Idx >= 0) and (Idx < Length(FMemoryFragments)) then
     begin
       mmoMemPreview.Text := FMemoryFragments[Idx].Content;
-      lblMemPreviewInfo.Caption := Format('%d chars | %d lines', [FMemoryFragments[Idx].CharCount, FMemoryFragments[Idx].LineCount]);
+      lblMemPreviewInfo.Caption := Format('%s | %d chars | %d lines', [
+        FormatDateTime('m/d/yyyy h:nn:ss am/pm', FMemoryFragments[Idx].Timestamp),
+        FMemoryFragments[Idx].CharCount,
+        FMemoryFragments[Idx].LineCount
+      ]);
     end;
   end;
   UpdateMemoryButtonStates;
