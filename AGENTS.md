@@ -133,3 +133,30 @@ To prevent duplicate processes and resource contention, Ace's Utilities strictly
 - **Named Mutex**: `CreateMutex(nil, True, 'AceUtils_SingleInstance_Mutex')` in `AceUtils.lpr` checks for an existing instance before initializing LCL forms.
 - **Secondary Instance Termination**: If `GetLastError = ERROR_ALREADY_EXISTS`, the second process signals the running instance and exits immediately.
 - **System Tray Restoration & Window Flashing**: The second process posts a registered message (`RegisterWindowMessage('AceUtils_Restore_SingleInstance')`) and calls `ShowWindow(..., SW_RESTORE)` / `SetForegroundWindow`. When `TfrmMain.WndProc` receives this message, it calls `Show`, sets `WindowState := wsNormal`, brings the form to the front (unhiding it if minimized to the system tray), and calls `FlashWindowEx` to flash the window title bar and taskbar.
+
+---
+
+## 8. Runtime TabControl / PageControl Style Switching (`MainForm.pas`)
+
+### The Win32 Widgetset Limitation
+In Free Pascal / Lazarus LCL's Win32 widgetset (`customnotebook.inc` and `win32pagecontrol.inc`):
+- `TCustomTabControl.SetStyle` (e.g., `PageControl.Style := tsButtons` / `tsFlatButtons` / `tsTabs`) only assigns an internal property `FStyle`.
+- It does **not** update or recreate the native Win32 window (`SysTabControl32`). The underlying Win32 window style flags (`TCS_BUTTONS`, `TCS_FLATBUTTONS`, `TCS_TABS`) are only evaluated in `CreateHandle` when `CreateWindowEx` is invoked.
+- Consequently, simply changing `PageControl1.Style := tsButtons` at runtime appears to do nothing on screen; the tabs retain their original visual style until the program restarts.
+
+### The Rule for Runtime Tab Style Switching
+Whenever modifying `PageControl.Style` dynamically at runtime:
+1. Check `if PageControl.HandleAllocated then`.
+2. Save the active tab index: `SavedIndex := PageControl.ActivePageIndex;`.
+3. Call `RecreateWnd(PageControl);` from the `Controls` unit to tear down and recreate the native window with the updated `Style` flags.
+4. Restore the active tab index: `if (SavedIndex >= 0) and (SavedIndex < PageControl.PageCount) then PageControl.ActivePageIndex := SavedIndex;`.
+5. Realign and trigger immediate invalidation and repainting:
+   ```pascal
+   PageControl.Realign;
+   PageControl.Invalidate;
+   PageControl.Repaint;
+   Self.Invalidate;
+   Self.Repaint;
+   Application.ProcessMessages;
+   ```
+6. Similarly, when toggling `TabHeight` or custom caption indicators (like active dot markers), ensure `Invalidate` and `Repaint` are explicitly called so changes reflect immediately without user interaction delays.

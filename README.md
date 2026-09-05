@@ -78,6 +78,13 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **One-Click Restore**: Left-clicking the tray icon restores the window to normal view immediately.
 - **Persistent Setting**: Preferences are saved across restarts in `AceUtils.ini`.
 
+### 📑 8. Dynamic Tab Presentation & Styling
+- **Multiple Tab Presentation Modes**: Switch instantly between **Classic Tabs**, **Modern Flat Buttons**, and **Push Buttons** at runtime via the `Tab Style ▾` header dropdown menu.
+- **Active Tab Highlight Indicator**: Optional dot indicator (`●`) clearly identifies the currently active notebook page.
+- **Spacious / Modern Tab Height**: Toggle between compact standard tab sizing and modern 28px touch/desktop tabs.
+- **Instant Live Refresh**: Seamless Win32 window recreation ensures visual style changes render immediately without requiring an application restart.
+- **Persistent Preferences**: Saves tab styles, heights, and indicator preferences across sessions in `AceUtils.ini`.
+
 ---
 
 ## 🛠️ Visual Form Designer & Lazarus IDE Compatibility

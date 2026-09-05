@@ -1374,6 +1374,8 @@ begin
 end;
 
 procedure TfrmMain.SetTabStyle(AStyle: Integer);
+var
+  SavedIndex: Integer;
 begin
   FTabStyle := AStyle;
   case AStyle of
@@ -1385,6 +1387,21 @@ begin
       PageControl1.Style := tsTabs;
     end;
   end;
+
+  if PageControl1.HandleAllocated then
+  begin
+    SavedIndex := PageControl1.ActivePageIndex;
+    RecreateWnd(PageControl1);
+    if (SavedIndex >= 0) and (SavedIndex < PageControl1.PageCount) then
+      PageControl1.ActivePageIndex := SavedIndex;
+    PageControl1.Realign;
+    PageControl1.Invalidate;
+    PageControl1.Repaint;
+    Self.Invalidate;
+    Self.Repaint;
+    Application.ProcessMessages;
+  end;
+
   UpdateTabOptionsMenu;
   SaveAllOptions;
 end;
@@ -1429,6 +1446,8 @@ begin
   FHighlightActiveTab := not FHighlightActiveTab;
   UpdateTabOptionsMenu;
   UpdateTabHighlight;
+  PageControl1.Invalidate;
+  PageControl1.Repaint;
   SaveAllOptions;
 end;
 
@@ -1439,6 +1458,11 @@ begin
     PageControl1.TabHeight := 28
   else
     PageControl1.TabHeight := 0;
+  PageControl1.Invalidate;
+  PageControl1.Repaint;
+  Self.Invalidate;
+  Self.Repaint;
+  Application.ProcessMessages;
   UpdateTabOptionsMenu;
   SaveAllOptions;
 end;
@@ -4029,11 +4053,22 @@ begin
   mmoAboutFeatures.Lines.Add('   - System tray minimize/close with quick actions context menu.');
   mmoAboutFeatures.Lines.Add('   - Live keyboard status (CAPS, NUM, INS) and ticking System Clock in status bar.');
   mmoAboutFeatures.Lines.Add('   - Embedded 16x16 chaicon modern icon set (727 icons under MIT License).');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('7. DYNAMIC TAB STYLING & NOTEBOOK CUSTOMIZATION:');
+  mmoAboutFeatures.Lines.Add('   - Switch between Classic Tabs, Modern Flat Buttons, and Push Buttons on the fly.');
+  mmoAboutFeatures.Lines.Add('   - Active tab highlight dot indicator (●) for fast visual reference.');
+  mmoAboutFeatures.Lines.Add('   - Modern 28px tab height toggle for comfortable desktop and touch ergonomics.');
+  mmoAboutFeatures.Lines.Add('   - Instant live Win32 window recreation ensuring real-time style rendering.');
 
   mmoAboutBuildLog.Lines.Clear;
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.3.2] - 2026-09-05');
+  mmoAboutBuildLog.Lines.Add('  * Dynamic Tab Style Switcher: Fixed runtime tab style switcher (Classic Tabs, Modern Flat Buttons, Push Buttons) by recreating native Win32 window handle and forcing real-time repaint.');
+  mmoAboutBuildLog.Lines.Add('  * Tab Layout Live Refresh: Realigned notebook pages, preserved active tab index, and added immediate form/control invalidation when changing tab style, height, or active dot.');
+  mmoAboutBuildLog.Lines.Add('  * Documentation & Developer Guidelines: Added Section 8 to AGENTS.md documenting Lazarus LCL Win32 tab control handle recreation invariants.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.3.1] - 2026-09-04');
   mmoAboutBuildLog.Lines.Add('  * Smart File Path Handling: Pasting full file paths or filenames into Explorer address bar automatically resolves to parent folder, selects target item, and previews it.');
