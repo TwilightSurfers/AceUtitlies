@@ -31,6 +31,7 @@ type
     cbRunInTray: TCheckBox;
     btnRegisterAssoc: TButton;
     btnToggleDarkMode: TButton;
+    btnTabStyle: TButton;
 
     // Page Control
     PageControl1: TPageControl;
@@ -131,6 +132,13 @@ type
     miTrayNotepad: TMenuItem;
     miTraySep: TMenuItem;
     miTrayExit: TMenuItem;
+    popTabOptions: TPopupMenu;
+    miTabStyleTabs: TMenuItem;
+    miTabStyleFlat: TMenuItem;
+    miTabStyleButtons: TMenuItem;
+    miTabSep1: TMenuItem;
+    miTabHighlightDot: TMenuItem;
+    miTabTallHeight: TMenuItem;
 
     popNotepad: TPopupMenu;
     miNotepadSave: TMenuItem;
@@ -188,6 +196,7 @@ type
     btnJumpPictures: TButton;
     btnJumpDriveC: TButton;
     btnJumpUserHome: TButton;
+    cbExpPreviewAlways: TCheckBox;
     pnlExpBody: TPanel;
     pnlExpLeft: TPanel;
     ShellTreeViewExplorer: TShellTreeView;
@@ -275,6 +284,8 @@ type
     procedure btnExpGoClick(Sender: TObject);
     procedure btnExpSetDefaultClick(Sender: TObject);
     procedure btnExpPreviewClick(Sender: TObject);
+    procedure cbExpPreviewAlwaysChange(Sender: TObject);
+    procedure miExpPreviewClick(Sender: TObject);
     procedure btnExpNewFolderClick(Sender: TObject);
     procedure btnJumpDesktopClick(Sender: TObject);
     procedure btnJumpDownloadsClick(Sender: TObject);
@@ -302,6 +313,11 @@ type
     // Header & Tray Events
     procedure btnToggleDarkModeClick(Sender: TObject);
     procedure btnRegisterAssocClick(Sender: TObject);
+    procedure btnTabStyleClick(Sender: TObject);
+    procedure miTabStyleClick(Sender: TObject);
+    procedure miTabHighlightDotClick(Sender: TObject);
+    procedure miTabTallHeightClick(Sender: TObject);
+    procedure popTabOptionsPopup(Sender: TObject);
     procedure cbRunInTrayChange(Sender: TObject);
     procedure TrayIcon1Click(Sender: TObject);
     procedure miTrayOpenClick(Sender: TObject);
@@ -482,6 +498,16 @@ type
     FExpNavigating: Boolean;
     FExpSortColumn: Integer;
     FExpSortAscending: Boolean;
+    FExpPreviewSyncing: Boolean;
+
+    // Tab Styling & Highlighting State & Helpers
+    FTabStyle: Integer;
+    FHighlightActiveTab: Boolean;
+    FTallTabs: Boolean;
+
+    procedure UpdateTabHighlight;
+    procedure SetTabStyle(AStyle: Integer);
+    procedure UpdateTabOptionsMenu;
 
     procedure EnsureExplorerSystemImageList;
     procedure NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
@@ -562,6 +588,14 @@ end;
 var
   WM_ACEUTILS_RESTORE: UINT = 0;
 
+function CleanTabCaption(const ACap: string): string;
+begin
+  Result := StringReplace(ACap, '● ', '', [rfReplaceAll]);
+  Result := StringReplace(Result, '▶ ', '', [rfReplaceAll]);
+  Result := StringReplace(Result, '■ ', '', [rfReplaceAll]);
+  Result := Trim(Result);
+end;
+
 { ----------------------------------------------------------------------------
   Lifecycle & Initialization
   ---------------------------------------------------------------------------- }
@@ -641,11 +675,29 @@ begin
     // General Options
     UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
     cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
+    FTabStyle := Ini.ReadInteger('General', 'TabStyle', 0);
+    FHighlightActiveTab := Ini.ReadBool('General', 'HighlightActiveTab', True);
+    FTallTabs := Ini.ReadBool('General', 'TallTabs', True);
+
+    if FTallTabs then
+      PageControl1.TabHeight := 28
+    else
+      PageControl1.TabHeight := 0;
+
+    case FTabStyle of
+      1: PageControl1.Style := tsButtons;
+      2: PageControl1.Style := tsFlatButtons;
+      else
+      begin
+        FTabStyle := 0;
+        PageControl1.Style := tsTabs;
+      end;
+    end;
 
     // Active Tab (defaults to The Real Explorer on initial launch)
     ColorStr := Ini.ReadString('General', 'ActiveTab', 'The Real Explorer');
     for i := 0 to PageControl1.PageCount - 1 do
-      if PageControl1.Pages[i].Caption = ColorStr then
+      if CleanTabCaption(PageControl1.Pages[i].Caption) = CleanTabCaption(ColorStr) then
       begin
         PageControl1.ActivePageIndex := i;
         Break;
@@ -680,6 +732,7 @@ begin
     FExpDefaultFolder := Ini.ReadString('Explorer', 'DefaultFolder', '');
     if (FExpDefaultFolder = '') or (not DirectoryExists(FExpDefaultFolder)) then
       FExpDefaultFolder := GetUserDesktopPath;
+    cbExpPreviewAlways.Checked := Ini.ReadBool('Explorer', 'PreviewAlways', False);
     NavigateExplorerTo(FExpDefaultFolder);
 
   finally
@@ -703,6 +756,8 @@ begin
   EnsureTrayIconLoaded;
   TrayIcon1.Visible := cbRunInTray.Checked;
   ApplyTheme(UserPrefersDark);
+  UpdateTabHighlight;
+  UpdateTabOptionsMenu;
 end;
 
 procedure TfrmMain.SaveAllOptions;
@@ -714,8 +769,11 @@ begin
     // General Options
     Ini.WriteBool('General', 'DarkMode', FDarkMode);
     Ini.WriteBool('General', 'RunInTray', cbRunInTray.Checked);
+    Ini.WriteInteger('General', 'TabStyle', FTabStyle);
+    Ini.WriteBool('General', 'HighlightActiveTab', FHighlightActiveTab);
+    Ini.WriteBool('General', 'TallTabs', FTallTabs);
     if Assigned(PageControl1.ActivePage) then
-      Ini.WriteString('General', 'ActiveTab', PageControl1.ActivePage.Caption);
+      Ini.WriteString('General', 'ActiveTab', CleanTabCaption(PageControl1.ActivePage.Caption));
 
     // Search Options
     Ini.WriteBool('Search', 'Subfolders', cbSubfolders.Checked);
@@ -734,6 +792,7 @@ begin
 
     // Explorer Options
     Ini.WriteString('Explorer', 'DefaultFolder', FExpDefaultFolder);
+    Ini.WriteBool('Explorer', 'PreviewAlways', cbExpPreviewAlways.Checked);
   finally
     Ini.Free;
   end;
@@ -815,6 +874,7 @@ begin
   FExpNavigating := False;
   FExpSortColumn := -1;
   FExpSortAscending := True;
+  FExpPreviewSyncing := False;
   FExpDefaultFolder := GetUserDesktopPath;
 
   ShellListViewExplorer.AutoSizeColumns := False;
@@ -938,6 +998,7 @@ begin
   Show;
   WindowState := wsNormal;
   PageControl1.ActivePage := tabNotepad;
+  UpdateTabHighlight;
   BringToFront;
 end;
 
@@ -1297,6 +1358,96 @@ begin
   end;
 end;
 
+procedure TfrmMain.UpdateTabHighlight;
+var
+  i: Integer;
+  BaseCap: string;
+begin
+  for i := 0 to PageControl1.PageCount - 1 do
+  begin
+    BaseCap := CleanTabCaption(PageControl1.Pages[i].Caption);
+    if FHighlightActiveTab and (PageControl1.Pages[i] = PageControl1.ActivePage) then
+      PageControl1.Pages[i].Caption := '● ' + BaseCap
+    else
+      PageControl1.Pages[i].Caption := BaseCap;
+  end;
+end;
+
+procedure TfrmMain.SetTabStyle(AStyle: Integer);
+begin
+  FTabStyle := AStyle;
+  case AStyle of
+    1: PageControl1.Style := tsButtons;
+    2: PageControl1.Style := tsFlatButtons;
+    else
+    begin
+      FTabStyle := 0;
+      PageControl1.Style := tsTabs;
+    end;
+  end;
+  UpdateTabOptionsMenu;
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.UpdateTabOptionsMenu;
+begin
+  if Assigned(miTabStyleTabs) then
+    miTabStyleTabs.Checked := (FTabStyle = 0);
+  if Assigned(miTabStyleFlat) then
+    miTabStyleFlat.Checked := (FTabStyle = 2);
+  if Assigned(miTabStyleButtons) then
+    miTabStyleButtons.Checked := (FTabStyle = 1);
+  if Assigned(miTabHighlightDot) then
+    miTabHighlightDot.Checked := FHighlightActiveTab;
+  if Assigned(miTabTallHeight) then
+    miTabTallHeight.Checked := FTallTabs;
+end;
+
+procedure TfrmMain.btnTabStyleClick(Sender: TObject);
+var
+  P: TPoint;
+begin
+  UpdateTabOptionsMenu;
+  P.X := 0;
+  P.Y := btnTabStyle.Height;
+  P := btnTabStyle.ClientToScreen(P);
+  popTabOptions.PopUp(P.X, P.Y);
+end;
+
+procedure TfrmMain.miTabStyleClick(Sender: TObject);
+begin
+  if Sender = miTabStyleButtons then
+    SetTabStyle(1)
+  else if Sender = miTabStyleFlat then
+    SetTabStyle(2)
+  else
+    SetTabStyle(0);
+end;
+
+procedure TfrmMain.miTabHighlightDotClick(Sender: TObject);
+begin
+  FHighlightActiveTab := not FHighlightActiveTab;
+  UpdateTabOptionsMenu;
+  UpdateTabHighlight;
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.miTabTallHeightClick(Sender: TObject);
+begin
+  FTallTabs := not FTallTabs;
+  if FTallTabs then
+    PageControl1.TabHeight := 28
+  else
+    PageControl1.TabHeight := 0;
+  UpdateTabOptionsMenu;
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.popTabOptionsPopup(Sender: TObject);
+begin
+  UpdateTabOptionsMenu;
+end;
+
 { ----------------------------------------------------------------------------
   Dark Mode & Modern Theming
   ---------------------------------------------------------------------------- }
@@ -1514,6 +1665,8 @@ begin
   cbCaseSensitive.Font.Color := TextColor;
   cbIncludeFolders.Font.Color := TextColor;
   cbEnablePreview.Font.Color := TextColor;
+  if Assigned(cbExpPreviewAlways) then
+    cbExpPreviewAlways.Font.Color := TextColor;
   cbRunInTray.Font.Color := TextColor;
   cbWordWrap.Font.Color := TextColor;
   cbMatchCase.Font.Color := TextColor;
@@ -2331,6 +2484,7 @@ end;
 
 procedure TfrmMain.PageControl1Change(Sender: TObject);
 begin
+  UpdateTabHighlight;
   UpdateSaveButtonState;
   {$IFDEF WINDOWS}
   if PageControl1.ActivePage = tabContextMenu then
@@ -2342,6 +2496,8 @@ begin
   begin
     EnsureExplorerSystemImageList;
     AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
+    if cbExpPreviewAlways.Checked and (ShellListViewExplorer.Selected <> nil) then
+      PreviewExplorerFile(GetExplorerSelectedPath);
   end
   else if PageControl1.ActivePage = tabSearch then
   begin
@@ -3268,6 +3424,7 @@ begin
     FIsModified := False;
     lblCurrentFile.Caption := ExtractFileName(AFileName) + ' (' + AFileName + ')';
     PageControl1.ActivePage := tabNotepad;
+    UpdateTabHighlight;
     UpdateNotepadStatus;
     UpdateSaveButtonState;
     SetStatus(' Opened file: ' + AFileName);
@@ -4234,18 +4391,46 @@ begin
 end;
 
 procedure TfrmMain.btnExpPreviewClick(Sender: TObject);
+begin
+  cbExpPreviewAlways.Checked := not cbExpPreviewAlways.Checked;
+end;
+
+procedure TfrmMain.miExpPreviewClick(Sender: TObject);
+begin
+  cbExpPreviewAlways.Checked := not cbExpPreviewAlways.Checked;
+end;
+
+procedure TfrmMain.cbExpPreviewAlwaysChange(Sender: TObject);
 var
   SelPath: string;
 begin
-  if frmPreview.Visible then
-    frmPreview.Hide
-  else
-  begin
-    SelPath := GetExplorerSelectedPath;
-    if (SelPath <> '') and FileExists(SelPath) then
-      PreviewExplorerFile(SelPath)
+  if FExpPreviewSyncing then Exit;
+  FExpPreviewSyncing := True;
+  try
+    if cbExpPreviewAlways.Checked then
+    begin
+      SelPath := GetExplorerSelectedPath;
+      if (SelPath <> '') and FileExists(SelPath) then
+        PreviewExplorerFile(SelPath)
+      else if Assigned(frmPreview) then
+      begin
+        if not frmPreview.Visible then
+          frmPreview.Show;
+        frmPreview.BringToFront;
+      end;
+    end
     else
-      frmPreview.Show;
+    begin
+      if Assigned(frmPreview) and frmPreview.Visible then
+        frmPreview.Hide;
+    end;
+
+    if Assigned(miExpPreview) then
+      miExpPreview.Checked := cbExpPreviewAlways.Checked;
+
+    SaveAllOptions;
+  finally
+    FExpPreviewSyncing := False;
   end;
 end;
 
@@ -4279,8 +4464,10 @@ begin
   begin
     frmPreview.ShowFile(APath, FileName, SizeStr, DateStr, TypeStr, SizeBytes, FDarkMode);
     if not frmPreview.Visible then
+    begin
       frmPreview.Show;
-    frmPreview.BringToFront;
+      frmPreview.BringToFront;
+    end;
   end;
 end;
 
@@ -4394,7 +4581,7 @@ var
 begin
   if not Selected or (Item = nil) then Exit;
   SelPath := ShellListViewExplorer.GetPathFromItem(Item);
-  if frmPreview.Visible and FileExists(SelPath) then
+  if (cbExpPreviewAlways.Checked or (Assigned(frmPreview) and frmPreview.Visible)) and FileExists(SelPath) then
     PreviewExplorerFile(SelPath);
 end;
 
@@ -4432,7 +4619,8 @@ begin
   miExpOpen.Enabled := HasSel;
   miExpOpenAssociated.Enabled := HasSel;
   miExpNotepad.Enabled := HasSel;
-  miExpPreview.Enabled := HasSel;
+  miExpPreview.Enabled := HasSel or cbExpPreviewAlways.Checked or (Assigned(frmPreview) and frmPreview.Visible);
+  miExpPreview.Checked := cbExpPreviewAlways.Checked;
   miExpReveal.Enabled := True;
   miExpCopyPath.Enabled := HasSel;
   miExpCopyName.Enabled := HasSel;

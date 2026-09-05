@@ -50,6 +50,7 @@ type
     miPrevSelectAll: TMenuItem;
 
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
+    procedure FormHide(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure btnOpenInNotepadClick(Sender: TObject);
@@ -204,7 +205,14 @@ end;
 procedure TfrmPreview.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   CloseAction := caHide;
+  FormHide(Sender);
+end;
+
+procedure TfrmPreview.FormHide(Sender: TObject);
+begin
   FCurrentPath := '';
+  if Assigned(frmMain) and Assigned(frmMain.cbExpPreviewAlways) then
+    frmMain.cbExpPreviewAlways.Checked := False;
 end;
 
 procedure TfrmPreview.btnCloseClick(Sender: TObject);

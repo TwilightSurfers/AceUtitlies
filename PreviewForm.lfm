@@ -11,6 +11,7 @@ object frmPreview: TfrmPreview
   KeyPreview = True
   OnClose = FormClose
   OnCreate = FormCreate
+  OnHide = FormHide
   OnKeyDown = FormKeyDown
   Position = poMainFormCenter
   LCLVersion = '3.6.0.0'

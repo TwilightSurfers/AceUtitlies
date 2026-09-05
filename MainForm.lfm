@@ -65,6 +65,16 @@ object frmMain: TfrmMain
       TabOrder = 2
       OnClick = btnToggleDarkModeClick
     end
+    object btnTabStyle: TButton
+      Left = 445
+      Height = 26
+      Top = 5
+      Width = 125
+      Anchors = [akTop, akRight]
+      Caption = '📑 Tab Style ▾'
+      TabOrder = 3
+      OnClick = btnTabStyleClick
+    end
   end
   object PageControl1: TPageControl
     Left = 0
@@ -74,6 +84,7 @@ object frmMain: TfrmMain
     ActivePage = tabSearch
     Align = alClient
     Images = ImageList1
+    PopupMenu = popTabOptions
     TabIndex = 0
     TabOrder = 1
     OnChange = PageControl1Change
@@ -1048,6 +1059,16 @@ object frmMain: TfrmMain
             TabOrder = 5
             OnClick = btnJumpUserHomeClick
           end
+          object cbExpPreviewAlways: TCheckBox
+            Left = 925
+            Height = 19
+            Top = 8
+            Width = 105
+            Anchors = [akTop, akRight]
+            Caption = 'Preview Always'
+            TabOrder = 6
+            OnChange = cbExpPreviewAlwaysChange
+          end
         end
       end
       object pnlExpBody: TPanel
@@ -1739,8 +1760,8 @@ object frmMain: TfrmMain
       OnClick = miExpNotepadClick
     end
     object miExpPreview: TMenuItem
-      Caption = 'Show Live Preview'
-      OnClick = btnExpPreviewClick
+      Caption = 'Preview Always'
+      OnClick = miExpPreviewClick
     end
     object miExpReveal: TMenuItem
       Caption = 'Reveal in Windows Explorer'
@@ -1787,5 +1808,44 @@ object frmMain: TfrmMain
     OnTimer = tmrStatusTimer
     Left = 256
     Top = 8
+  end
+  object popTabOptions: TPopupMenu
+    OnPopup = popTabOptionsPopup
+    Left = 400
+    Top = 8
+    object miTabStyleTabs: TMenuItem
+      AutoCheck = True
+      Caption = 'Classic Tabs'
+      GroupIndex = 10
+      RadioItem = True
+      OnClick = miTabStyleClick
+    end
+    object miTabStyleFlat: TMenuItem
+      AutoCheck = True
+      Caption = 'Modern Flat Buttons'
+      GroupIndex = 10
+      RadioItem = True
+      OnClick = miTabStyleClick
+    end
+    object miTabStyleButtons: TMenuItem
+      AutoCheck = True
+      Caption = 'Push Buttons'
+      GroupIndex = 10
+      RadioItem = True
+      OnClick = miTabStyleClick
+    end
+    object miTabSep1: TMenuItem
+      Caption = '-'
+    end
+    object miTabHighlightDot: TMenuItem
+      AutoCheck = True
+      Caption = 'Highlight Active Tab (●)'
+      OnClick = miTabHighlightDotClick
+    end
+    object miTabTallHeight: TMenuItem
+      AutoCheck = True
+      Caption = 'Modern Tab Height (28px)'
+      OnClick = miTabTallHeightClick
+    end
   end
 end
