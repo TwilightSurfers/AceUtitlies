@@ -1540,7 +1540,7 @@ object frmMain: TfrmMain
           Height = 25
           Top = 8
           Width = 320
-          Caption = 'Ace''s Utilities  v1.2.0'
+          Caption = 'Ace''s Utilities  v1.4.1'
           Font.Height = -19
           Font.Style = [fsBold]
           ParentFont = False
@@ -2067,12 +2067,10 @@ object frmMain: TfrmMain
     Top = 560
     object miNotepadSave: TMenuItem
       Caption = 'Save'
-      ShortCut = 16467
       OnClick = btnSaveFileClick
     end
     object miNotepadSaveAs: TMenuItem
       Caption = 'Save As...'
-      ShortCut = 49235
       OnClick = btnSaveAsClick
     end
     object miNotepadClose: TMenuItem
@@ -2103,7 +2101,6 @@ object frmMain: TfrmMain
     end
     object miSelectAll: TMenuItem
       Caption = 'Select All'
-      ShortCut = 16449
       OnClick = miSelectAllClick
     end
     object miSepNotepad2: TMenuItem
@@ -2111,12 +2108,10 @@ object frmMain: TfrmMain
     end
     object miUndo: TMenuItem
       Caption = 'Undo'
-      ShortCut = 16474
       OnClick = miUndoClick
     end
     object miRedo: TMenuItem
       Caption = 'Redo'
-      ShortCut = 16473
       OnClick = miRedoClick
     end
   end
@@ -2150,7 +2145,6 @@ object frmMain: TfrmMain
     end
     object miExpCopyPath: TMenuItem
       Caption = 'Copy Full Path'
-      ShortCut = 49219
       OnClick = miExpCopyPathClick
     end
     object miExpCopyName: TMenuItem
@@ -2166,12 +2160,10 @@ object frmMain: TfrmMain
     end
     object miExpRename: TMenuItem
       Caption = 'Rename...'
-      ShortCut = 113
       OnClick = miExpRenameClick
     end
     object miExpDelete: TMenuItem
       Caption = 'Delete to Recycle Bin'
-      ShortCut = 46
       OnClick = miExpDeleteClick
     end
   end

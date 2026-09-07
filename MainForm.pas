@@ -961,6 +961,19 @@ begin
   cmbSyntax.ItemIndex := 0;
   SynEdit1.Highlighter := nil;
   SynEdit1.ScrollBars := ssBoth;
+  SynEdit1.Options := [
+    eoAutoIndent,
+    eoBracketHighlight,
+    eoGroupUndo,
+    eoTabIndent,
+    eoEnhanceHomeKey
+  ];
+  SynEdit1.Options2 := [
+    eoEnhanceEndKey,
+    eoOverwriteBlock
+  ];
+  SynEdit1.WantTabs := True;
+  SynEdit1.TabWidth := 4;
 
   // Default Search Status
   ProgressBar1.Style := pbstMarquee;
@@ -2703,7 +2716,12 @@ procedure TfrmMain.PageControl1Change(Sender: TObject);
 begin
   UpdateTabHighlight;
   UpdateSaveButtonState;
-  if PageControl1.ActivePage = tabMemory then
+  if PageControl1.ActivePage = tabNotepad then
+  begin
+    if SynEdit1.CanFocus then
+      SynEdit1.SetFocus;
+  end
+  else if PageControl1.ActivePage = tabMemory then
   begin
     CheckAndCollectClipboard;
     UpdateMemoryStatusUI;
@@ -3721,14 +3739,14 @@ begin
   OnNotepadTab := (PageControl1.ActivePage = tabNotepad);
   HasContent := (SynEdit1.Lines.Count > 1) or ((SynEdit1.Lines.Count = 1) and (Trim(SynEdit1.Lines[0]) <> ''));
 
-  // Save is enabled if on Notepad tab, document has modifications, and is not empty
-  CanSave := OnNotepadTab and HasContent and FIsModified;
+  // Save is enabled if on Notepad tab and there are unsaved changes or an existing file is loaded
+  CanSave := OnNotepadTab and (FIsModified or (FCurrentFileName <> ''));
 
-  // Save As is enabled if on Notepad tab and document has content or an open file
-  CanSaveAs := OnNotepadTab and (HasContent or (FCurrentFileName <> ''));
+  // Save As is always enabled on Notepad tab so empty/new files can be created/saved
+  CanSaveAs := OnNotepadTab;
 
-  // Close is enabled whenever a file is open or editor has content (regardless of whether modified)
-  CanClose := (FCurrentFileName <> '') or HasContent;
+  // Close is enabled whenever a file is open or editor has content or modifications
+  CanClose := (FCurrentFileName <> '') or HasContent or FIsModified;
 
   btnSaveFile.Enabled := CanSave;
   btnSaveAs.Enabled := CanSaveAs;
@@ -4013,57 +4031,26 @@ end;
 
 procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  UpdateKeyboardAndTimerStatus;
-  if (PageControl1.ActivePage = tabNotepad) and (ssCtrl in Shift) then
+  if (Key = VK_INSERT) or (Key = VK_CAPITAL) or (Key = VK_NUMLOCK) then
+    UpdateKeyboardAndTimerStatus;
+
+  if (PageControl1 <> nil) and (PageControl1.ActivePage = tabNotepad) and
+     (ssCtrl in Shift) and not (ssAlt in Shift) then
   begin
     if (ssShift in Shift) and (Key = VK_S) then
     begin
-      if btnSaveAs.Enabled then
-        btnSaveAsClick(nil);
+      btnSaveAsClick(nil);
       Key := 0;
       Exit;
     end
     else if (Key = VK_S) then
     begin
-      if btnSaveFile.Enabled then
-        btnSaveFileClick(nil);
+      if FCurrentFileName <> '' then
+        btnSaveFileClick(nil)
+      else
+        btnSaveAsClick(nil);
       Key := 0;
       Exit;
-    end;
-
-    case Key of
-      VK_C:
-        if SynEdit1.Focused and (SynEdit1.SelText <> '') then
-        begin
-          SynEdit1.CopyToClipboard;
-          CheckAndCollectClipboard;
-          {$IFDEF WINDOWS}
-          FLastClipboardSeq := GetClipboardSequenceNumber;
-          {$ENDIF}
-          Key := 0;
-        end;
-      VK_X:
-        if SynEdit1.Focused and (SynEdit1.SelText <> '') then
-        begin
-          SynEdit1.CutToClipboard;
-          CheckAndCollectClipboard;
-          {$IFDEF WINDOWS}
-          FLastClipboardSeq := GetClipboardSequenceNumber;
-          {$ENDIF}
-          Key := 0;
-        end;
-      VK_V:
-        if SynEdit1.Focused then
-        begin
-          SynEdit1.PasteFromClipboard;
-          Key := 0;
-        end;
-      VK_A:
-        if SynEdit1.Focused then
-        begin
-          SynEdit1.SelectAll;
-          Key := 0;
-        end;
     end;
   end;
 end;
@@ -4787,7 +4774,8 @@ end;
 
 procedure TfrmMain.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  UpdateKeyboardAndTimerStatus;
+  if (Key = VK_INSERT) or (Key = VK_CAPITAL) or (Key = VK_NUMLOCK) then
+    UpdateKeyboardAndTimerStatus;
 end;
 
 procedure TfrmMain.FormResize(Sender: TObject);
@@ -4942,10 +4930,20 @@ begin
   mmoAboutFeatures.Lines.Add('   - Embedded persistent Quick Notes scratchpad automatically saved across sessions.');
   mmoAboutFeatures.Lines.Add('   - Right-click context menu for quick copy, transfer to Notepad, and pinning to notes.');
 
+  lblAboutTitle.Caption := 'Ace''s Utilities  v1.4.1';
+
   mmoAboutBuildLog.Lines.Clear;
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.4.1] - 2026-09-07');
+  mmoAboutBuildLog.Lines.Add('  * Notepad SynEdit Keyboard & Cursor Fix: Disabled eoScrollPastEol and eoSmartTabs, and enabled eoTabIndent, eoEnhanceHomeKey, and eoEnhanceEndKey for standard modern text editor cursor and indentation behavior.');
+  mmoAboutBuildLog.Lines.Add('  * Context Menu Keystroke Decoupling: Removed global form-level ShortCut properties (Delete, F2, Ctrl+Shift+C, Ctrl+A, Ctrl+Z, Ctrl+Y, Ctrl+S) from popup menus to prevent keystroke interception.');
+  mmoAboutBuildLog.Lines.Add('  * AltGr Key Support: Guarded Ctrl shortcuts against AltGr (Ctrl+Alt) modifier combinations, allowing international symbols (@, [, ], {, }, \, ~, €) to type smoothly.');
+  mmoAboutBuildLog.Lines.Add('  * Tab Navigation Focus: Automatically shifts keyboard focus to SynEdit when switching to the Notepad tab so arrow keys and typing respond immediately.');
+  mmoAboutBuildLog.Lines.Add('  * Save & Save As for New/Blank Files: Enabled saving and Save As for new/blank untitled documents (e.g. creating empty text, config, or code files).');
+  mmoAboutBuildLog.Lines.Add('  * Status Bar Performance: Eliminated redundant status bar panel repaint messages on general typing.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.4.0] - 2026-09-05');
   mmoAboutBuildLog.Lines.Add('  * New Tab "Memory & Notes": Added clipboard memory manager and persistent scratchpad.');
