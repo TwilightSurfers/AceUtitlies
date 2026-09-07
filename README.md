@@ -57,11 +57,32 @@ Preview files dynamically on a single click without blocking the main search win
 
 ### 📝 5. Windows 11 Notepad Replacement
 A complete, tabbed text and code editor powered by `TSynEdit`:
-- **File Management**: New, Open, Save, and Save As with dirty-tracking prompts so you never lose unsaved changes.
-- **Multi-Language Syntax Highlighting**: Includes syntax highlighters for Pascal (`.pas`, `.pp`, `.lpr`), Python (`.py`), HTML/XML (`.html`, `.xml`), CSS (`.css`), JavaScript/JSON (`.js`, `.json`), SQL (`.sql`), Batch (`.bat`, `.cmd`), INI/Config (`.ini`, `.cfg`), and a **dedicated custom Markdown syntax highlighter** (`.md`, `.markdown`) with header, code block, list, blockquote, link, and formatting styles for both dark and light modes.
+- **File Management**: New, Open, Save, and Save As with dirty-tracking prompts so you never lose unsaved changes. Empty or blank files can also be created and saved directly.
+- **Multi-Language Syntax Highlighting**: Features 20 comprehensive syntax highlighters:
+  - Pascal / Delphi / Free Pascal (`.pas`, `.pp`, `.lpr`, `.inc`, `.dpr`)
+  - Python (`.py`, `.pyw`, `.pyi`)
+  - JavaScript, TypeScript & JSON (`.js`, `.jsx`, `.ts`, `.tsx`, `.json`, `.json5`)
+  - HTML & Web Templates (`.html`, `.htm`, `.vue`, `.svelte`, `.twig`)
+  - XML & SVG (`.xml`, `.svg`, `.xaml`, `.plist`, `.csproj`, `.config`)
+  - CSS & Stylesheets (`.css`, `.scss`, `.sass`, `.less`)
+  - PHP (`.php`, `.phtml`)
+  - C, C++, C# & Arduino (`.c`, `.cpp`, `.h`, `.hpp`, `.cs`, `.ino`)
+  - Java, Kotlin & Groovy (`.java`, `.kt`, `.kts`, `.gradle`)
+  - SQL & Databases (`.sql`, `.ddl`, `.pgsql`, `.sqlite`)
+  - Windows Batch (`.bat`, `.cmd`)
+  - INI, Config, YAML & TOML (`.ini`, `.cfg`, `.conf`, `.toml`, `.yaml`, `.yml`, `.editorconfig`)
+  - Unix Shell Scripts (`.sh`, `.bash`, `.zsh`)
+  - Perl (`.pl`, `.pm`)
+  - Visual Basic (`.vb`, `.vbs`, `.bas`)
+  - Unified Diff & Patches (`.diff`, `.patch`)
+  - TeX & LaTeX (`.tex`, `.ltx`)
+  - Lazarus / Delphi Forms (`.lfm`, `.dfm`)
+  - Gettext PO Catalogs (`.po`, `.pot`)
+  - **Dedicated Custom Markdown Highlighter** (`.md`, `.markdown`, `.mdown`) with real-time styling for headers, code blocks, lists, blockquotes, links, and bold/italic markup.
+- **Full Keyboard & Editing Fidelity**: Standard Backspace, Delete, Word-Backspace (`Ctrl+Backspace`), Select All (`Ctrl+A`), Save (`Ctrl+S`), Save As (`Ctrl+Shift+S`), and modern cursor navigation with immediate focus transfer on tab navigation.
 - **Find & Replace Bar**: Sleek slide-down search bar with Find Next, Replace, Replace All, Case Sensitivity, and Whole Word matching.
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
-- **Status Bar**: Live line number, column number, character position, and modified state tracker.
+- **Status Bar**: Live line number, column number, character count, UTF-8 indicator, and modified state tracker.
 
 ### 🌙 6. Native Windows 11 Dark Mode
 - **Native DWM Titlebar**: Integrates directly with Windows 11 Desktop Window Manager (`DwmSetWindowAttribute` via `dwmapi.dll`) for a true dark window frame.

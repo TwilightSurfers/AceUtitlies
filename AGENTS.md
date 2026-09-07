@@ -182,3 +182,55 @@ In Delphi VCL, `TStatusBar.SimplePanel` defaults to `False`. In Lazarus LCL, how
      end;
      ```
      This keeps the right-aligned status panels (Files, Dirs, CAPS, NUM, INS, Clock) cleanly docked to the right edge across all monitor resolutions and window sizes.
+
+---
+
+## 10. SynEdit Keystroke Invariants & Form KeyPreview Guarding (`MainForm.pas`)
+
+### The `csLoading` Keystroke Invariant (CRITICAL)
+In Lazarus SynEdit (`synedit.pp` line 2454):
+```pascal
+if assigned(Owner) and not (csLoading in Owner.ComponentState) then
+  SetDefaultKeystrokes;
+```
+- **The Symptom**: When `TSynEdit` is loaded from a `.lfm` stream, `Owner.ComponentState` contains `csLoading`. SynEdit's constructor skips `SetDefaultKeystrokes`. Furthermore, `TCustomSynEdit.Loaded` only updates the caret and does **not** call `SetDefaultKeystrokes`. If the `.lfm` does not contain a serialized `<Keystrokes>` collection, `SynEdit.Keystrokes.Count` remains **`0`**.
+- **The Impact**: With 0 keystrokes registered, `VK_BACK` is never dispatched to `ecDeleteLastChar`, `ord('A')` with `ssCtrl` is never dispatched to `ecSelectAll`, and all editor navigation keys (Delete, Home, End, Ctrl+Arrows) fail silently, appearing as if the control is "swallowing" keys.
+- **The Rule**:
+  Always explicitly call `SynEdit.Keystrokes.ResetDefaults;` in `FormCreate`:
+  ```pascal
+  SynEdit1.Keystrokes.ResetDefaults;
+  ```
+
+### Form `KeyPreview` Scope & Classic Delphi Typing Guard
+When `KeyPreview = True` is enabled on the main form:
+1. **Scope Restriction**: Secondary forms (like `TfrmPreview`) must keep `KeyPreview = False` to prevent phantom interception outside the main window.
+2. **The Non-Interference Guard**: When the user is typing into an active text editor (`SynEdit1`, `TCustomEdit`, `TCustomMemo`), `FormKeyDown` must **never** swallow or process normal typing or editing keys (`VK_BACK`, `VK_DELETE`, `VK_RETURN`, arrow keys).
+3. **Explicit `Ctrl+A` Routing**: Because LCL Win32 only delivers `EM_SETSEL` to native `EditClsName` controls, custom controls like `TSynEdit` require form-level shortcut routing:
+   ```pascal
+   if (ssCtrl in Shift) and not (ssAlt in Shift) and ((Key = VK_A) or (Key = ord('A'))) then
+   begin
+     if (ActiveControl = SynEdit1) or ((PageControl1 <> nil) and (PageControl1.ActivePage = tabNotepad) and (SynEdit1 <> nil)) then
+     begin
+       SynEdit1.SelectAll;
+       Key := 0;
+       Exit;
+     end
+     else if ActiveControl is TCustomEdit then
+     begin
+       TCustomEdit(ActiveControl).SelectAll;
+       Key := 0;
+       Exit;
+     end
+     else if ActiveControl is TCustomMemo then
+     begin
+       TCustomMemo(ActiveControl).SelectAll;
+       Key := 0;
+       Exit;
+     end;
+   end;
+
+   // Delphi tip: Never let Form-level KeyPreview interfere with typing in active editor/edit controls!
+   if (ActiveControl = SynEdit1) or (ActiveControl is TCustomEdit) or (ActiveControl is TCustomMemo) then
+     Exit;
+   ```
+4. **Focus Assurance**: Ensure `SynEdit1.SetFocus` is called on tab switches (`PageControl1Change`), `OpenFileInNotepad`, and `btnNewFileClick` so keyboard input is never directed into inactive containers.

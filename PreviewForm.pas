@@ -7,11 +7,12 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
   Menus, Clipbrd, LazUTF8,
-  SynEdit, SynEditWrappedView,
+  SynEdit, SynEditWrappedView, SynEditHighlighter,
   SynHighlighterPas, SynHighlighterPython, SynHighlighterXML, SynHighlighterHTML,
   SynHighlighterCSS, SynHighlighterJScript, SynHighlighterPHP, SynHighlighterCpp,
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
+  SynHighlighterTeX, SynHighlighterLFM, SynHighlighterPo,
   SynHighlighterMarkdown, LConvEncoding, LMessages;
 
 type
@@ -52,7 +53,6 @@ type
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormHide(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormWindowStateChange(Sender: TObject);
     procedure btnOpenInNotepadClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
@@ -86,6 +86,9 @@ type
     FHighlighterSh: TSynUNIXShellScriptSyn;
     FHighlighterPerl: TSynPerlSyn;
     FHighlighterVB: TSynVBSyn;
+    FHighlighterTeX: TSynTeXSyn;
+    FHighlighterLFM: TSynLFMSyn;
+    FHighlighterPo: TSynPoSyn;
     FHighlighterMarkdown: TSynMarkdownSyn;
 
     procedure AutoDetectHighlighter(const AFileName: string);
@@ -193,6 +196,9 @@ begin
   FHighlighterSh := TSynUNIXShellScriptSyn.Create(Self);
   FHighlighterPerl := TSynPerlSyn.Create(Self);
   FHighlighterVB := TSynVBSyn.Create(Self);
+  FHighlighterTeX := TSynTeXSyn.Create(Self);
+  FHighlighterLFM := TSynLFMSyn.Create(Self);
+  FHighlighterPo := TSynPoSyn.Create(Self);
   FHighlighterMarkdown := TSynMarkdownSyn.Create(Self);
 
   FormStyle := fsStayOnTop;
@@ -204,6 +210,10 @@ begin
 
   FWrapPlugin := TLazSynEditLineWrapPlugin.Create(synPreview);
   synPreview.ScrollBars := ssVertical;
+  synPreview.Keystrokes.ResetDefaults;
+
+  // Initialize theme and highlighters for immediate crisp dark/light styling
+  ApplyTheme(FDarkMode);
 end;
 
 procedure TfrmPreview.FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -226,27 +236,87 @@ end;
 
 function TfrmPreview.IsTextFile(const APath: string): Boolean;
 var
-  Ext: string;
+  Ext, BaseName: string;
+  FS: TFileStream;
+  Buf: array[0..1023] of Byte;
+  BytesRead, i: Integer;
 begin
   if (APath = '') or DirectoryExists(APath) then Exit(False);
   Ext := LowerCase(ExtractFileExt(APath));
-  Result := (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or
-            (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or (Ext = '.dpr') or
-            (Ext = '.py') or (Ext = '.pyw') or
-            (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') or (Ext = '.xml') or (Ext = '.svg') or
-            (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.phtml') or
-            (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') or
-            (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or (Ext = '.mjs') or
-            (Ext = '.sql') or (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.ps1') or
-            (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or (Ext = '.log') or
-            (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
-            (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or
-            (Ext = '.h') or (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.cs') or
-            (Ext = '.java') or (Ext = '.go') or (Ext = '.rs') or
-            (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.env') or
-            (Ext = '.pl') or (Ext = '.pm') or (Ext = '.cgi') or
-            (Ext = '.vbs') or (Ext = '.vb') or (Ext = '.bas') or (Ext = '.vba') or
-            (Ext = '.yaml') or (Ext = '.yml') or (Ext = '.toml');
+  BaseName := LowerCase(ExtractFileName(APath));
+
+  // 1. Common extensionless files & dotfiles
+  if (BaseName = 'dockerfile') or (BaseName = 'makefile') or (BaseName = 'gnumakefile') or
+     (BaseName = 'license') or (BaseName = 'readme') or (BaseName = 'authors') or
+     (BaseName = 'gemfile') or (BaseName = 'procfile') or (BaseName = 'vagrantfile') or
+     (BaseName = 'rakefile') or (BaseName = '.gitignore') or (BaseName = '.gitattributes') or
+     (BaseName = '.gitmodules') or (BaseName = '.editorconfig') or (BaseName = '.env') or
+     (Pos('.env.', BaseName) = 1) or (BaseName = '.bashrc') or (BaseName = '.bash_profile') or
+     (BaseName = '.zshrc') or (BaseName = '.profile') then
+    Exit(True);
+
+  // 2. Known code, script, web, markup, data & config extensions
+  if (Ext = '.txt') or (Ext = '.md') or (Ext = '.markdown') or (Ext = '.mdown') or (Ext = '.mkd') or
+     (Ext = '.pas') or (Ext = '.pp') or (Ext = '.p') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.dfm') or
+     (Ext = '.fmx') or (Ext = '.inc') or (Ext = '.dpr') or (Ext = '.dpk') or
+     (Ext = '.py') or (Ext = '.pyw') or (Ext = '.pyi') or (Ext = '.pyx') or (Ext = '.pxd') or
+     (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') or (Ext = '.shtml') or (Ext = '.asp') or
+     (Ext = '.jsp') or (Ext = '.vue') or (Ext = '.svelte') or (Ext = '.twig') or
+     (Ext = '.xml') or (Ext = '.svg') or (Ext = '.xaml') or (Ext = '.plist') or (Ext = '.rss') or
+     (Ext = '.atom') or (Ext = '.xsd') or (Ext = '.xsl') or (Ext = '.xslt') or (Ext = '.resx') or
+     (Ext = '.manifest') or (Ext = '.pom') or (Ext = '.kml') or (Ext = '.gpx') or (Ext = '.config') or
+     (Ext = '.nuspec') or (Ext = '.props') or (Ext = '.targets') or (Ext = '.csproj') or
+     (Ext = '.vbproj') or (Ext = '.fsproj') or (Ext = '.vcxproj') or
+     (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.php7') or
+     (Ext = '.php8') or (Ext = '.phtml') or (Ext = '.phps') or
+     (Ext = '.css') or (Ext = '.scss') or (Ext = '.sass') or (Ext = '.less') or (Ext = '.pcss') or
+     (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.mjs') or
+     (Ext = '.cjs') or (Ext = '.json') or (Ext = '.json5') or (Ext = '.jsonc') or (Ext = '.map') or
+     (Ext = '.webmanifest') or
+     (Ext = '.sql') or (Ext = '.ddl') or (Ext = '.dml') or (Ext = '.bat') or (Ext = '.cmd') or
+     (Ext = '.btm') or (Ext = '.ps1') or (Ext = '.psm1') or (Ext = '.psd1') or
+     (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or (Ext = '.log') or
+     (Ext = '.properties') or (Ext = '.desktop') or (Ext = '.service') or (Ext = '.gitconfig') or
+     (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') or
+     (Ext = '.csv') or (Ext = '.tsv') or (Ext = '.diff') or (Ext = '.patch') or
+     (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or (Ext = '.h') or
+     (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.hh') or (Ext = '.cs') or (Ext = '.ino') or
+     (Ext = '.java') or (Ext = '.kt') or (Ext = '.kts') or (Ext = '.groovy') or (Ext = '.gradle') or
+     (Ext = '.go') or (Ext = '.rs') or (Ext = '.dart') or (Ext = '.zig') or (Ext = '.lua') or
+     (Ext = '.r') or (Ext = '.swift') or (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or
+     (Ext = '.fish') or (Ext = '.env') or (Ext = '.pl') or (Ext = '.pm') or (Ext = '.cgi') or
+     (Ext = '.vb') or (Ext = '.vbs') or (Ext = '.bas') or (Ext = '.cls') or (Ext = '.frm') or
+     (Ext = '.vba') or (Ext = '.tex') or (Ext = '.ltx') or (Ext = '.sty') or (Ext = '.bib') or
+     (Ext = '.po') or (Ext = '.pot') then
+    Exit(True);
+
+  // 3. Fallback binary probe: check first 1KB for null bytes (#0)
+  Result := False;
+  try
+    FS := TFileStream.Create(APath, fmOpenRead or fmShareDenyNone);
+    try
+      if (FS.Size > 0) and (FS.Size <= 50 * 1024 * 1024) then
+      begin
+        BytesRead := FS.Read(Buf[0], SizeOf(Buf));
+        if BytesRead > 0 then
+        begin
+          Result := True;
+          for i := 0 to BytesRead - 1 do
+          begin
+            if Buf[i] = 0 then
+            begin
+              Result := False;
+              Break;
+            end;
+          end;
+        end;
+      end;
+    finally
+      FS.Free;
+    end;
+  except
+    Result := False;
+  end;
 end;
 
 procedure TfrmPreview.btnOpenInNotepadClick(Sender: TObject);
@@ -263,26 +333,6 @@ begin
   end;
 end;
 
-procedure TfrmPreview.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-begin
-  if ssCtrl in Shift then
-  begin
-    case Key of
-      VK_C:
-        if synPreview.Visible and (synPreview.SelText <> '') then
-        begin
-          synPreview.CopyToClipboard;
-          Key := 0;
-        end;
-      VK_A:
-        if synPreview.Visible then
-        begin
-          synPreview.SelectAll;
-          Key := 0;
-        end;
-    end;
-  end;
-end;
 
 procedure TfrmPreview.FormWindowStateChange(Sender: TObject);
 begin
@@ -455,6 +505,19 @@ end;
 procedure TfrmPreview.ApplyHighlighterTheme(ADark: Boolean);
 var
   CommentCol, KeyCol, StringCol, NumberCol, SymbolCol, BracketCol, TagCol, AttrCol, ValCol: TColor;
+  DiffAddCol, DiffDelCol, DiffModCol: TColor;
+
+  procedure ResetHighlighterBackgrounds(AHL: TSynCustomHighlighter);
+  var
+    i: Integer;
+  begin
+    if AHL = nil then Exit;
+    for i := 0 to AHL.AttrCount - 1 do
+    begin
+      AHL.Attribute[i].Background := clNone;
+    end;
+  end;
+
 begin
   if ADark then
   begin
@@ -467,6 +530,9 @@ begin
     TagCol     := $004EC9B0;  // Teal / Cyan
     AttrCol    := $009CDCFE;  // Sky blue
     ValCol     := $00CE9178;  // Warm peach
+    DiffAddCol := $0070DF90;  // Emerald Green
+    DiffDelCol := $007070FF;  // Coral Red
+    DiffModCol := $0050D0FF;  // Golden Amber
   end
   else
   begin
@@ -479,7 +545,32 @@ begin
     TagCol     := $00800000;  // Navy
     AttrCol    := $00804000;  // Dark cyan
     ValCol     := $00007700;  // Dark green
+    DiffAddCol := $00007700;  // Forest Green
+    DiffDelCol := $000000C0;  // Deep Red
+    DiffModCol := $000060C0;  // Dark Amber
   end;
+
+  // Clear any default opaque backgrounds across all highlighters
+  ResetHighlighterBackgrounds(FHighlighterPas);
+  ResetHighlighterBackgrounds(FHighlighterPython);
+  ResetHighlighterBackgrounds(FHighlighterJS);
+  ResetHighlighterBackgrounds(FHighlighterHTML);
+  ResetHighlighterBackgrounds(FHighlighterXML);
+  ResetHighlighterBackgrounds(FHighlighterCSS);
+  ResetHighlighterBackgrounds(FHighlighterPHP);
+  ResetHighlighterBackgrounds(FHighlighterCpp);
+  ResetHighlighterBackgrounds(FHighlighterJava);
+  ResetHighlighterBackgrounds(FHighlighterSQL);
+  ResetHighlighterBackgrounds(FHighlighterBat);
+  ResetHighlighterBackgrounds(FHighlighterIni);
+  ResetHighlighterBackgrounds(FHighlighterSh);
+  ResetHighlighterBackgrounds(FHighlighterPerl);
+  ResetHighlighterBackgrounds(FHighlighterVB);
+  ResetHighlighterBackgrounds(FHighlighterDiff);
+  ResetHighlighterBackgrounds(FHighlighterTeX);
+  ResetHighlighterBackgrounds(FHighlighterLFM);
+  ResetHighlighterBackgrounds(FHighlighterPo);
+  ResetHighlighterBackgrounds(FHighlighterMarkdown);
 
   // 1. Pascal
   FHighlighterPas.CommentAttri.Foreground := CommentCol;
@@ -491,12 +582,21 @@ begin
   // 2. Python
   FHighlighterPython.CommentAttri.Foreground := CommentCol;
   FHighlighterPython.KeyAttri.Foreground := KeyCol;
+  FHighlighterPython.NonKeyAttri.Foreground := TagCol;
+  FHighlighterPython.SystemAttri.Foreground := ValCol;
   FHighlighterPython.StringAttri.Foreground := StringCol;
+  FHighlighterPython.DocStringAttri.Foreground := StringCol;
   FHighlighterPython.NumberAttri.Foreground := NumberCol;
+  FHighlighterPython.HexAttri.Foreground := NumberCol;
+  FHighlighterPython.FloatAttri.Foreground := NumberCol;
+  FHighlighterPython.SymbolAttri.Foreground := SymbolCol;
 
   // 3. JavaScript / JSON / TypeScript
   FHighlighterJS.CommentAttri.Foreground := CommentCol;
   FHighlighterJS.KeyAttri.Foreground := KeyCol;
+  FHighlighterJS.NonReservedKeyAttri.Foreground := TagCol;
+  FHighlighterJS.EventAttri.Foreground := ValCol;
+  FHighlighterJS.IdentifierAttri.Foreground := SymbolCol;
   FHighlighterJS.StringAttri.Foreground := StringCol;
   FHighlighterJS.NumberAttri.Foreground := NumberCol;
   FHighlighterJS.SymbolAttri.Foreground := SymbolCol;
@@ -505,25 +605,50 @@ begin
   // 4. HTML
   FHighlighterHTML.CommentAttri.Foreground := CommentCol;
   FHighlighterHTML.KeyAttri.Foreground := TagCol;
+  FHighlighterHTML.UndefKeyAttri.Foreground := TagCol;
+  FHighlighterHTML.IdentifierAttri.Foreground := AttrCol;
   FHighlighterHTML.ValueAttri.Foreground := ValCol;
-  FHighlighterHTML.TextAttri.Foreground := AttrCol;
+  FHighlighterHTML.TextAttri.Foreground := SymbolCol;
+  FHighlighterHTML.SymbolAttri.Foreground := SymbolCol;
+  FHighlighterHTML.AndAttri.Foreground := NumberCol;
+  FHighlighterHTML.DOCTYPEAttri.Foreground := KeyCol;
+  FHighlighterHTML.CDATAAttri.Foreground := ValCol;
+  FHighlighterHTML.ASPAttri.Foreground := ValCol;
 
   // 5. XML / SVG
   FHighlighterXML.CommentAttri.Foreground := CommentCol;
   FHighlighterXML.ElementAttri.Foreground := TagCol;
   FHighlighterXML.AttributeAttri.Foreground := AttrCol;
   FHighlighterXML.AttributeValueAttri.Foreground := ValCol;
-  FHighlighterXML.TextAttri.Foreground := StringCol;
+  FHighlighterXML.NamespaceAttributeAttri.Foreground := AttrCol;
+  FHighlighterXML.NamespaceAttributeValueAttri.Foreground := ValCol;
+  FHighlighterXML.TextAttri.Foreground := SymbolCol;
+  FHighlighterXML.SymbolAttri.Foreground := SymbolCol;
+  FHighlighterXML.ProcessingInstructionAttri.Foreground := KeyCol;
+  FHighlighterXML.DocTypeAttri.Foreground := KeyCol;
+  FHighlighterXML.CDATAAttri.Foreground := ValCol;
+  FHighlighterXML.EntityRefAttri.Foreground := NumberCol;
 
   // 6. CSS
   FHighlighterCSS.CommentAttri.Foreground := CommentCol;
   FHighlighterCSS.SelectorAttri.Foreground := TagCol;
   FHighlighterCSS.KeyAttri.Foreground := KeyCol;
+  FHighlighterCSS.IdentifierAttri.Foreground := AttrCol;
+  FHighlighterCSS.MeasurementUnitAttri.Foreground := NumberCol;
   FHighlighterCSS.StringAttri.Foreground := StringCol;
   FHighlighterCSS.NumberAttri.Foreground := NumberCol;
   FHighlighterCSS.SymbolAttri.Foreground := SymbolCol;
 
-  // 7. C / C++ / C#
+  // 7. PHP
+  FHighlighterPHP.CommentAttri.Foreground := CommentCol;
+  FHighlighterPHP.KeyAttri.Foreground := KeyCol;
+  FHighlighterPHP.VariableAttri.Foreground := AttrCol;
+  FHighlighterPHP.IdentifierAttri.Foreground := TagCol;
+  FHighlighterPHP.StringAttri.Foreground := StringCol;
+  FHighlighterPHP.NumberAttri.Foreground := NumberCol;
+  FHighlighterPHP.SymbolAttri.Foreground := SymbolCol;
+
+  // 8. C / C++ / C#
   FHighlighterCpp.CommentAttri.Foreground := CommentCol;
   FHighlighterCpp.KeyAttri.Foreground := KeyCol;
   FHighlighterCpp.StringAttri.Foreground := StringCol;
@@ -531,25 +656,21 @@ begin
   FHighlighterCpp.DirecAttri.Foreground := TagCol;
   FHighlighterCpp.SymbolAttri.Foreground := SymbolCol;
 
-  // 8. Java
+  // 9. Java / Kotlin
   FHighlighterJava.CommentAttri.Foreground := CommentCol;
   FHighlighterJava.KeyAttri.Foreground := KeyCol;
+  FHighlighterJava.IdentifierAttri.Foreground := SymbolCol;
   FHighlighterJava.StringAttri.Foreground := StringCol;
   FHighlighterJava.NumberAttri.Foreground := NumberCol;
   FHighlighterJava.SymbolAttri.Foreground := SymbolCol;
 
-  // 9. PHP
-  FHighlighterPHP.CommentAttri.Foreground := CommentCol;
-  FHighlighterPHP.KeyAttri.Foreground := KeyCol;
-  FHighlighterPHP.VariableAttri.Foreground := AttrCol;
-  FHighlighterPHP.StringAttri.Foreground := StringCol;
-  FHighlighterPHP.NumberAttri.Foreground := NumberCol;
-  FHighlighterPHP.SymbolAttri.Foreground := SymbolCol;
-
   // 10. SQL
   FHighlighterSQL.CommentAttri.Foreground := CommentCol;
   FHighlighterSQL.KeyAttri.Foreground := KeyCol;
-  FHighlighterSQL.TableNameAttri.Foreground := TagCol;
+  FHighlighterSQL.DataTypeAttri.Foreground := TagCol;
+  FHighlighterSQL.FunctionAttri.Foreground := TagCol;
+  FHighlighterSQL.TableNameAttri.Foreground := AttrCol;
+  FHighlighterSQL.VariableAttri.Foreground := AttrCol;
   FHighlighterSQL.StringAttri.Foreground := StringCol;
   FHighlighterSQL.NumberAttri.Foreground := NumberCol;
   FHighlighterSQL.SymbolAttri.Foreground := SymbolCol;
@@ -568,7 +689,68 @@ begin
   FHighlighterIni.NumberAttri.Foreground := NumberCol;
   FHighlighterIni.SymbolAttri.Foreground := SymbolCol;
 
-  // 13. Markdown
+  // 13. Unix Shell Script
+  FHighlighterSh.CommentAttri.Foreground := CommentCol;
+  FHighlighterSh.KeyAttri.Foreground := KeyCol;
+  FHighlighterSh.SecondKeyAttri.Foreground := KeyCol;
+  FHighlighterSh.VarAttri.Foreground := AttrCol;
+  FHighlighterSh.IdentifierAttri.Foreground := SymbolCol;
+  FHighlighterSh.StringAttri.Foreground := StringCol;
+  FHighlighterSh.NumberAttri.Foreground := NumberCol;
+  FHighlighterSh.SymbolAttri.Foreground := SymbolCol;
+
+  // 14. Perl
+  FHighlighterPerl.CommentAttri.Foreground := CommentCol;
+  FHighlighterPerl.KeyAttri.Foreground := KeyCol;
+  FHighlighterPerl.PragmaAttri.Foreground := TagCol;
+  FHighlighterPerl.VariableAttri.Foreground := AttrCol;
+  FHighlighterPerl.OperatorAttri.Foreground := SymbolCol;
+  FHighlighterPerl.IdentifierAttri.Foreground := SymbolCol;
+  FHighlighterPerl.StringAttri.Foreground := StringCol;
+  FHighlighterPerl.NumberAttri.Foreground := NumberCol;
+  FHighlighterPerl.SymbolAttri.Foreground := SymbolCol;
+
+  // 15. Visual Basic
+  FHighlighterVB.CommentAttri.Foreground := CommentCol;
+  FHighlighterVB.KeyAttri.Foreground := KeyCol;
+  FHighlighterVB.IdentifierAttri.Foreground := SymbolCol;
+  FHighlighterVB.StringAttri.Foreground := StringCol;
+  FHighlighterVB.NumberAttri.Foreground := NumberCol;
+  FHighlighterVB.SymbolAttri.Foreground := SymbolCol;
+
+  // 16. Diff / Patch
+  FHighlighterDiff.OrigFileAttri.Foreground := TagCol;
+  FHighlighterDiff.NewFileAttri.Foreground := TagCol;
+  FHighlighterDiff.ChunkMarkerAttri.Foreground := BracketCol;
+  FHighlighterDiff.ChunkNewAttri.Foreground := DiffAddCol;
+  FHighlighterDiff.ChunkOldAttri.Foreground := DiffDelCol;
+  FHighlighterDiff.ChunkMixedAttri.Foreground := DiffModCol;
+  FHighlighterDiff.LineAddedAttri.Foreground := DiffAddCol;
+  FHighlighterDiff.LineRemovedAttri.Foreground := DiffDelCol;
+  FHighlighterDiff.LineChangedAttri.Foreground := DiffModCol;
+  FHighlighterDiff.LineContextAttri.Foreground := SymbolCol;
+
+  // 17. TeX / LaTeX
+  FHighlighterTeX.CommentAttri.Foreground := CommentCol;
+  FHighlighterTeX.ControlSequenceAttri.Foreground := TagCol;
+  FHighlighterTeX.MathmodeAttri.Foreground := ValCol;
+  FHighlighterTeX.TextAttri.Foreground := SymbolCol;
+  FHighlighterTeX.BraceAttri.Foreground := BracketCol;
+  FHighlighterTeX.BracketAttri.Foreground := BracketCol;
+
+  // 18. LFM Form
+  FHighlighterLFM.CommentAttri.Foreground := CommentCol;
+  FHighlighterLFM.KeyAttri.Foreground := KeyCol;
+  FHighlighterLFM.IdentifierAttri.Foreground := TagCol;
+  FHighlighterLFM.StringAttri.Foreground := StringCol;
+  FHighlighterLFM.NumberAttri.Foreground := NumberCol;
+
+  // 19. PO Gettext
+  FHighlighterPo.CommentAttri.Foreground := CommentCol;
+  FHighlighterPo.KeyAttri.Foreground := KeyCol;
+  FHighlighterPo.TextAttri.Foreground := StringCol;
+
+  // 20. Markdown
   FHighlighterMarkdown.HeaderAttri.Foreground := KeyCol;
   FHighlighterMarkdown.HeaderAttri.Style := [fsBold];
   FHighlighterMarkdown.CodeBlockAttri.Foreground := ValCol;
@@ -603,79 +785,122 @@ end;
 
 procedure TfrmPreview.AutoDetectHighlighter(const AFileName: string);
 var
-  Ext: string;
+  Ext, BaseName: string;
 begin
   Ext := LowerCase(ExtractFileExt(AFileName));
+  BaseName := LowerCase(ExtractFileName(AFileName));
 
-  // Pascal / Delphi / Lazarus
-  if (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.lfm') or (Ext = '.inc') or (Ext = '.dpr') then
-    synPreview.Highlighter := FHighlighterPas
-
-  // Python
-  else if (Ext = '.py') or (Ext = '.pyw') then
-    synPreview.Highlighter := FHighlighterPython
-
-  // HTML
-  else if (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') then
-    synPreview.Highlighter := FHighlighterHTML
-
-  // XML / SVG
-  else if (Ext = '.xml') or (Ext = '.svg') or (Ext = '.xaml') or (Ext = '.plist') or (Ext = '.rss') then
-    synPreview.Highlighter := FHighlighterXML
-
-  // PHP
-  else if (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or (Ext = '.phtml') then
-    synPreview.Highlighter := FHighlighterPHP
-
-  // CSS / Styling
-  else if (Ext = '.css') or (Ext = '.scss') or (Ext = '.less') then
-    synPreview.Highlighter := FHighlighterCSS
-
-  // JavaScript / TypeScript / JSON
-  else if (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or (Ext = '.json') or (Ext = '.mjs') then
-    synPreview.Highlighter := FHighlighterJS
-
-  // C / C++ / C#
-  else if (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or
-          (Ext = '.h') or (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.cs') then
-    synPreview.Highlighter := FHighlighterCpp
-
-  // Java
-  else if (Ext = '.java') then
-    synPreview.Highlighter := FHighlighterJava
-
-  // SQL
-  else if (Ext = '.sql') then
-    synPreview.Highlighter := FHighlighterSQL
-
-  // Batch / Windows Command
-  else if (Ext = '.bat') or (Ext = '.cmd') then
-    synPreview.Highlighter := FHighlighterBat
-
-  // Shell / Bash / Unix
-  else if (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.env') then
+  // Special extensionless or dot-files
+  if (BaseName = 'dockerfile') or (BaseName = 'makefile') or (BaseName = 'gnumakefile') then
+    synPreview.Highlighter := FHighlighterSh
+  else if (BaseName = '.gitignore') or (BaseName = '.gitattributes') or (BaseName = '.gitmodules') or
+          (BaseName = '.editorconfig') then
+    synPreview.Highlighter := FHighlighterIni
+  else if (BaseName = '.env') or (Pos('.env.', BaseName) = 1) or (BaseName = '.bashrc') or
+          (BaseName = '.bash_profile') or (BaseName = '.zshrc') or (BaseName = '.profile') then
     synPreview.Highlighter := FHighlighterSh
 
-  // Perl
-  else if (Ext = '.pl') or (Ext = '.pm') or (Ext = '.cgi') then
+  // 1. Pascal / Delphi / Free Pascal
+  else if (Ext = '.pas') or (Ext = '.pp') or (Ext = '.p') or (Ext = '.inc') or
+          (Ext = '.lpr') or (Ext = '.dpr') or (Ext = '.dpk') then
+    synPreview.Highlighter := FHighlighterPas
+
+  // 2. Python
+  else if (Ext = '.py') or (Ext = '.pyw') or (Ext = '.pyi') or (Ext = '.pyx') or
+          (Ext = '.pxd') or (Ext = '.tac') or (Ext = '.wsgi') then
+    synPreview.Highlighter := FHighlighterPython
+
+  // 3. JavaScript / TypeScript / JSON
+  else if (Ext = '.js') or (Ext = '.jsx') or (Ext = '.ts') or (Ext = '.tsx') or
+          (Ext = '.mjs') or (Ext = '.cjs') or (Ext = '.json') or (Ext = '.json5') or
+          (Ext = '.jsonc') or (Ext = '.map') or (Ext = '.webmanifest') then
+    synPreview.Highlighter := FHighlighterJS
+
+  // 4. HTML & Web Templates
+  else if (Ext = '.html') or (Ext = '.htm') or (Ext = '.xhtml') or (Ext = '.shtml') or
+          (Ext = '.asp') or (Ext = '.jsp') or (Ext = '.vue') or (Ext = '.svelte') or
+          (Ext = '.twig') then
+    synPreview.Highlighter := FHighlighterHTML
+
+  // 5. XML / SVG
+  else if (Ext = '.xml') or (Ext = '.svg') or (Ext = '.xaml') or (Ext = '.plist') or
+          (Ext = '.rss') or (Ext = '.atom') or (Ext = '.xsd') or (Ext = '.xsl') or
+          (Ext = '.xslt') or (Ext = '.resx') or (Ext = '.manifest') or (Ext = '.pom') or
+          (Ext = '.kml') or (Ext = '.gpx') or (Ext = '.config') or (Ext = '.nuspec') or
+          (Ext = '.props') or (Ext = '.targets') or (Ext = '.wxs') or (Ext = '.wxi') or
+          (Ext = '.csproj') or (Ext = '.vbproj') or (Ext = '.fsproj') or (Ext = '.vcxproj') then
+    synPreview.Highlighter := FHighlighterXML
+
+  // 6. CSS & Stylesheets
+  else if (Ext = '.css') or (Ext = '.scss') or (Ext = '.sass') or (Ext = '.less') or (Ext = '.pcss') then
+    synPreview.Highlighter := FHighlighterCSS
+
+  // 7. PHP
+  else if (Ext = '.php') or (Ext = '.php3') or (Ext = '.php4') or (Ext = '.php5') or
+          (Ext = '.php7') or (Ext = '.php8') or (Ext = '.phtml') or (Ext = '.phps') then
+    synPreview.Highlighter := FHighlighterPHP
+
+  // 8. C / C++ / C#
+  else if (Ext = '.c') or (Ext = '.cpp') or (Ext = '.cc') or (Ext = '.cxx') or
+          (Ext = '.h') or (Ext = '.hpp') or (Ext = '.hxx') or (Ext = '.hh') or
+          (Ext = '.cs') or (Ext = '.ino') or (Ext = '.cu') or (Ext = '.cuh') or
+          (Ext = '.m') or (Ext = '.mm') or (Ext = '.idl') then
+    synPreview.Highlighter := FHighlighterCpp
+
+  // 9. Java & Kotlin / JVM
+  else if (Ext = '.java') or (Ext = '.kt') or (Ext = '.kts') or (Ext = '.groovy') or (Ext = '.gradle') then
+    synPreview.Highlighter := FHighlighterJava
+
+  // 10. SQL & Databases
+  else if (Ext = '.sql') or (Ext = '.ddl') or (Ext = '.dml') or (Ext = '.pgsql') or
+          (Ext = '.plsql') or (Ext = '.sqlite') or (Ext = '.cql') then
+    synPreview.Highlighter := FHighlighterSQL
+
+  // 11. Batch / Windows Command
+  else if (Ext = '.bat') or (Ext = '.cmd') or (Ext = '.btm') then
+    synPreview.Highlighter := FHighlighterBat
+
+  // 12. INI & Config / YAML / TOML
+  else if (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or
+          (Ext = '.properties') or (Ext = '.desktop') or (Ext = '.service') or
+          (Ext = '.gitconfig') or (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
+    synPreview.Highlighter := FHighlighterIni
+
+  // 13. Unix Shell Script / Bash / Zsh
+  else if (Ext = '.sh') or (Ext = '.bash') or (Ext = '.zsh') or (Ext = '.ksh') or
+          (Ext = '.csh') or (Ext = '.tcsh') or (Ext = '.fish') then
+    synPreview.Highlighter := FHighlighterSh
+
+  // 14. Perl
+  else if (Ext = '.pl') or (Ext = '.pm') or (Ext = '.t') or (Ext = '.pod') or (Ext = '.cgi') then
     synPreview.Highlighter := FHighlighterPerl
 
-  // Visual Basic / VBScript
-  else if (Ext = '.vbs') or (Ext = '.vb') or (Ext = '.bas') or (Ext = '.vba') then
+  // 15. Visual Basic / VBScript
+  else if (Ext = '.vb') or (Ext = '.vbs') or (Ext = '.bas') or (Ext = '.cls') or
+          (Ext = '.frm') or (Ext = '.vba') then
     synPreview.Highlighter := FHighlighterVB
 
-  // Diff / Patches
+  // 16. Diff & Patch
   else if (Ext = '.diff') or (Ext = '.patch') then
     synPreview.Highlighter := FHighlighterDiff
 
-  // Markdown
-  else if (Ext = '.md') or (Ext = '.markdown') or (Ext = '.mdown') or (Ext = '.mkd') then
-    synPreview.Highlighter := FHighlighterMarkdown
+  // 17. TeX & LaTeX
+  else if (Ext = '.tex') or (Ext = '.ltx') or (Ext = '.sty') or (Ext = '.cls') or
+          (Ext = '.bib') or (Ext = '.dtx') or (Ext = '.ins') then
+    synPreview.Highlighter := FHighlighterTeX
 
-  // Config / INI / YAML / TOML
-  else if (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.conf') or (Ext = '.inf') or
-          (Ext = '.toml') or (Ext = '.yaml') or (Ext = '.yml') then
-    synPreview.Highlighter := FHighlighterIni
+  // 18. Form (LFM / DFM)
+  else if (Ext = '.lfm') or (Ext = '.dfm') or (Ext = '.fmx') then
+    synPreview.Highlighter := FHighlighterLFM
+
+  // 19. PO Gettext
+  else if (Ext = '.po') or (Ext = '.pot') then
+    synPreview.Highlighter := FHighlighterPo
+
+  // 20. Markdown
+  else if (Ext = '.md') or (Ext = '.markdown') or (Ext = '.mdown') or (Ext = '.mkd') or
+          (Ext = '.mkdn') or (Ext = '.mdwn') or (Ext = '.mdtxt') or (Ext = '.mdtext') then
+    synPreview.Highlighter := FHighlighterMarkdown
 
   else
     synPreview.Highlighter := nil;
