@@ -114,6 +114,7 @@ type
     btnCloseFind: TButton;
 
     pnlEditorHeader: TPanel;
+    cbReplaceAITells: TCheckBox;
     btnCloseFile: TButton;
 
     SynEdit1: TSynEdit;
@@ -436,6 +437,10 @@ type
     procedure btnRedoClick(Sender: TObject);
     procedure btnFindDialogClick(Sender: TObject);
     procedure cbWordWrapClick(Sender: TObject);
+    procedure cbReplaceAITellsClick(Sender: TObject);
+    procedure SynEdit1Paste(Sender: TObject; var AText: String;
+      var AMode: TSynSelectionMode; ALogStartPos: TPoint;
+      var AnAction: TSynCopyPasteAction);
     procedure btnFontColorClick(Sender: TObject);
     procedure cmbSyntaxChange(Sender: TObject);
     procedure btnFindNextClick(Sender: TObject);
@@ -609,6 +614,8 @@ type
     function GetUserSpecialPath(const AFoId: string): string;
 
   private
+    FLoadingSettings: Boolean;
+
     // Memory & Notes State & Helpers
     FMemoryFragments: array of TMemoryFragment;
     FMemoryLimit: Integer;
@@ -619,6 +626,7 @@ type
     {$IFDEF WINDOWS}
     function GetWinClipboardText(out AText: string; out AOpened: Boolean): Boolean;
     {$ENDIF}
+    function CleanAITells(const AText: string): string;
     function CheckAndCollectClipboard: Boolean;
     procedure AddMemoryFragment(const AText: string);
     procedure DeleteMemoryFragmentInternal(AIndex: Integer);
@@ -792,101 +800,107 @@ var
   ColorStr: string;
   i: Integer;
 begin
-  Ini := TIniFile.Create(GetIniPath);
+  FLoadingSettings := True;
   try
-    // General Options
-    UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
-    cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
-    FTabStyle := Ini.ReadInteger('General', 'TabStyle', 0);
-    FHighlightActiveTab := Ini.ReadBool('General', 'HighlightActiveTab', True);
-    FTallTabs := Ini.ReadBool('General', 'TallTabs', True);
+    Ini := TIniFile.Create(GetIniPath);
+    try
+      // General Options
+      UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
+      cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
+      FTabStyle := Ini.ReadInteger('General', 'TabStyle', 0);
+      FHighlightActiveTab := Ini.ReadBool('General', 'HighlightActiveTab', True);
+      FTallTabs := Ini.ReadBool('General', 'TallTabs', True);
 
-    if FTallTabs then
-      PageControl1.TabHeight := 28
-    else
-      PageControl1.TabHeight := 0;
-
-    case FTabStyle of
-      1: PageControl1.Style := tsButtons;
-      2: PageControl1.Style := tsFlatButtons;
+      if FTallTabs then
+        PageControl1.TabHeight := 28
       else
-      begin
-        FTabStyle := 0;
-        PageControl1.Style := tsTabs;
+        PageControl1.TabHeight := 0;
+
+      case FTabStyle of
+        1: PageControl1.Style := tsButtons;
+        2: PageControl1.Style := tsFlatButtons;
+        else
+        begin
+          FTabStyle := 0;
+          PageControl1.Style := tsTabs;
+        end;
       end;
+
+      // Active Tab (defaults to The Real Explorer on initial launch)
+      ColorStr := Ini.ReadString('General', 'ActiveTab', 'The Real Explorer');
+      for i := 0 to PageControl1.PageCount - 1 do
+        if CleanTabCaption(PageControl1.Pages[i].Caption) = CleanTabCaption(ColorStr) then
+        begin
+          PageControl1.ActivePageIndex := i;
+          Break;
+        end;
+
+      // Search Options
+      cbSubfolders.Checked := Ini.ReadBool('Search', 'Subfolders', True);
+      cbCaseSensitive.Checked := Ini.ReadBool('Search', 'CaseSensitive', False);
+      cbIncludeFolders.Checked := Ini.ReadBool('Search', 'IncludeFolders', False);
+      cbEnablePreview.Checked := Ini.ReadBool('Search', 'EnablePreview', True);
+      FSelectedPath := Ini.ReadString('Search', 'LastSearchPath', 'C:\');
+      if DirectoryExists(FSelectedPath) then
+        edtSearchPath.Text := FSelectedPath
+      else
+        edtSearchPath.Text := 'C:\';
+
+      // Notepad Options
+      cbWordWrap.Checked := Ini.ReadBool('Notepad', 'WordWrap', True);
+      cbReplaceAITells.Checked := Ini.ReadBool('Notepad', 'ReplaceAITells', False);
+      ColorStr := Ini.ReadString('Notepad', 'FontColor', '');
+      if ColorStr <> '' then
+      begin
+        try
+          FCustomFontColor := StringToColor(ColorStr);
+        except
+          FCustomFontColor := clNone;
+        end;
+      end
+      else
+        FCustomFontColor := clNone;
+
+      // Explorer Options
+      FExpDefaultFolder := Ini.ReadString('Explorer', 'DefaultFolder', '');
+      if (FExpDefaultFolder = '') or (not DirectoryExists(FExpDefaultFolder)) then
+        FExpDefaultFolder := GetUserDesktopPath;
+      cbExpPreviewAlways.Checked := Ini.ReadBool('Explorer', 'PreviewAlways', False);
+      NavigateExplorerTo(FExpDefaultFolder);
+
+      // Memory & Notes Options
+      FMemoryLimit := Ini.ReadInteger('Memory', 'ManagerLimit', 5);
+      cmbMemoryLimit.ItemIndex := GetMemoryIndexFromCapacity(FMemoryLimit);
+      FMemoryLimit := GetMemoryCapacityFromIndex(cmbMemoryLimit.ItemIndex);
+
+    finally
+      Ini.Free;
     end;
 
-    // Active Tab (defaults to The Real Explorer on initial launch)
-    ColorStr := Ini.ReadString('General', 'ActiveTab', 'The Real Explorer');
-    for i := 0 to PageControl1.PageCount - 1 do
-      if CleanTabCaption(PageControl1.Pages[i].Caption) = CleanTabCaption(ColorStr) then
-      begin
-        PageControl1.ActivePageIndex := i;
-        Break;
-      end;
-
-    // Search Options
-    cbSubfolders.Checked := Ini.ReadBool('Search', 'Subfolders', True);
-    cbCaseSensitive.Checked := Ini.ReadBool('Search', 'CaseSensitive', False);
-    cbIncludeFolders.Checked := Ini.ReadBool('Search', 'IncludeFolders', False);
-    cbEnablePreview.Checked := Ini.ReadBool('Search', 'EnablePreview', True);
-    FSelectedPath := Ini.ReadString('Search', 'LastSearchPath', 'C:\');
-    if DirectoryExists(FSelectedPath) then
-      edtSearchPath.Text := FSelectedPath
-    else
-      edtSearchPath.Text := 'C:\';
-
-    // Notepad Options
-    cbWordWrap.Checked := Ini.ReadBool('Notepad', 'WordWrap', True);
-    ColorStr := Ini.ReadString('Notepad', 'FontColor', '');
-    if ColorStr <> '' then
+    // Apply WordWrap
+    if cbWordWrap.Checked then
     begin
-      try
-        FCustomFontColor := StringToColor(ColorStr);
-      except
-        FCustomFontColor := clNone;
-      end;
+      if FWrapPlugin = nil then
+        FWrapPlugin := TLazSynEditLineWrapPlugin.Create(SynEdit1);
+      SynEdit1.ScrollBars := ssVertical;
     end
     else
-      FCustomFontColor := clNone;
+    begin
+      SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
+      SynEdit1.ScrollBars := ssBoth;
+    end;
 
-    // Explorer Options
-    FExpDefaultFolder := Ini.ReadString('Explorer', 'DefaultFolder', '');
-    if (FExpDefaultFolder = '') or (not DirectoryExists(FExpDefaultFolder)) then
-      FExpDefaultFolder := GetUserDesktopPath;
-    cbExpPreviewAlways.Checked := Ini.ReadBool('Explorer', 'PreviewAlways', False);
-    NavigateExplorerTo(FExpDefaultFolder);
-
-    // Memory & Notes Options
-    FMemoryLimit := Ini.ReadInteger('Memory', 'ManagerLimit', 5);
-    cmbMemoryLimit.ItemIndex := GetMemoryIndexFromCapacity(FMemoryLimit);
-    FMemoryLimit := GetMemoryCapacityFromIndex(cmbMemoryLimit.ItemIndex);
-
+    // Apply Tray & Theme
+    EnsureTrayIconLoaded;
+    TrayIcon1.Visible := cbRunInTray.Checked;
+    ApplyTheme(UserPrefersDark);
+    UpdateTabHighlight;
+    UpdateTabOptionsMenu;
+    UpdateMemoryStatusUI;
+    LoadQuickNotes;
   finally
-    Ini.Free;
+    FLoadingSettings := False;
   end;
-
-  // Apply WordWrap
-  if cbWordWrap.Checked then
-  begin
-    if FWrapPlugin = nil then
-      FWrapPlugin := TLazSynEditLineWrapPlugin.Create(SynEdit1);
-    SynEdit1.ScrollBars := ssVertical;
-  end
-  else
-  begin
-    SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
-    SynEdit1.ScrollBars := ssBoth;
-  end;
-
-  // Apply Tray & Theme
-  EnsureTrayIconLoaded;
-  TrayIcon1.Visible := cbRunInTray.Checked;
-  ApplyTheme(UserPrefersDark);
-  UpdateTabHighlight;
-  UpdateTabOptionsMenu;
-  UpdateMemoryStatusUI;
-  LoadQuickNotes;
 end;
 
 procedure TfrmMain.SaveAllOptions;
@@ -914,6 +928,7 @@ begin
 
     // Notepad Options
     Ini.WriteBool('Notepad', 'WordWrap', cbWordWrap.Checked);
+    Ini.WriteBool('Notepad', 'ReplaceAITells', cbReplaceAITells.Checked);
     if FCustomFontColor <> clNone then
       Ini.WriteString('Notepad', 'FontColor', ColorToString(FCustomFontColor))
     else
@@ -987,6 +1002,7 @@ begin
   SynEdit1.WantTabs := True;
   SynEdit1.TabWidth := 4;
   SynEdit1.Keystrokes.ResetDefaults;
+  SynEdit1.OnPaste := @SynEdit1Paste;
 
   // Default Search Status
   ProgressBar1.Style := pbstMarquee;
@@ -1914,6 +1930,8 @@ begin
     cbExpPreviewAlways.Font.Color := TextColor;
   cbRunInTray.Font.Color := TextColor;
   cbWordWrap.Font.Color := TextColor;
+  if Assigned(cbReplaceAITells) then
+    cbReplaceAITells.Font.Color := TextColor;
   cbMatchCase.Font.Color := TextColor;
   cbWholeWord.Font.Color := TextColor;
 
@@ -3802,6 +3820,8 @@ begin
     end;
 
     CleanStr := ConvertToUTF8(RawBytes);
+    if cbReplaceAITells.Checked then
+      CleanStr := CleanAITells(CleanStr);
     AutoDetectHighlighter(AFileName);
     SynEdit1.Text := CleanStr;
     SynEdit1.Modified := False;
@@ -4153,6 +4173,62 @@ begin
     SynEdit1.ScrollBars := ssBoth;
   end;
   SaveAllOptions;
+end;
+
+function TfrmMain.CleanAITells(const AText: string): string;
+begin
+  Result := AText;
+  if Result = '' then Exit;
+
+  // Em-dash (— U+2014), En-dash (– U+2013), and Horizontal bar (― U+2015) to hyphens (-)
+  Result := StringReplace(Result, #$E2#$80#$94, '-', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$93, '-', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$95, '-', [rfReplaceAll]);
+
+  // Curly double quotes (“ ” U+201C, U+201D) and low double quote („ U+201E) to straight quotes (")
+  Result := StringReplace(Result, #$E2#$80#$9C, '"', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$9D, '"', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$9E, '"', [rfReplaceAll]);
+
+  // Curly single quotes / apostrophes (‘ ’ U+2018, U+2019), low quote (‚ U+201A),
+  // high reversed-9 quote (‛ U+201B), modifier letter apostrophe (ʼ U+02BC) to straight apostrophe (')
+  Result := StringReplace(Result, #$E2#$80#$98, '''', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$99, '''', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$9A, '''', [rfReplaceAll]);
+  Result := StringReplace(Result, #$E2#$80#$9B, '''', [rfReplaceAll]);
+  Result := StringReplace(Result, #$CA#$BC, '''', [rfReplaceAll]);
+end;
+
+procedure TfrmMain.cbReplaceAITellsClick(Sender: TObject);
+begin
+  if FLoadingSettings then Exit;
+
+  if cbReplaceAITells.Checked then
+  begin
+    if MessageDlg('Replace AI Tells',
+      'This feature automatically cleans common AI formatting artifacts:' + LineEnding +
+      '  • Replaces em-dashes (—) and en-dashes (–) with hyphens (-)' + LineEnding +
+      '  • Replaces curly double quotes (“ ”) with straight quotes (")' + LineEnding +
+      '  • Replaces curly single quotes and apostrophes (‘ ’) with straight apostrophes ('')' + LineEnding + LineEnding +
+      'This replacement runs ONLY when a file is opened or when text is pasted into the editor.' + LineEnding +
+      '(It will NOT run on keypress, keydown, or typing events).' + LineEnding + LineEnding +
+      'Do you want to enable this feature?',
+      mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    begin
+      cbReplaceAITells.Checked := False;
+      Exit;
+    end;
+  end;
+
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.SynEdit1Paste(Sender: TObject; var AText: String;
+  var AMode: TSynSelectionMode; ALogStartPos: TPoint;
+  var AnAction: TSynCopyPasteAction);
+begin
+  if cbReplaceAITells.Checked then
+    AText := CleanAITells(AText);
 end;
 
 procedure TfrmMain.btnFontColorClick(Sender: TObject);
@@ -5175,6 +5251,7 @@ begin
   mmoAboutFeatures.Lines.Add('');
   mmoAboutFeatures.Lines.Add('5. NOTEPAD REPLACEMENT:');
   mmoAboutFeatures.Lines.Add('   - Tabbed editor powered by TSynEdit with dirty tracking.');
+  mmoAboutFeatures.Lines.Add('   - Replace AI Tells option: automatically converts em-dashes to hyphens, curly quotes to straight quotes, and curly apostrophes to straight ones on open and paste.');
   mmoAboutFeatures.Lines.Add('   - Dedicated custom Markdown highlighter (headers, code blocks, lists, links).');
   mmoAboutFeatures.Lines.Add('   - 20 highlighters: Pascal, Python, JS/TS/JSON, HTML, XML/SVG, CSS, PHP, C/C++/C#, Java, SQL, Batch, INI/Config, Shell, Perl, VB, Diff, TeX, LFM, PO, Markdown.');
   mmoAboutFeatures.Lines.Add('   - Slide-down Find & Replace bar with regex, match case, and whole words.');

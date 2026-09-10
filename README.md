@@ -82,6 +82,7 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Full Keyboard & Editing Fidelity**: Standard Backspace, Delete, Word-Backspace (`Ctrl+Backspace`), Select All (`Ctrl+A`), Save (`Ctrl+S`), Save As (`Ctrl+Shift+S`), and modern cursor navigation with immediate focus transfer on tab navigation.
 - **Find & Replace Bar**: Sleek slide-down search bar with Find Next, Replace, Replace All, Case Sensitivity, and Whole Word matching.
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
+- **Replace AI Tells Option**: Checkbox option to automatically sanitize common AI formatting artifacts. Replaces em-dashes and en-dashes with standard hyphens (`-`), curly double quotes with straight quotes (`"`), and curly apostrophes / single quotes with straight ones (`'`). Runs exclusively when a file is opened or text is pasted (zero interference with live keyboard typing) with an explanatory confirmation modal and persistent state in `AceUtils.ini`.
 - **Status Bar**: Live line number, column number, character count, UTF-8 indicator, and modified state tracker.
 
 ### 🌙 6. Native Windows 11 Dark Mode

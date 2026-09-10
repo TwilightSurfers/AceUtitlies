@@ -651,6 +651,15 @@ object frmMain: TfrmMain
         ClientHeight = 28
         ClientWidth = 1042
         TabOrder = 2
+        object cbReplaceAITells: TCheckBox
+          Left = 8
+          Height = 19
+          Top = 4
+          Width = 115
+          Caption = 'Replace AI tells'
+          TabOrder = 0
+          OnClick = cbReplaceAITellsClick
+        end
         object btnCloseFile: TButton
           Left = 960
           Height = 24
@@ -658,7 +667,7 @@ object frmMain: TfrmMain
           Width = 76
           Anchors = [akTop, akRight]
           Caption = 'Close File'
-          TabOrder = 0
+          TabOrder = 1
           OnClick = btnCloseFileClick
         end
       end
@@ -681,6 +690,7 @@ object frmMain: TfrmMain
         OnChange = SynEdit1Change
         OnEnter = SynEdit1Enter
         OnExit = SynEdit1Exit
+        OnPaste = SynEdit1Paste
         OnStatusChange = SynEdit1StatusChange
       end
       object pnlNotepadStatus: TPanel
