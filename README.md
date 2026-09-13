@@ -82,6 +82,11 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Full Keyboard & Editing Fidelity**: Standard Backspace, Delete, Word-Backspace (`Ctrl+Backspace`), Select All (`Ctrl+A`), Save (`Ctrl+S`), Save As (`Ctrl+Shift+S`), and modern cursor navigation with immediate focus transfer on tab navigation.
 - **Find & Replace Bar**: Sleek slide-down search bar with Find Next, Replace, Replace All, Case Sensitivity, and Whole Word matching.
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
+- **Text & HTML List Formatting**: Format lines instantly as numbered or bulleted lists via toolbar buttons or context menu (`Format`):
+  - **Numbered List**: Prefixes lines as an ordered list (`1. Item`, `2. Item`), preserving blank lines and automatically stripping prior numbering/bullets so you can renumber or switch formats easily.
+  - **HTML Option & Unordered Bullet List**: Toggle the **HTML** option to format lines with HTML tags (`<ol><li>...</li></ol>`) and reveal the **Bullet List** option for unordered lists (`<ul><li>...</li></ul>`).
+  - **Selection-Aware & Atomic Undo**: When text is highlighted, formatting applies exclusively to the selected lines; when nothing is highlighted, the entire document is formatted. All format operations support atomic single-step undo (`Ctrl+Z`).
+- **Smart Default File Name on Save**: When saving an untitled file, the Save dialog automatically pre-fills a clean 8-character default filename extracted from the first line of text (filtering out Windows and Linux illegal filename characters such as `\ / : * ? " < > |`), saving user time while preserving full customization.
 - **Replace AI Tells Option**: Checkbox option to automatically sanitize common AI formatting artifacts. Replaces em-dashes and en-dashes with standard hyphens (`-`), curly double quotes with straight quotes (`"`), and curly apostrophes / single quotes with straight ones (`'`). Runs exclusively when a file is opened or text is pasted (zero interference with live keyboard typing) with an explanatory confirmation modal and persistent state in `AceUtils.ini`.
 - **Status Bar**: Live line number, column number, character count, UTF-8 indicator, and modified state tracker.
 

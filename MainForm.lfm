@@ -660,6 +660,43 @@ object frmMain: TfrmMain
           TabOrder = 0
           OnClick = cbReplaceAITellsClick
         end
+        object cbFormatHTML: TCheckBox
+          Left = 140
+          Height = 19
+          Top = 4
+          Width = 55
+          Caption = 'HTML'
+          Hint = 'Enable HTML list formatting (<ol>, <ul>, <li>)'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 1
+          OnClick = cbFormatHTMLClick
+        end
+        object btnFormatNumbered: TButton
+          Left = 205
+          Height = 24
+          Top = 2
+          Width = 100
+          Caption = 'Numbered List'
+          Hint = 'Format lines as a numbered list'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 2
+          OnClick = btnFormatNumberedClick
+        end
+        object btnFormatBullet: TButton
+          Left = 312
+          Height = 24
+          Top = 2
+          Width = 85
+          Caption = 'Bullet List'
+          Hint = 'Format lines as an unordered HTML bullet list'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 3
+          Visible = False
+          OnClick = btnFormatBulletClick
+        end
         object btnCloseFile: TButton
           Left = 960
           Height = 24
@@ -667,7 +704,7 @@ object frmMain: TfrmMain
           Width = 76
           Anchors = [akTop, akRight]
           Caption = 'Close File'
-          TabOrder = 1
+          TabOrder = 4
           OnClick = btnCloseFileClick
         end
       end
@@ -2129,6 +2166,28 @@ object frmMain: TfrmMain
     object miRedo: TMenuItem
       Caption = 'Redo'
       OnClick = miRedoClick
+    end
+    object miSepNotepad3: TMenuItem
+      Caption = '-'
+    end
+    object miFormatMenu: TMenuItem
+      Caption = 'Format'
+      object miFormatNumbered: TMenuItem
+        Caption = 'Numbered List'
+        OnClick = btnFormatNumberedClick
+      end
+      object miFormatBullet: TMenuItem
+        Caption = 'Bullet List'
+        Visible = False
+        OnClick = btnFormatBulletClick
+      end
+      object miSepFormat1: TMenuItem
+        Caption = '-'
+      end
+      object miFormatHTML: TMenuItem
+        Caption = 'HTML Mode'
+        OnClick = miFormatHTMLClick
+      end
     end
   end
   object popExplorer: TPopupMenu

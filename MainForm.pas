@@ -115,6 +115,9 @@ type
 
     pnlEditorHeader: TPanel;
     cbReplaceAITells: TCheckBox;
+    cbFormatHTML: TCheckBox;
+    btnFormatNumbered: TButton;
+    btnFormatBullet: TButton;
     btnCloseFile: TButton;
 
     SynEdit1: TSynEdit;
@@ -168,6 +171,12 @@ type
     miSepNotepad2: TMenuItem;
     miUndo: TMenuItem;
     miRedo: TMenuItem;
+    miSepNotepad3: TMenuItem;
+    miFormatMenu: TMenuItem;
+    miFormatNumbered: TMenuItem;
+    miFormatBullet: TMenuItem;
+    miSepFormat1: TMenuItem;
+    miFormatHTML: TMenuItem;
 
     // Tab 3: Memory & Notes Controls
     tabMemory: TTabSheet;
@@ -438,6 +447,10 @@ type
     procedure btnFindDialogClick(Sender: TObject);
     procedure cbWordWrapClick(Sender: TObject);
     procedure cbReplaceAITellsClick(Sender: TObject);
+    procedure cbFormatHTMLClick(Sender: TObject);
+    procedure btnFormatNumberedClick(Sender: TObject);
+    procedure btnFormatBulletClick(Sender: TObject);
+    procedure miFormatHTMLClick(Sender: TObject);
     procedure SynEdit1Paste(Sender: TObject; var AText: String;
       var AMode: TSynSelectionMode; ALogStartPos: TPoint;
       var AnAction: TSynCopyPasteAction);
@@ -553,6 +566,11 @@ type
     // Notepad Helpers
     function SaveCurrentFile: Boolean;
     function PromptSaveIfModified: Boolean;
+    function StripListMarker(const S: string): string;
+    function FormatAsNumberedList(const AText: string; AIsHTML: Boolean): string;
+    function FormatAsBulletList(const AText: string; AIsHTML: Boolean): string;
+    procedure ApplyListFormatting(ANumbered: Boolean);
+    function GetSuggestedFileName: string;
     procedure UpdateNotepadStatus;
     procedure UpdateSaveButtonState;
     procedure AutoDetectHighlighter(const AFileName: string);
@@ -849,6 +867,8 @@ begin
       // Notepad Options
       cbWordWrap.Checked := Ini.ReadBool('Notepad', 'WordWrap', True);
       cbReplaceAITells.Checked := Ini.ReadBool('Notepad', 'ReplaceAITells', False);
+      cbFormatHTML.Checked := Ini.ReadBool('Notepad', 'FormatHTML', False);
+      btnFormatBullet.Visible := cbFormatHTML.Checked;
       ColorStr := Ini.ReadString('Notepad', 'FontColor', '');
       if ColorStr <> '' then
       begin
@@ -929,6 +949,7 @@ begin
     // Notepad Options
     Ini.WriteBool('Notepad', 'WordWrap', cbWordWrap.Checked);
     Ini.WriteBool('Notepad', 'ReplaceAITells', cbReplaceAITells.Checked);
+    Ini.WriteBool('Notepad', 'FormatHTML', cbFormatHTML.Checked);
     if FCustomFontColor <> clNone then
       Ini.WriteString('Notepad', 'FontColor', ColorToString(FCustomFontColor))
     else
@@ -1932,6 +1953,8 @@ begin
   cbWordWrap.Font.Color := TextColor;
   if Assigned(cbReplaceAITells) then
     cbReplaceAITells.Font.Color := TextColor;
+  if Assigned(cbFormatHTML) then
+    cbFormatHTML.Font.Color := TextColor;
   cbMatchCase.Font.Color := TextColor;
   cbWholeWord.Font.Color := TextColor;
 
@@ -4138,7 +4161,7 @@ begin
   if FCurrentFileName <> '' then
     SaveDialog1.FileName := FCurrentFileName
   else
-    SaveDialog1.FileName := 'Untitled.txt';
+    SaveDialog1.FileName := GetSuggestedFileName;
 
   if SaveDialog1.Execute then
   begin
@@ -4221,6 +4244,299 @@ begin
   end;
 
   SaveAllOptions;
+end;
+
+function TfrmMain.GetSuggestedFileName: string;
+var
+  i, LineIdx: Integer;
+  Candidate, RawLine, CleanChars: string;
+  C: Char;
+const
+  IllegalChars: set of Char = ['\', '/', ':', '*', '?', '"', '<', '>', '|'];
+begin
+  Candidate := '';
+  RawLine := '';
+
+  // Scan for the first non-empty line
+  for LineIdx := 0 to SynEdit1.Lines.Count - 1 do
+  begin
+    if Trim(SynEdit1.Lines[LineIdx]) <> '' then
+    begin
+      RawLine := SynEdit1.Lines[LineIdx];
+      Break;
+    end;
+  end;
+
+  if RawLine <> '' then
+  begin
+    CleanChars := '';
+    for i := 1 to Length(RawLine) do
+    begin
+      C := RawLine[i];
+      if (not (C in IllegalChars)) and (Ord(C) >= 32) then
+      begin
+        // Skip leading space or period
+        if (CleanChars = '') and (C in [' ', '.']) then
+          Continue;
+        CleanChars := CleanChars + C;
+      end;
+    end;
+
+    // Take up to 8 characters
+    Candidate := Copy(CleanChars, 1, 8);
+    Candidate := Trim(Candidate);
+
+    // Remove any trailing periods or spaces
+    while (Length(Candidate) > 0) and (Candidate[Length(Candidate)] in ['.', ' ']) do
+      Delete(Candidate, Length(Candidate), 1);
+  end;
+
+  if Candidate = '' then
+    Result := 'Untitled.txt'
+  else
+    Result := Candidate + '.txt';
+end;
+
+function TfrmMain.StripListMarker(const S: string): string;
+var
+  i, len: Integer;
+  LowerS: string;
+begin
+  Result := Trim(S);
+  if Result = '' then Exit;
+
+  // Check for HTML <li>...</li>
+  LowerS := LowerCase(Result);
+  if (Copy(LowerS, 1, 4) = '<li>') and (Copy(LowerS, Length(LowerS) - 4, 5) = '</li>') then
+  begin
+    Result := Copy(Result, 5, Length(Result) - 9);
+    Result := Trim(Result);
+  end;
+
+  // Check for leading markdown / text bullets: '-', '*', '+', followed by space
+  if (Length(Result) >= 2) and (Result[1] in ['-', '*', '+']) and (Result[2] = ' ') then
+  begin
+    Delete(Result, 1, 2);
+    Result := Trim(Result);
+    Exit;
+  end;
+
+  // UTF-8 Bullet '•' is 3 bytes: #$E2#$80#$A2
+  if (Length(Result) >= 3) and (Copy(Result, 1, 3) = #$E2#$80#$A2) then
+  begin
+    Delete(Result, 1, 3);
+    Result := Trim(Result);
+    if (Length(Result) > 0) and (Result[1] = ' ') then
+    begin
+      Delete(Result, 1, 1);
+      Result := Trim(Result);
+    end;
+    Exit;
+  end;
+
+  // Check for leading number like '1. ', '1) ', '12. '
+  len := Length(Result);
+  i := 1;
+  while (i <= len) and (Result[i] in ['0'..'9']) do
+    Inc(i);
+  if (i > 1) and (i <= len) and (Result[i] in ['.', ')', '-']) then
+  begin
+    Inc(i);
+    while (i <= len) and (Result[i] = ' ') do
+      Inc(i);
+    Result := Copy(Result, i, len - i + 1);
+  end;
+end;
+
+function TfrmMain.FormatAsNumberedList(const AText: string; AIsHTML: Boolean): string;
+var
+  Lines, OutLines: TStringList;
+  i, ItemNum: Integer;
+  CurLine, CleanItem, LowLine: string;
+  HasTrailingNL: Boolean;
+begin
+  if AText = '' then
+  begin
+    Result := '';
+    Exit;
+  end;
+
+  HasTrailingNL := (Length(AText) > 0) and ((AText[Length(AText)] = #10) or (AText[Length(AText)] = #13));
+  Lines := TStringList.Create;
+  OutLines := TStringList.Create;
+  try
+    Lines.Text := AText;
+    ItemNum := 1;
+
+    if AIsHTML then
+    begin
+      OutLines.Add('<ol>');
+      for i := 0 to Lines.Count - 1 do
+      begin
+        CurLine := Lines[i];
+        if Trim(CurLine) = '' then
+          Continue;
+        LowLine := LowerCase(Trim(CurLine));
+        if (LowLine = '<ol>') or (LowLine = '</ol>') or
+           (LowLine = '<ul>') or (LowLine = '</ul>') then
+          Continue;
+        CleanItem := StripListMarker(CurLine);
+        OutLines.Add('  <li>' + CleanItem + '</li>');
+      end;
+      OutLines.Add('</ol>');
+    end
+    else
+    begin
+      for i := 0 to Lines.Count - 1 do
+      begin
+        CurLine := Lines[i];
+        if Trim(CurLine) = '' then
+          OutLines.Add(CurLine)
+        else
+        begin
+          CleanItem := StripListMarker(CurLine);
+          OutLines.Add(IntToStr(ItemNum) + '. ' + CleanItem);
+          Inc(ItemNum);
+        end;
+      end;
+    end;
+
+    Result := OutLines.Text;
+    if (not HasTrailingNL) and (Length(Result) >= Length(LineEnding)) and
+       (Copy(Result, Length(Result) - Length(LineEnding) + 1, Length(LineEnding)) = LineEnding) then
+    begin
+      SetLength(Result, Length(Result) - Length(LineEnding));
+    end;
+  finally
+    Lines.Free;
+    OutLines.Free;
+  end;
+end;
+
+function TfrmMain.FormatAsBulletList(const AText: string; AIsHTML: Boolean): string;
+var
+  Lines, OutLines: TStringList;
+  i: Integer;
+  CurLine, CleanItem, LowLine: string;
+  HasTrailingNL: Boolean;
+begin
+  if AText = '' then
+  begin
+    Result := '';
+    Exit;
+  end;
+
+  HasTrailingNL := (Length(AText) > 0) and ((AText[Length(AText)] = #10) or (AText[Length(AText)] = #13));
+  Lines := TStringList.Create;
+  OutLines := TStringList.Create;
+  try
+    Lines.Text := AText;
+
+    if AIsHTML then
+    begin
+      OutLines.Add('<ul>');
+      for i := 0 to Lines.Count - 1 do
+      begin
+        CurLine := Lines[i];
+        if Trim(CurLine) = '' then
+          Continue;
+        LowLine := LowerCase(Trim(CurLine));
+        if (LowLine = '<ol>') or (LowLine = '</ol>') or
+           (LowLine = '<ul>') or (LowLine = '</ul>') then
+          Continue;
+        CleanItem := StripListMarker(CurLine);
+        OutLines.Add('  <li>' + CleanItem + '</li>');
+      end;
+      OutLines.Add('</ul>');
+    end
+    else
+    begin
+      for i := 0 to Lines.Count - 1 do
+      begin
+        CurLine := Lines[i];
+        if Trim(CurLine) = '' then
+          OutLines.Add(CurLine)
+        else
+        begin
+          CleanItem := StripListMarker(CurLine);
+          OutLines.Add('• ' + CleanItem);
+        end;
+      end;
+    end;
+
+    Result := OutLines.Text;
+    if (not HasTrailingNL) and (Length(Result) >= Length(LineEnding)) and
+       (Copy(Result, Length(Result) - Length(LineEnding) + 1, Length(LineEnding)) = LineEnding) then
+    begin
+      SetLength(Result, Length(Result) - Length(LineEnding));
+    end;
+  finally
+    Lines.Free;
+    OutLines.Free;
+  end;
+end;
+
+procedure TfrmMain.ApplyListFormatting(ANumbered: Boolean);
+var
+  TargetText, FormattedText: string;
+  HasSelection: Boolean;
+begin
+  HasSelection := (SynEdit1.SelText <> '');
+  if HasSelection then
+    TargetText := SynEdit1.SelText
+  else
+    TargetText := SynEdit1.Text;
+
+  if Trim(TargetText) = '' then Exit;
+
+  if ANumbered then
+    FormattedText := FormatAsNumberedList(TargetText, cbFormatHTML.Checked)
+  else
+    FormattedText := FormatAsBulletList(TargetText, cbFormatHTML.Checked);
+
+  if HasSelection then
+  begin
+    SynEdit1.SelText := FormattedText;
+  end
+  else
+  begin
+    SynEdit1.Lines.BeginUpdate;
+    try
+      SynEdit1.SelectAll;
+      SynEdit1.SelText := FormattedText;
+      SynEdit1.CaretX := 1;
+      SynEdit1.CaretY := 1;
+    finally
+      SynEdit1.Lines.EndUpdate;
+    end;
+  end;
+end;
+
+procedure TfrmMain.cbFormatHTMLClick(Sender: TObject);
+begin
+  btnFormatBullet.Visible := cbFormatHTML.Checked;
+  if Assigned(miFormatBullet) then
+    miFormatBullet.Visible := cbFormatHTML.Checked;
+  if Assigned(miFormatHTML) then
+    miFormatHTML.Checked := cbFormatHTML.Checked;
+  if not FLoadingSettings then
+    SaveAllOptions;
+end;
+
+procedure TfrmMain.btnFormatNumberedClick(Sender: TObject);
+begin
+  ApplyListFormatting(True);
+end;
+
+procedure TfrmMain.btnFormatBulletClick(Sender: TObject);
+begin
+  ApplyListFormatting(False);
+end;
+
+procedure TfrmMain.miFormatHTMLClick(Sender: TObject);
+begin
+  cbFormatHTML.Checked := not cbFormatHTML.Checked;
+  cbFormatHTMLClick(cbFormatHTML);
 end;
 
 procedure TfrmMain.SynEdit1Paste(Sender: TObject; var AText: String;
@@ -4417,6 +4733,10 @@ begin
   miNotepadSaveAs.Enabled := btnSaveAs.Enabled;
   if Assigned(miNotepadClose) and Assigned(btnCloseFile) then
     miNotepadClose.Enabled := btnCloseFile.Enabled;
+  if Assigned(miFormatBullet) and Assigned(cbFormatHTML) then
+    miFormatBullet.Visible := cbFormatHTML.Checked;
+  if Assigned(miFormatHTML) and Assigned(cbFormatHTML) then
+    miFormatHTML.Checked := cbFormatHTML.Checked;
 end;
 
 procedure TfrmMain.miCutClick(Sender: TObject);
@@ -5252,6 +5572,7 @@ begin
   mmoAboutFeatures.Lines.Add('5. NOTEPAD REPLACEMENT:');
   mmoAboutFeatures.Lines.Add('   - Tabbed editor powered by TSynEdit with dirty tracking.');
   mmoAboutFeatures.Lines.Add('   - Replace AI Tells option: automatically converts em-dashes to hyphens, curly quotes to straight quotes, and curly apostrophes to straight ones on open and paste.');
+  mmoAboutFeatures.Lines.Add('   - Text Formatting: Numbered list and HTML list (<ol>, <ul>) support, applicable to selection or whole document.');
   mmoAboutFeatures.Lines.Add('   - Dedicated custom Markdown highlighter (headers, code blocks, lists, links).');
   mmoAboutFeatures.Lines.Add('   - 20 highlighters: Pascal, Python, JS/TS/JSON, HTML, XML/SVG, CSS, PHP, C/C++/C#, Java, SQL, Batch, INI/Config, Shell, Perl, VB, Diff, TeX, LFM, PO, Markdown.');
   mmoAboutFeatures.Lines.Add('   - Slide-down Find & Replace bar with regex, match case, and whole words.');
