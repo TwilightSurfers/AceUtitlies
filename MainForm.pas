@@ -13,6 +13,7 @@ uses
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
   SynHighlighterTeX, SynHighlighterLFM, SynHighlighterPo,
+  SynGutter, SynGutterBase, SynGutterLineNumber, SynGutterCodeFolding,
   LConvEncoding, LazUTF8, LCLType,
   ImgList, LCLIntf, SynHighlighterMarkdown, LMessages;
 
@@ -519,6 +520,7 @@ type
     // Dark Mode State
     FDarkMode: Boolean;
     FAllowClose: Boolean;
+    FCheckBoxLabels: array of TLabel;
 
     // Highlighters
     FHighlighterPas: TSynPasSyn;
@@ -582,6 +584,8 @@ type
     procedure ApplyTheme(ADark: Boolean);
     procedure SetWindowsTitleBarDark(AForm: TForm; ADark: Boolean);
     function DetectWindowsDarkMode: Boolean;
+    procedure EnsureCheckBoxLabels;
+    procedure LinkedLabelClick(Sender: TObject);
 
     // Config & Shell Helpers
     function GetIniPath: string;
@@ -824,6 +828,7 @@ begin
     try
       // General Options
       UserPrefersDark := Ini.ReadBool('General', 'DarkMode', DetectWindowsDarkMode);
+      FDarkMode := UserPrefersDark;
       cbRunInTray.Checked := Ini.ReadBool('General', 'RunInTray', False);
       FTabStyle := Ini.ReadInteger('General', 'TabStyle', 0);
       FHighlightActiveTab := Ini.ReadBool('General', 'HighlightActiveTab', True);
@@ -927,6 +932,7 @@ procedure TfrmMain.SaveAllOptions;
 var
   Ini: TIniFile;
 begin
+  if FLoadingSettings then Exit;
   Ini := TIniFile.Create(GetIniPath);
   try
     // General Options
@@ -1150,6 +1156,8 @@ begin
   AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
   AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
   {$ENDIF}
+
+  ApplyTheme(FDarkMode);
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -1739,9 +1747,241 @@ begin
   {$ENDIF}
 end;
 
+{$IFDEF WINDOWS}
+function SafeSetWindowTheme(hwnd: HWND; pszSubAppName: LPCWSTR; pszSubIdList: LPCWSTR): HRESULT;
+type
+  TSetWindowThemeProc = function(hwnd: HWND; pszSubAppName: LPCWSTR; pszSubIdList: LPCWSTR): HRESULT; stdcall;
+var
+  hUx: HMODULE;
+  pFunc: TSetWindowThemeProc;
+begin
+  Result := S_FALSE;
+  hUx := GetModuleHandle('uxtheme.dll');
+  if hUx = 0 then
+    hUx := LoadLibrary('uxtheme.dll');
+  if hUx <> 0 then
+  begin
+    pFunc := TSetWindowThemeProc(GetProcAddress(hUx, 'SetWindowTheme'));
+    if Assigned(pFunc) then
+      Result := pFunc(hwnd, pszSubAppName, pszSubIdList);
+  end;
+end;
+
+procedure SafeApplyUxThemeDarkMode(hwnd: HWND; ADark: Boolean);
+type
+  TSetPreferredAppMode = function(appMode: Integer): Integer; stdcall;
+  TAllowDarkModeForWindow = function(hwnd: HWND; allow: BOOL): BOOL; stdcall;
+  TFlushMenuThemes = procedure; stdcall;
+var
+  hUx: HMODULE;
+  SetAppMode: TSetPreferredAppMode;
+  AllowDarkWnd: TAllowDarkModeForWindow;
+  FlushMenus: TFlushMenuThemes;
+begin
+  hUx := GetModuleHandle('uxtheme.dll');
+  if hUx = 0 then
+    hUx := LoadLibrary('uxtheme.dll');
+  if hUx <> 0 then
+  begin
+    SetAppMode := TSetPreferredAppMode(GetProcAddress(hUx, MAKEINTRESOURCE(135)));
+    if Assigned(SetAppMode) then
+    begin
+      if ADark then
+        SetAppMode(2) // ForceDark
+      else
+        SetAppMode(0); // Default
+    end;
+
+    AllowDarkWnd := TAllowDarkModeForWindow(GetProcAddress(hUx, MAKEINTRESOURCE(133)));
+    if Assigned(AllowDarkWnd) and (hwnd <> 0) then
+      AllowDarkWnd(hwnd, ADark);
+
+    FlushMenus := TFlushMenuThemes(GetProcAddress(hUx, MAKEINTRESOURCE(136)));
+    if Assigned(FlushMenus) then
+      FlushMenus();
+  end;
+end;
+{$ENDIF}
+
+procedure ApplyCheckBoxTheme(ACB: TCheckBox; ADark: Boolean; APanelColor, ATextColor: TColor);
+begin
+  if ACB = nil then Exit;
+  ACB.ParentColor := False;
+  ACB.ParentFont := False;
+  ACB.Color := APanelColor;
+  ACB.Font.Color := ATextColor;
+  {$IFDEF WINDOWS}
+  if ACB.HandleAllocated then
+  begin
+    if ADark then
+      SafeSetWindowTheme(ACB.Handle, 'DarkMode_Explorer', nil)
+    else
+      SafeSetWindowTheme(ACB.Handle, nil, nil);
+  end;
+  {$ENDIF}
+end;
+
+procedure ApplyLabelTheme(ALbl: TLabel; ATextColor: TColor);
+begin
+  if ALbl = nil then Exit;
+  ALbl.ParentFont := False;
+  ALbl.Font.Color := ATextColor;
+end;
+
+procedure TfrmMain.LinkedLabelClick(Sender: TObject);
+var
+  CB: TCheckBox;
+begin
+  if (Sender is TLabel) and (TLabel(Sender).Tag <> 0) then
+  begin
+    CB := TCheckBox(Pointer(TLabel(Sender).Tag));
+    if Assigned(CB) and CB.Enabled then
+    begin
+      CB.Checked := not CB.Checked;
+      if CB.CanFocus then
+        CB.SetFocus;
+    end;
+  end;
+end;
+
+procedure TfrmMain.EnsureCheckBoxLabels;
+  procedure AttachLabel(ACB: TCheckBox);
+  var
+    Lbl: TLabel;
+    OrigLeft: Integer;
+    OrigAnchors: TAnchors;
+  begin
+    if ACB = nil then Exit;
+    if ACB.Tag = 9999 then Exit; // already attached
+    if ACB.Caption = '' then Exit;
+
+    OrigLeft := ACB.Left;
+    OrigAnchors := ACB.Anchors;
+
+    Lbl := TLabel.Create(Self);
+    Lbl.Parent := ACB.Parent;
+    Lbl.Caption := ACB.Caption;
+    Lbl.Font.Assign(ACB.Font);
+    Lbl.ParentFont := False;
+    Lbl.Cursor := crDefault;
+    Lbl.Layout := tlCenter;
+    Lbl.AutoSize := True;
+    Lbl.Tag := PtrInt(Pointer(ACB));
+    Lbl.OnClick := @LinkedLabelClick;
+    Lbl.OnDblClick := @LinkedLabelClick;
+
+    // Temporarily anchor top-left so changing Width does not shift Left when akRight is present
+    ACB.Anchors := [akTop, akLeft];
+    ACB.Caption := '';
+    ACB.Width := 18;
+    ACB.Left := OrigLeft;
+    ACB.Anchors := OrigAnchors;
+
+    Lbl.AnchorSide[akLeft].Control := ACB;
+    Lbl.AnchorSide[akLeft].Side := asrRight;
+    Lbl.BorderSpacing.Left := 4;
+    Lbl.AnchorSide[akTop].Control := ACB;
+    Lbl.AnchorSide[akTop].Side := asrCenter;
+    Lbl.Anchors := [akTop, akLeft];
+
+    SetLength(FCheckBoxLabels, Length(FCheckBoxLabels) + 1);
+    FCheckBoxLabels[High(FCheckBoxLabels)] := Lbl;
+
+    ACB.Tag := 9999;
+  end;
+begin
+  AttachLabel(cbSubfolders);
+  AttachLabel(cbCaseSensitive);
+  AttachLabel(cbIncludeFolders);
+  AttachLabel(cbEnablePreview);
+  AttachLabel(cbExpPreviewAlways);
+  AttachLabel(cbRunInTray);
+  AttachLabel(cbWordWrap);
+  AttachLabel(cbReplaceAITells);
+  AttachLabel(cbFormatHTML);
+  AttachLabel(cbMatchCase);
+  AttachLabel(cbWholeWord);
+end;
+
+procedure ApplySynEditGutterTheme(ASynEdit: TSynEdit; ADark: Boolean; AGutterBg: TColor);
+var
+  i: Integer;
+  LineNumCol, ActiveLineNumCol: TColor;
+  LinePart: TSynGutterLineNumber;
+  SepPart: TSynGutterSeparator;
+  FoldPart: TSynGutterCodeFolding;
+begin
+  if ASynEdit = nil then Exit;
+
+  if ADark then
+  begin
+    LineNumCol := $00858585;        // Clean, readable muted slate-gray for line numbers (VS Code style)
+    ActiveLineNumCol := $00FFFFFF;  // Bright crisp white for current active line number
+  end
+  else
+  begin
+    LineNumCol := $00707070;        // Readable neutral gray for line numbers
+    ActiveLineNumCol := $00000000;  // Solid black for current active line number
+  end;
+
+  ASynEdit.Gutter.Color := AGutterBg;
+
+  // Update background of all gutter parts (Marks, Changes, LineNumber, Separator, CodeFolding)
+  // so the entire gutter surface follows the dark/light palette instead of staying clBtnFace
+  for i := 0 to ASynEdit.Gutter.Parts.Count - 1 do
+  begin
+    if ASynEdit.Gutter.Parts[i] <> nil then
+      ASynEdit.Gutter.Parts[i].MarkupInfo.Background := AGutterBg;
+  end;
+
+  // Explicitly configure line number part colors for crystal clarity in both modes
+  LinePart := ASynEdit.Gutter.LineNumberPart;
+  if LinePart <> nil then
+  begin
+    LinePart.MarkupInfo.Background := AGutterBg;
+    LinePart.MarkupInfo.Foreground := LineNumCol;
+    LinePart.MarkupInfoCurrentLine.Background := AGutterBg;
+    LinePart.MarkupInfoCurrentLine.Foreground := ActiveLineNumCol;
+  end;
+
+  // Configure separator line between gutter and editor canvas
+  SepPart := ASynEdit.Gutter.SeparatorPart;
+  if SepPart <> nil then
+  begin
+    SepPart.MarkupInfo.Background := AGutterBg;
+    if ADark then
+      SepPart.MarkupInfo.Foreground := $003C3834
+    else
+      SepPart.MarkupInfo.Foreground := clBtnShadow;
+  end;
+
+  // Configure code folding markers to remain visible against the gutter background
+  FoldPart := ASynEdit.Gutter.CodeFoldPart;
+  if FoldPart <> nil then
+  begin
+    FoldPart.MarkupInfo.Background := AGutterBg;
+    if ADark then
+      FoldPart.MarkupInfo.Foreground := $00858585
+    else
+      FoldPart.MarkupInfo.Foreground := clGrayText;
+  end;
+
+  // Keep right gutter synchronized if ever enabled
+  ASynEdit.RightGutter.Color := AGutterBg;
+  for i := 0 to ASynEdit.RightGutter.Parts.Count - 1 do
+  begin
+    if ASynEdit.RightGutter.Parts[i] <> nil then
+      ASynEdit.RightGutter.Parts[i].MarkupInfo.Background := AGutterBg;
+  end;
+
+  ASynEdit.InvalidateGutter;
+  ASynEdit.Repaint;
+end;
+
 procedure TfrmMain.ApplyTheme(ADark: Boolean);
 var
   BgColor, PanelColor, EditBg, TextColor, GutterBg, HeaderBg: TColor;
+  i: Integer;
 begin
   FDarkMode := ADark;
 
@@ -1770,93 +2010,165 @@ begin
     btnToggleDarkMode.Caption := '☀️ Dark Mode: OFF';
   end;
 
-  // Window Title Bar
+  // Window Title Bar & UxTheme Dark Mode
   SetWindowsTitleBarDark(Self, ADark);
+  {$IFDEF WINDOWS}
+  if HandleAllocated then
+    SafeApplyUxThemeDarkMode(Handle, ADark);
+  {$ENDIF}
 
   // Form & Panels
   Color := BgColor;
+  Self.Font.Color := TextColor;
+
   pnlHeader.Color := HeaderBg;
-  lblAppTitle.Font.Color := TextColor;
+  pnlHeader.Font.Color := TextColor;
+  ApplyLabelTheme(lblAppTitle, TextColor);
 
   pnlSearchTop.Color := PanelColor;
+  pnlSearchTop.Font.Color := TextColor;
   pnlSearchProgress.Color := PanelColor;
+  pnlSearchProgress.Font.Color := TextColor;
   pnlSearchBody.Color := PanelColor;
+  pnlSearchBody.Font.Color := TextColor;
   pnlLeft.Color := PanelColor;
+  pnlLeft.Font.Color := TextColor;
   pnlLeftHeader.Color := HeaderBg;
+  pnlLeftHeader.Font.Color := TextColor;
   pnlRight.Color := PanelColor;
+  pnlRight.Font.Color := TextColor;
   pnlNotepadToolbar.Color := HeaderBg;
+  pnlNotepadToolbar.Font.Color := TextColor;
   pnlFindReplace.Color := PanelColor;
+  pnlFindReplace.Font.Color := TextColor;
   pnlEditorHeader.Color := HeaderBg;
+  pnlEditorHeader.Font.Color := TextColor;
   pnlNotepadStatus.Color := HeaderBg;
+  pnlNotepadStatus.Font.Color := TextColor;
+
+  // Splitters
+  splMain.Color := PanelColor;
+  splMemPreview.Color := PanelColor;
+  splMemoryNotes.Color := PanelColor;
+  splExplorer.Color := PanelColor;
+
+  // TabSheets & PageControls
+  PageControl1.Font.Color := TextColor;
+  pcAboutInfo.Font.Color := TextColor;
+  tabSearch.Color := PanelColor;
+  tabNotepad.Color := PanelColor;
+  tabMemory.Color := PanelColor;
+  tabContextMenu.Color := PanelColor;
+  tabExplorer.Color := PanelColor;
+  tabAbout.Color := PanelColor;
+  tabAboutFeatures.Color := PanelColor;
+  tabAboutBuildLog.Color := PanelColor;
+  tabAboutLicense.Color := PanelColor;
+
+  // Global Status Bar
+  StatusBar1.Color := HeaderBg;
+  StatusBar1.Font.Color := TextColor;
+  {$IFDEF WINDOWS}
+  if StatusBar1.HandleAllocated then
+  begin
+    if ADark then
+      SafeSetWindowTheme(StatusBar1.Handle, ' ', ' ')
+    else
+      SafeSetWindowTheme(StatusBar1.Handle, nil, nil);
+  end;
+  {$ENDIF}
+  StatusBar1.Invalidate;
 
   // Memory & Notes Tab
   pnlMemoryTop.Color := HeaderBg;
+  pnlMemoryTop.Font.Color := TextColor;
   pnlMemoryClient.Color := PanelColor;
+  pnlMemoryClient.Font.Color := TextColor;
   pnlMemoryLeft.Color := PanelColor;
+  pnlMemoryLeft.Font.Color := TextColor;
   pnlMemListHeader.Color := HeaderBg;
+  pnlMemListHeader.Font.Color := TextColor;
   pnlMemPreview.Color := PanelColor;
+  pnlMemPreview.Font.Color := TextColor;
   pnlMemPreviewHeader.Color := HeaderBg;
+  pnlMemPreviewHeader.Font.Color := TextColor;
   pnlMemoryRight.Color := PanelColor;
+  pnlMemoryRight.Font.Color := TextColor;
   pnlNotesHeader.Color := HeaderBg;
+  pnlNotesHeader.Font.Color := TextColor;
   pnlNotesInfo.Color := PanelColor;
+  pnlNotesInfo.Font.Color := TextColor;
   lvMemory.Color := EditBg;
   lvMemory.Font.Color := TextColor;
   mmoMemPreview.Color := EditBg;
   mmoMemPreview.Font.Color := TextColor;
   mmoQuickNotes.Color := EditBg;
   mmoQuickNotes.Font.Color := TextColor;
-  lblMemoryManager.Font.Color := TextColor;
-  lblMemListTitle.Font.Color := TextColor;
-  lblMemPreviewTitle.Font.Color := TextColor;
-  lblNotesTitle.Font.Color := TextColor;
+  cmbMemoryLimit.Color := EditBg;
+  cmbMemoryLimit.Font.Color := TextColor;
+
+  ApplyLabelTheme(lblMemoryManager, TextColor);
+  ApplyLabelTheme(lblMemListTitle, TextColor);
+  ApplyLabelTheme(lblMemPreviewTitle, TextColor);
+  ApplyLabelTheme(lblNotesTitle, TextColor);
+
   if ADark then
   begin
-    lblMemCount.Font.Color := $00A0A0A0;
-    lblMemPreviewInfo.Font.Color := $00A0A0A0;
-    lblNotesStatus.Font.Color := $00A0A0A0;
-    lblNotesStats.Font.Color := $00A0A0A0;
+    ApplyLabelTheme(lblMemCount, $00A0A0A0);
+    ApplyLabelTheme(lblMemPreviewInfo, $00A0A0A0);
+    ApplyLabelTheme(lblNotesStatus, $00A0A0A0);
+    ApplyLabelTheme(lblNotesStats, $00A0A0A0);
     if FMemoryLimit > 0 then
-      lblMemoryBadge.Font.Color := $0034D399
+      ApplyLabelTheme(lblMemoryBadge, $0034D399)
     else
-      lblMemoryBadge.Font.Color := $00808080;
+      ApplyLabelTheme(lblMemoryBadge, $00808080);
   end
   else
   begin
-    lblMemCount.Font.Color := clGray;
-    lblMemPreviewInfo.Font.Color := clGray;
-    lblNotesStatus.Font.Color := clGray;
-    lblNotesStats.Font.Color := clGray;
+    ApplyLabelTheme(lblMemCount, clGray);
+    ApplyLabelTheme(lblMemPreviewInfo, clGray);
+    ApplyLabelTheme(lblNotesStatus, clGray);
+    ApplyLabelTheme(lblNotesStats, clGray);
     if FMemoryLimit > 0 then
-      lblMemoryBadge.Font.Color := $00059669
+      ApplyLabelTheme(lblMemoryBadge, $00059669)
     else
-      lblMemoryBadge.Font.Color := clGray;
+      ApplyLabelTheme(lblMemoryBadge, clGray);
   end;
 
   // Context Menu Management Tab
   pnlContextMenuToolbar.Color := HeaderBg;
+  pnlContextMenuToolbar.Font.Color := TextColor;
   pnlContextMenuBottom.Color := HeaderBg;
+  pnlContextMenuBottom.Font.Color := TextColor;
   lvContextMenu.Color := EditBg;
   lvContextMenu.Font.Color := TextColor;
   edtEditVerbLabel.Color := EditBg;
   edtEditVerbLabel.Font.Color := TextColor;
   edtEditVerbCmd.Color := EditBg;
   edtEditVerbCmd.Font.Color := TextColor;
-  lblContextMenuStatus.Font.Color := TextColor;
-  lblEditVerbLabel.Font.Color := TextColor;
-  lblEditVerbCmd.Font.Color := TextColor;
+  ApplyLabelTheme(lblContextMenuStatus, TextColor);
+  ApplyLabelTheme(lblEditVerbLabel, TextColor);
+  ApplyLabelTheme(lblEditVerbCmd, TextColor);
   if ADark then
-    lblRemapHelp.Font.Color := $00A0A0A0
+    ApplyLabelTheme(lblRemapHelp, $00A0A0A0)
   else
-    lblRemapHelp.Font.Color := clGray;
+    ApplyLabelTheme(lblRemapHelp, clGray);
 
   // About Tab
   pnlAboutHeader.Color := HeaderBg;
+  pnlAboutHeader.Font.Color := TextColor;
   pnlAboutLinks.Color := HeaderBg;
+  pnlAboutLinks.Font.Color := TextColor;
   pnlLinkWeb.Color := PanelColor;
+  pnlLinkWeb.Font.Color := TextColor;
   pnlLinkFavAmp.Color := PanelColor;
+  pnlLinkFavAmp.Font.Color := TextColor;
   pnlLinkRankGalactic.Color := PanelColor;
+  pnlLinkRankGalactic.Font.Color := TextColor;
   pnlLinkX.Color := PanelColor;
+  pnlLinkX.Font.Color := TextColor;
   pnlLinkGithub.Color := PanelColor;
+  pnlLinkGithub.Font.Color := TextColor;
 
   if ADark then
   begin
@@ -1866,13 +2178,13 @@ begin
     pnlImgContainerX.Color := $002E2E2E;
     pnlImgContainerGithub.Color := $002E2E2E;
 
-    lblAboutSubtitle.Font.Color := $00C0C0C0;
-    lblAboutAuthor.Font.Color := $00A0A0A0;
-    lblLinkWebUrl.Font.Color := $00FFB060;
-    lblLinkFavAmpUrl.Font.Color := $00FFB060;
-    lblLinkRankGalacticUrl.Font.Color := $00FFB060;
-    lblLinkXUrl.Font.Color := $00FFB060;
-    lblLinkGithubUrl.Font.Color := $00FFB060;
+    ApplyLabelTheme(lblAboutSubtitle, $00C0C0C0);
+    ApplyLabelTheme(lblAboutAuthor, $00A0A0A0);
+    ApplyLabelTheme(lblLinkWebUrl, $00FFB060);
+    ApplyLabelTheme(lblLinkFavAmpUrl, $00FFB060);
+    ApplyLabelTheme(lblLinkRankGalacticUrl, $00FFB060);
+    ApplyLabelTheme(lblLinkXUrl, $00FFB060);
+    ApplyLabelTheme(lblLinkGithubUrl, $00FFB060);
   end
   else
   begin
@@ -1882,21 +2194,21 @@ begin
     pnlImgContainerX.Color := $00E8E8E8;
     pnlImgContainerGithub.Color := $00E8E8E8;
 
-    lblAboutSubtitle.Font.Color := clGray;
-    lblAboutAuthor.Font.Color := clGray;
-    lblLinkWebUrl.Font.Color := clHighlight;
-    lblLinkFavAmpUrl.Font.Color := clHighlight;
-    lblLinkRankGalacticUrl.Font.Color := clHighlight;
-    lblLinkXUrl.Font.Color := clHighlight;
-    lblLinkGithubUrl.Font.Color := clHighlight;
+    ApplyLabelTheme(lblAboutSubtitle, clGray);
+    ApplyLabelTheme(lblAboutAuthor, clGray);
+    ApplyLabelTheme(lblLinkWebUrl, clHighlight);
+    ApplyLabelTheme(lblLinkFavAmpUrl, clHighlight);
+    ApplyLabelTheme(lblLinkRankGalacticUrl, clHighlight);
+    ApplyLabelTheme(lblLinkXUrl, clHighlight);
+    ApplyLabelTheme(lblLinkGithubUrl, clHighlight);
   end;
 
-  lblAboutTitle.Font.Color := TextColor;
-  lblLinkWebTitle.Font.Color := TextColor;
-  lblLinkFavAmpTitle.Font.Color := TextColor;
-  lblLinkRankGalacticTitle.Font.Color := TextColor;
-  lblLinkXTitle.Font.Color := TextColor;
-  lblLinkGithubTitle.Font.Color := TextColor;
+  ApplyLabelTheme(lblAboutTitle, TextColor);
+  ApplyLabelTheme(lblLinkWebTitle, TextColor);
+  ApplyLabelTheme(lblLinkFavAmpTitle, TextColor);
+  ApplyLabelTheme(lblLinkRankGalacticTitle, TextColor);
+  ApplyLabelTheme(lblLinkXTitle, TextColor);
+  ApplyLabelTheme(lblLinkGithubTitle, TextColor);
   mmoAboutFeatures.Color := EditBg;
   mmoAboutFeatures.Font.Color := TextColor;
   mmoAboutBuildLog.Color := EditBg;
@@ -1906,29 +2218,36 @@ begin
 
   // The Real Explorer Tab
   pnlExplorerTop.Color := HeaderBg;
+  pnlExplorerTop.Font.Color := TextColor;
   pnlExplorerNav.Color := HeaderBg;
+  pnlExplorerNav.Font.Color := TextColor;
   pnlExpQuickBar.Color := PanelColor;
-  lblExpQuick.Font.Color := TextColor;
+  pnlExpQuickBar.Font.Color := TextColor;
+  ApplyLabelTheme(lblExpQuick, TextColor);
   edtExpPath.Color := EditBg;
   edtExpPath.Font.Color := TextColor;
+  pnlExpBody.Color := PanelColor;
+  pnlExpBody.Font.Color := TextColor;
   pnlExpLeft.Color := PanelColor;
+  pnlExpLeft.Font.Color := TextColor;
   pnlExpRight.Color := PanelColor;
+  pnlExpRight.Font.Color := TextColor;
   ShellTreeViewExplorer.Color := EditBg;
   ShellTreeViewExplorer.Font.Color := TextColor;
   ShellListViewExplorer.Color := EditBg;
   ShellListViewExplorer.Font.Color := TextColor;
 
-  // Labels
-  lblPattern.Font.Color := TextColor;
-  lblSearchIn.Font.Color := TextColor;
-  lblContent.Font.Color := TextColor;
-  lblActivity.Font.Color := TextColor;
-  lblFolders.Font.Color := TextColor;
-  lblSyntax.Font.Color := TextColor;
-  lblCurrentFile.Font.Color := TextColor;
-  lblFindText.Font.Color := TextColor;
-  lblReplaceText.Font.Color := TextColor;
-  lblNotepadStatus.Font.Color := TextColor;
+  // Search & Notepad Labels
+  ApplyLabelTheme(lblPattern, TextColor);
+  ApplyLabelTheme(lblSearchIn, TextColor);
+  ApplyLabelTheme(lblContent, TextColor);
+  ApplyLabelTheme(lblActivity, TextColor);
+  ApplyLabelTheme(lblFolders, TextColor);
+  ApplyLabelTheme(lblSyntax, TextColor);
+  ApplyLabelTheme(lblCurrentFile, TextColor);
+  ApplyLabelTheme(lblFindText, TextColor);
+  ApplyLabelTheme(lblReplaceText, TextColor);
+  ApplyLabelTheme(lblNotepadStatus, TextColor);
 
   // Edits
   edtPattern.Color := EditBg;
@@ -1942,21 +2261,26 @@ begin
   edtReplaceText.Color := EditBg;
   edtReplaceText.Font.Color := TextColor;
 
-  // Checkboxes
-  cbSubfolders.Font.Color := TextColor;
-  cbCaseSensitive.Font.Color := TextColor;
-  cbIncludeFolders.Font.Color := TextColor;
-  cbEnablePreview.Font.Color := TextColor;
-  if Assigned(cbExpPreviewAlways) then
-    cbExpPreviewAlways.Font.Color := TextColor;
-  cbRunInTray.Font.Color := TextColor;
-  cbWordWrap.Font.Color := TextColor;
-  if Assigned(cbReplaceAITells) then
-    cbReplaceAITells.Font.Color := TextColor;
-  if Assigned(cbFormatHTML) then
-    cbFormatHTML.Font.Color := TextColor;
-  cbMatchCase.Font.Color := TextColor;
-  cbWholeWord.Font.Color := TextColor;
+  // ComboBoxes
+  cmbSyntax.Color := EditBg;
+  cmbSyntax.Font.Color := TextColor;
+
+  // Checkboxes (Ensure dedicated high-contrast labels and dark background)
+  EnsureCheckBoxLabels;
+  for i := 0 to High(FCheckBoxLabels) do
+    ApplyLabelTheme(FCheckBoxLabels[i], TextColor);
+
+  ApplyCheckBoxTheme(cbSubfolders, ADark, PanelColor, TextColor);
+  ApplyCheckBoxTheme(cbCaseSensitive, ADark, PanelColor, TextColor);
+  ApplyCheckBoxTheme(cbIncludeFolders, ADark, PanelColor, TextColor);
+  ApplyCheckBoxTheme(cbEnablePreview, ADark, PanelColor, TextColor);
+  ApplyCheckBoxTheme(cbExpPreviewAlways, ADark, PanelColor, TextColor);
+  ApplyCheckBoxTheme(cbRunInTray, ADark, HeaderBg, TextColor);
+  ApplyCheckBoxTheme(cbWordWrap, ADark, HeaderBg, TextColor);
+  ApplyCheckBoxTheme(cbReplaceAITells, ADark, HeaderBg, TextColor);
+  ApplyCheckBoxTheme(cbFormatHTML, ADark, HeaderBg, TextColor);
+  ApplyCheckBoxTheme(cbMatchCase, ADark, PanelColor, TextColor);
+  ApplyCheckBoxTheme(cbWholeWord, ADark, PanelColor, TextColor);
 
   // TreeView & ListView
   ShellTreeView1.Color := EditBg;
@@ -1964,15 +2288,84 @@ begin
   lvResults.Color := EditBg;
   lvResults.Font.Color := TextColor;
 
+  {$IFDEF WINDOWS}
+  if ADark then
+  begin
+    if lvResults.HandleAllocated then
+    begin
+      SafeSetWindowTheme(lvResults.Handle, 'DarkMode_Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(lvResults.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
+    end;
+    if ShellListViewExplorer.HandleAllocated then
+    begin
+      SafeSetWindowTheme(ShellListViewExplorer.Handle, 'DarkMode_Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(ShellListViewExplorer.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
+    end;
+    if lvMemory.HandleAllocated then
+    begin
+      SafeSetWindowTheme(lvMemory.Handle, 'DarkMode_Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(lvMemory.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
+    end;
+    if lvContextMenu.HandleAllocated then
+    begin
+      SafeSetWindowTheme(lvContextMenu.Handle, 'DarkMode_Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(lvContextMenu.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
+    end;
+    if ShellTreeView1.HandleAllocated then
+      SafeSetWindowTheme(ShellTreeView1.Handle, 'DarkMode_Explorer', nil);
+    if ShellTreeViewExplorer.HandleAllocated then
+      SafeSetWindowTheme(ShellTreeViewExplorer.Handle, 'DarkMode_Explorer', nil);
+    if cmbSyntax.HandleAllocated then
+      SafeSetWindowTheme(cmbSyntax.Handle, 'DarkMode_CFD', nil);
+    if cmbMemoryLimit.HandleAllocated then
+      SafeSetWindowTheme(cmbMemoryLimit.Handle, 'DarkMode_CFD', nil);
+    if PageControl1.HandleAllocated then
+      SafeSetWindowTheme(PageControl1.Handle, 'DarkMode_Explorer', nil);
+  end
+  else
+  begin
+    if lvResults.HandleAllocated then
+    begin
+      SafeSetWindowTheme(lvResults.Handle, 'Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(lvResults.Handle, $101F, 0, 0)), 'Explorer', nil);
+    end;
+    if ShellListViewExplorer.HandleAllocated then
+    begin
+      SafeSetWindowTheme(ShellListViewExplorer.Handle, 'Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(ShellListViewExplorer.Handle, $101F, 0, 0)), 'Explorer', nil);
+    end;
+    if lvMemory.HandleAllocated then
+    begin
+      SafeSetWindowTheme(lvMemory.Handle, 'Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(lvMemory.Handle, $101F, 0, 0)), 'Explorer', nil);
+    end;
+    if lvContextMenu.HandleAllocated then
+    begin
+      SafeSetWindowTheme(lvContextMenu.Handle, 'Explorer', nil);
+      SafeSetWindowTheme(HWND(SendMessage(lvContextMenu.Handle, $101F, 0, 0)), 'Explorer', nil);
+    end;
+    if ShellTreeView1.HandleAllocated then
+      SafeSetWindowTheme(ShellTreeView1.Handle, 'Explorer', nil);
+    if ShellTreeViewExplorer.HandleAllocated then
+      SafeSetWindowTheme(ShellTreeViewExplorer.Handle, 'Explorer', nil);
+    if cmbSyntax.HandleAllocated then
+      SafeSetWindowTheme(cmbSyntax.Handle, nil, nil);
+    if cmbMemoryLimit.HandleAllocated then
+      SafeSetWindowTheme(cmbMemoryLimit.Handle, nil, nil);
+    if PageControl1.HandleAllocated then
+      SafeSetWindowTheme(PageControl1.Handle, nil, nil);
+  end;
+  {$ENDIF}
+
   // SynEdit
   SynEdit1.Color := EditBg;
   if FCustomFontColor <> clNone then
     SynEdit1.Font.Color := FCustomFontColor
   else
     SynEdit1.Font.Color := TextColor;
-  SynEdit1.Gutter.Color := GutterBg;
   SynEdit1.SelectedColor.Background := $006B4D2B;
   SynEdit1.SelectedColor.Foreground := clWhite;
+  ApplySynEditGutterTheme(SynEdit1, ADark, GutterBg);
 
   ApplyHighlighterTheme(ADark);
 
@@ -5596,12 +5989,15 @@ begin
   mmoAboutFeatures.Lines.Add('   - Embedded persistent Quick Notes scratchpad automatically saved across sessions.');
   mmoAboutFeatures.Lines.Add('   - Right-click context menu for quick copy, transfer to Notepad, and pinning to notes.');
 
-  lblAboutTitle.Caption := 'Ace''s Utilities  v1.4.1';
+  lblAboutTitle.Caption := 'Ace''s Utilities  v1.4.3';
 
   mmoAboutBuildLog.Lines.Clear;
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.4.3] - 2026-09-18');
+  mmoAboutBuildLog.Lines.Add('  * SynEdit Dark Mode Gutter & Line Numbers Fix: Resolved bug where SynEdit gutter parts retained default clBtnFace background and rendered line numbers invisible in dark mode. Synchronized gutter background, line numbers, current-line highlight, separators, and code-folding parts across Notepad and Live Preview.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.4.1] - 2026-09-07');
   mmoAboutBuildLog.Lines.Add('  * Notepad SynEdit Keystroke Invariant: Restored SynEdit keystroke table defaults via Keystrokes.ResetDefaults, resolving Backspace and navigation key swallowing caused by LCL streaming.');

@@ -1593,7 +1593,7 @@ object frmMain: TfrmMain
           Height = 25
           Top = 8
           Width = 320
-          Caption = 'Ace''s Utilities  v1.4.1'
+          Caption = 'Ace''s Utilities  v1.4.3'
           Font.Height = -19
           Font.Style = [fsBold]
           ParentFont = False

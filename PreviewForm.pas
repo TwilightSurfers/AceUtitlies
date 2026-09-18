@@ -13,6 +13,7 @@ uses
   SynHighlighterJava, SynHighlighterSQL, SynHighlighterBat, SynHighlighterIni,
   SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
   SynHighlighterTeX, SynHighlighterLFM, SynHighlighterPo,
+  SynGutter, SynGutterBase, SynGutterLineNumber, SynGutterCodeFolding,
   SynHighlighterMarkdown, LConvEncoding, LMessages;
 
 type
@@ -416,6 +417,125 @@ begin
   {$ENDIF}
 end;
 
+{$IFDEF WINDOWS}
+procedure SafeApplyUxThemeDarkMode(hwnd: HWND; ADark: Boolean);
+type
+  TSetPreferredAppMode = function(appMode: Integer): Integer; stdcall;
+  TAllowDarkModeForWindow = function(hwnd: HWND; allow: BOOL): BOOL; stdcall;
+  TFlushMenuThemes = procedure; stdcall;
+var
+  hUx: HMODULE;
+  SetAppMode: TSetPreferredAppMode;
+  AllowDarkWnd: TAllowDarkModeForWindow;
+  FlushMenus: TFlushMenuThemes;
+begin
+  hUx := GetModuleHandle('uxtheme.dll');
+  if hUx = 0 then
+    hUx := LoadLibrary('uxtheme.dll');
+  if hUx <> 0 then
+  begin
+    SetAppMode := TSetPreferredAppMode(GetProcAddress(hUx, MAKEINTRESOURCE(135)));
+    if Assigned(SetAppMode) then
+    begin
+      if ADark then
+        SetAppMode(2) // ForceDark
+      else
+        SetAppMode(0); // Default
+    end;
+
+    AllowDarkWnd := TAllowDarkModeForWindow(GetProcAddress(hUx, MAKEINTRESOURCE(133)));
+    if Assigned(AllowDarkWnd) and (hwnd <> 0) then
+      AllowDarkWnd(hwnd, ADark);
+
+    FlushMenus := TFlushMenuThemes(GetProcAddress(hUx, MAKEINTRESOURCE(136)));
+    if Assigned(FlushMenus) then
+      FlushMenus();
+  end;
+end;
+{$ENDIF}
+
+procedure ApplyPreviewLabelTheme(ALbl: TLabel; ATextColor: TColor);
+begin
+  if ALbl = nil then Exit;
+  ALbl.ParentFont := False;
+  ALbl.Font.Color := ATextColor;
+end;
+
+procedure ApplySynEditGutterTheme(ASynEdit: TSynEdit; ADark: Boolean; AGutterBg: TColor);
+var
+  i: Integer;
+  LineNumCol, ActiveLineNumCol: TColor;
+  LinePart: TSynGutterLineNumber;
+  SepPart: TSynGutterSeparator;
+  FoldPart: TSynGutterCodeFolding;
+begin
+  if ASynEdit = nil then Exit;
+
+  if ADark then
+  begin
+    LineNumCol := $00858585;        // Clean, readable muted slate-gray for line numbers (VS Code style)
+    ActiveLineNumCol := $00FFFFFF;  // Bright crisp white for current active line number
+  end
+  else
+  begin
+    LineNumCol := $00707070;        // Readable neutral gray for line numbers
+    ActiveLineNumCol := $00000000;  // Solid black for current active line number
+  end;
+
+  ASynEdit.Gutter.Color := AGutterBg;
+
+  // Update background of all gutter parts (Marks, Changes, LineNumber, Separator, CodeFolding)
+  // so the entire gutter surface follows the dark/light palette instead of staying clBtnFace
+  for i := 0 to ASynEdit.Gutter.Parts.Count - 1 do
+  begin
+    if ASynEdit.Gutter.Parts[i] <> nil then
+      ASynEdit.Gutter.Parts[i].MarkupInfo.Background := AGutterBg;
+  end;
+
+  // Explicitly configure line number part colors for crystal clarity in both modes
+  LinePart := ASynEdit.Gutter.LineNumberPart;
+  if LinePart <> nil then
+  begin
+    LinePart.MarkupInfo.Background := AGutterBg;
+    LinePart.MarkupInfo.Foreground := LineNumCol;
+    LinePart.MarkupInfoCurrentLine.Background := AGutterBg;
+    LinePart.MarkupInfoCurrentLine.Foreground := ActiveLineNumCol;
+  end;
+
+  // Configure separator line between gutter and editor canvas
+  SepPart := ASynEdit.Gutter.SeparatorPart;
+  if SepPart <> nil then
+  begin
+    SepPart.MarkupInfo.Background := AGutterBg;
+    if ADark then
+      SepPart.MarkupInfo.Foreground := $003C3834
+    else
+      SepPart.MarkupInfo.Foreground := clBtnShadow;
+  end;
+
+  // Configure code folding markers to remain visible against the gutter background
+  FoldPart := ASynEdit.Gutter.CodeFoldPart;
+  if FoldPart <> nil then
+  begin
+    FoldPart.MarkupInfo.Background := AGutterBg;
+    if ADark then
+      FoldPart.MarkupInfo.Foreground := $00858585
+    else
+      FoldPart.MarkupInfo.Foreground := clGrayText;
+  end;
+
+  // Keep right gutter synchronized if ever enabled
+  ASynEdit.RightGutter.Color := AGutterBg;
+  for i := 0 to ASynEdit.RightGutter.Parts.Count - 1 do
+  begin
+    if ASynEdit.RightGutter.Parts[i] <> nil then
+      ASynEdit.RightGutter.Parts[i].MarkupInfo.Background := AGutterBg;
+  end;
+
+  ASynEdit.InvalidateGutter;
+  ASynEdit.Repaint;
+end;
+
 procedure TfrmPreview.ApplyTheme(ADark: Boolean);
 var
   BgColor, PanelColor, HeaderBg, EditBg, TextColor, GutterBg: TColor;
@@ -442,31 +562,41 @@ begin
   end;
 
   SetWindowsTitleBarDark(Self, ADark);
+  {$IFDEF WINDOWS}
+  if HandleAllocated then
+    SafeApplyUxThemeDarkMode(Handle, ADark);
+  {$ENDIF}
 
   Color := BgColor;
+  Self.Font.Color := TextColor;
+
   pnlTop.Color := HeaderBg;
-  lblFileName.Font.Color := TextColor;
-  lblFileMeta.Font.Color := TextColor;
+  pnlTop.Font.Color := TextColor;
+  ApplyPreviewLabelTheme(lblFileName, TextColor);
+  ApplyPreviewLabelTheme(lblFileMeta, TextColor);
 
   pnlContent.Color := PanelColor;
+  pnlContent.Font.Color := TextColor;
   pnlImage.Color := PanelColor;
-  lblImageDetails.Font.Color := TextColor;
+  pnlImage.Font.Color := TextColor;
+  ApplyPreviewLabelTheme(lblImageDetails, TextColor);
 
   pnlInfo.Color := PanelColor;
-  lblInfoName.Font.Color := TextColor;
-  lblInfoType.Font.Color := TextColor;
-  lblInfoSize.Font.Color := TextColor;
-  lblInfoModified.Font.Color := TextColor;
-  lblHexTitle.Font.Color := TextColor;
+  pnlInfo.Font.Color := TextColor;
+  ApplyPreviewLabelTheme(lblInfoName, TextColor);
+  ApplyPreviewLabelTheme(lblInfoType, TextColor);
+  ApplyPreviewLabelTheme(lblInfoSize, TextColor);
+  ApplyPreviewLabelTheme(lblInfoModified, TextColor);
+  ApplyPreviewLabelTheme(lblHexTitle, TextColor);
 
   memHex.Color := EditBg;
   memHex.Font.Color := TextColor;
 
   synPreview.Color := EditBg;
   synPreview.Font.Color := TextColor;
-  synPreview.Gutter.Color := GutterBg;
   synPreview.SelectedColor.Background := $006B4D2B;
   synPreview.SelectedColor.Foreground := clWhite;
+  ApplySynEditGutterTheme(synPreview, ADark, GutterBg);
 
   ApplyHighlighterTheme(ADark);
 end;

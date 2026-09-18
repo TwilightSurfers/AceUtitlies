@@ -234,3 +234,89 @@ When `KeyPreview = True` is enabled on the main form:
      Exit;
    ```
 4. **Focus Assurance**: Ensure `SynEdit1.SetFocus` is called on tab switches (`PageControl1Change`), `OpenFileInNotepad`, and `btnNewFileClick` so keyboard input is never directed into inactive containers.
+
+---
+
+## 11. SynEdit Gutter Theming & Dark Mode Invariants (`MainForm.pas` / `PreviewForm.pas`)
+
+### The `TSynGutterPartBase` Default Color Trap (CRITICAL)
+In Lazarus SynEdit (`syngutterbase.pp`), all gutter parts (`TSynGutterLineNumber`, `TSynGutterMarks`, `TSynGutterChanges`, `TSynGutterSeparator`, `TSynGutterCodeFolding`) inherit from `TSynGutterPartBase`:
+```pascal
+constructor TSynGutterPartBase.Create(AOwner: TComponent);
+begin
+  FMarkupInfo := TSynSelectedColor.Create;
+  FMarkupInfo.Background := clBtnFace;
+  FMarkupInfo.Foreground := clNone;
+  ...
+```
+- **The Symptom**: When switching to Dark Mode, assigning `SynEdit.Gutter.Color := GutterBg;` only tints the underlying gutter container canvas. When individual gutter parts paint (`TSynGutterLineNumber.Paint` and `TSynGutterPartBase.PaintBackground`), they explicitly draw opaque rectangles using `MarkupInfo.Background`. Because `MarkupInfo.Background` was initialized to `clBtnFace` (and is NOT `clNone`), the gutter parts remain bright button-face grey (`$00F0F0F0`), so the gutter never goes dark.
+- **The Invisible Line Numbers Issue**: Because `MarkupInfo.Foreground` is `clNone` by default, `TSynGutterLineNumber` falls back to `SynEdit.Font.Color`. In dark mode, `Font.Color` is set to light grey/white (`$00F0F0F0`). Consequently, white/light text was drawn on top of an un-darkened `clBtnFace` (`$00F0F0F0`) background—rendering line numbers completely invisible.
+- **The Rule**:
+  Always update all gutter parts and explicitly configure line number foreground and current line colors via a dedicated helper `ApplySynEditGutterTheme`:
+  ```pascal
+  procedure ApplySynEditGutterTheme(ASynEdit: TSynEdit; ADark: Boolean; AGutterBg: TColor);
+  var
+    i: Integer;
+    LineNumCol, ActiveLineNumCol: TColor;
+    LinePart: TSynGutterLineNumber;
+    SepPart: TSynGutterSeparator;
+    FoldPart: TSynGutterCodeFolding;
+  begin
+    if ASynEdit = nil then Exit;
+
+    if ADark then
+    begin
+      LineNumCol := $00858585;        // Clean readable muted slate-gray for line numbers (VS Code style)
+      ActiveLineNumCol := $00FFFFFF;  // Bright crisp white for active line number
+    end
+    else
+    begin
+      LineNumCol := $00707070;        // Readable neutral gray for line numbers
+      ActiveLineNumCol := $00000000;  // Solid black for active line number
+    end;
+
+    ASynEdit.Gutter.Color := AGutterBg;
+
+    // Update background of all gutter parts
+    for i := 0 to ASynEdit.Gutter.Parts.Count - 1 do
+      if ASynEdit.Gutter.Parts[i] <> nil then
+        ASynEdit.Gutter.Parts[i].MarkupInfo.Background := AGutterBg;
+
+    // Explicitly configure line numbers
+    LinePart := ASynEdit.Gutter.LineNumberPart;
+    if LinePart <> nil then
+    begin
+      LinePart.MarkupInfo.Background := AGutterBg;
+      LinePart.MarkupInfo.Foreground := LineNumCol;
+      LinePart.MarkupInfoCurrentLine.Background := AGutterBg;
+      LinePart.MarkupInfoCurrentLine.Foreground := ActiveLineNumCol;
+    end;
+
+    // Synchronize separator line and code folding markers
+    SepPart := ASynEdit.Gutter.SeparatorPart;
+    if SepPart <> nil then
+    begin
+      SepPart.MarkupInfo.Background := AGutterBg;
+      if ADark then SepPart.MarkupInfo.Foreground := $003C3834
+      else SepPart.MarkupInfo.Foreground := clBtnShadow;
+    end;
+
+    FoldPart := ASynEdit.Gutter.CodeFoldPart;
+    if FoldPart <> nil then
+    begin
+      FoldPart.MarkupInfo.Background := AGutterBg;
+      if ADark then FoldPart.MarkupInfo.Foreground := $00858585
+      else FoldPart.MarkupInfo.Foreground := clGrayText;
+    end;
+
+    ASynEdit.RightGutter.Color := AGutterBg;
+    for i := 0 to ASynEdit.RightGutter.Parts.Count - 1 do
+      if ASynEdit.RightGutter.Parts[i] <> nil then
+        ASynEdit.RightGutter.Parts[i].MarkupInfo.Background := AGutterBg;
+
+    ASynEdit.InvalidateGutter;
+    ASynEdit.Repaint;
+  end;
+  ```
+  Ensure this is invoked for every `TSynEdit` control (`SynEdit1` in `MainForm` and `synPreview` in `PreviewForm`) in `ApplyTheme`.
+
