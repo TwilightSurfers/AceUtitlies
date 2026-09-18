@@ -2005,36 +2005,44 @@ object frmMain: TfrmMain
     Top = 625
     Width = 1050
     Align = alBottom
+    OnDrawPanel = StatusBar1DrawPanel
     SimplePanel = False
     Panels = <    
       item
+        Style = psOwnerDraw
         Width = 566
       end    
       item
         Alignment = taRightJustify
+        Style = psOwnerDraw
         Width = 90
       end    
       item
         Alignment = taRightJustify
+        Style = psOwnerDraw
         Width = 90
       end    
       item
         Alignment = taCenter
+        Style = psOwnerDraw
         Text = 'CAPS'
         Width = 50
       end    
       item
         Alignment = taCenter
+        Style = psOwnerDraw
         Text = 'NUM'
         Width = 50
       end    
       item
         Alignment = taCenter
+        Style = psOwnerDraw
         Text = 'INS'
         Width = 50
       end    
       item
         Alignment = taCenter
+        Style = psOwnerDraw
         Width = 130
       end>
   end

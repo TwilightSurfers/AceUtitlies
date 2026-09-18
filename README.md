@@ -94,6 +94,7 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Native DWM Titlebar**: Integrates directly with Windows 11 Desktop Window Manager (`DwmSetWindowAttribute` via `dwmapi.dll`) for a true dark window frame.
 - **Automatic System Detection**: Detects your Windows theme preference (`AppsUseLightTheme`) on startup.
 - **Full SynEdit Dark Gutter & Line Numbers**: Gutter backgrounds, line numbers, active line highlights, separators, and code-folding parts deeply integrate with the dark palette, delivering high contrast and crystal-clear line number visibility across both the Notepad editor and Live Preview without washed-out light gutter panels.
+- **Owner-Drawn Dark Status Bar**: High-contrast light text (`$00F0F0F0`) and active lock indicator styling (`$0050D0FF`) across all panels, eliminating native Windows `SysStatus32` black text on dark backgrounds.
 - **One-Click Toggle**: Switch between Dark and Light mode anytime via the header toggle button.
 
 ### 📥 7. System Tray Integration

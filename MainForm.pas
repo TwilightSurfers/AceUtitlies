@@ -341,6 +341,7 @@ type
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormResize(Sender: TObject);
     procedure tmrStatusTimer(Sender: TObject);
+    procedure StatusBar1DrawPanel(StatusBar: TStatusBar; Panel: TStatusPanel; const Rect: TRect);
 
     // About Tab Events
     procedure pnlLinkWebClick(Sender: TObject);
@@ -974,6 +975,8 @@ begin
 end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
+var
+  i: Integer;
 begin
   {$IFDEF WINDOWS}
   WM_ACEUTILS_RESTORE := RegisterWindowMessage('AceUtils_Restore_SingleInstance');
@@ -1036,6 +1039,9 @@ begin
   ProgressBar1.Visible := False;
   lblActivity.Caption := 'Ready.';
   StatusBar1.SimplePanel := False;
+  for i := 0 to StatusBar1.Panels.Count - 1 do
+    StatusBar1.Panels[i].Style := psOwnerDraw;
+  StatusBar1.OnDrawPanel := @StatusBar1DrawPanel;
   FormResize(Self);
   StatusBar1.Panels[0].Text := ' Ready. Enter pattern or select folder to search.';
   StatusBar1.Panels[1].Text := 'Files: 0';
@@ -2078,6 +2084,7 @@ begin
   end;
   {$ENDIF}
   StatusBar1.Invalidate;
+  StatusBar1.Repaint;
 
   // Memory & Notes Tab
   pnlMemoryTop.Color := HeaderBg;
@@ -5843,6 +5850,72 @@ begin
     StatusBar1.Panels[0].Width := Max(200, StatusBar1.ClientWidth - RightPanelsWidth);
 end;
 
+procedure TfrmMain.StatusBar1DrawPanel(StatusBar: TStatusBar; Panel: TStatusPanel; const Rect: TRect);
+var
+  X, Y: Integer;
+  DrawTxt: string;
+  TxtW, TxtH: Integer;
+  R: TRect;
+begin
+  if (StatusBar = nil) or (Panel = nil) then Exit;
+
+  // Fill panel background using the themed status bar background
+  StatusBar.Canvas.Brush.Color := StatusBar.Color;
+  StatusBar.Canvas.FillRect(Rect);
+
+  // Subtle separator between panels (except after the last panel)
+  if (Panel.Index < StatusBar.Panels.Count - 1) and (Rect.Right > Rect.Left) then
+  begin
+    if FDarkMode then
+      StatusBar.Canvas.Pen.Color := $003C3834
+    else
+      StatusBar.Canvas.Pen.Color := clBtnShadow;
+    StatusBar.Canvas.Line(Rect.Right - 1, Rect.Top + 2, Rect.Right - 1, Rect.Bottom - 2);
+  end;
+
+  DrawTxt := Panel.Text;
+  if DrawTxt = '' then Exit;
+
+  // Configure high-contrast foreground font colors
+  StatusBar.Canvas.Font.Assign(StatusBar.Font);
+  if FDarkMode then
+  begin
+    if Panel.Index in [3, 4, 5] then
+      StatusBar.Canvas.Font.Color := $0050D0FF   // Crisp amber/cyan highlight for active lock indicators
+    else
+      StatusBar.Canvas.Font.Color := $00F0F0F0;  // Clean readable light silver for status text, counts, and clock
+  end
+  else
+  begin
+    if Panel.Index in [3, 4, 5] then
+      StatusBar.Canvas.Font.Color := $00902000   // Bold dark navy / crimson for active lock indicators
+    else
+      StatusBar.Canvas.Font.Color := clWindowText;
+  end;
+
+  StatusBar.Canvas.Brush.Style := bsClear;
+
+  TxtW := StatusBar.Canvas.TextWidth(DrawTxt);
+  TxtH := StatusBar.Canvas.TextHeight(DrawTxt);
+  Y := Rect.Top + (Rect.Height - TxtH) div 2;
+
+  case Panel.Alignment of
+    taCenter:
+      X := Rect.Left + (Rect.Width - TxtW) div 2;
+    taRightJustify:
+      X := Rect.Right - TxtW - 6;
+  else
+    X := Rect.Left + 6;
+  end;
+
+  R := Rect;
+  R.Left := R.Left + 2;
+  R.Right := R.Right - 2;
+  R.Top := R.Top + 1;
+  R.Bottom := R.Bottom - 1;
+  StatusBar.Canvas.TextRect(R, X, Y, DrawTxt);
+end;
+
 procedure TfrmMain.UpdateKeyboardAndTimerStatus;
 {$IFDEF WINDOWS}
 var
@@ -5998,6 +6071,7 @@ begin
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.4.3] - 2026-09-18');
   mmoAboutBuildLog.Lines.Add('  * SynEdit Dark Mode Gutter & Line Numbers Fix: Resolved bug where SynEdit gutter parts retained default clBtnFace background and rendered line numbers invisible in dark mode. Synchronized gutter background, line numbers, current-line highlight, separators, and code-folding parts across Notepad and Live Preview.');
+  mmoAboutBuildLog.Lines.Add('  * Bottom Status Bar Dark Mode Contrast Fix: Implemented owner-drawn panels (psOwnerDraw via StatusBar1DrawPanel) with high-contrast light text ($00F0F0F0) and amber/cyan indicator highlights ($0050D0FF), eliminating unreadable dark text on dark status bar backgrounds.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.4.1] - 2026-09-07');
   mmoAboutBuildLog.Lines.Add('  * Notepad SynEdit Keystroke Invariant: Restored SynEdit keystroke table defaults via Keystrokes.ResetDefaults, resolving Backspace and navigation key swallowing caused by LCL streaming.');

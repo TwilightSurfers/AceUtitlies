@@ -183,6 +183,14 @@ In Delphi VCL, `TStatusBar.SimplePanel` defaults to `False`. In Lazarus LCL, how
      ```
      This keeps the right-aligned status panels (Files, Dirs, CAPS, NUM, INS, Clock) cleanly docked to the right edge across all monitor resolutions and window sizes.
 
+### Native Win32 `SysStatus32` Text Color Limitation & `psOwnerDraw` (CRITICAL)
+- **The Issue**: On Windows, the underlying `SysStatus32` common control draws panel text using the GDI system color `COLOR_BTNTEXT` (hardcoded black). Standard `TStatusBar.Font.Color` assignments are completely ignored by `SysStatus32` when non-owner-drawn. When the status bar background is set to a dark color (e.g., `HeaderBg`), the text renders black on dark gray, making it unreadable.
+- **The Rule**:
+  1. Set `Style = psOwnerDraw` on each panel in both `.lfm` and `FormCreate`.
+  2. Implement an `OnDrawPanel` event handler (`StatusBar1DrawPanel`) to paint the panel background (`StatusBar.Canvas.Brush.Color := StatusBar.Color; StatusBar.Canvas.FillRect(Rect);`) and draw the text using `StatusBar.Canvas.Font` with explicit high-contrast colors (`$00F0F0F0` for general text, counts, and clock in dark mode; `$0050D0FF` for active lock indicators).
+  3. Use `StatusBar.Canvas.Brush.Style := bsClear;` and `StatusBar.Canvas.TextRect(...)` with alignment calculations to render clean, vertically centered, and clipped text across all resolutions.
+
+
 ---
 
 ## 10. SynEdit Keystroke Invariants & Form KeyPreview Guarding (`MainForm.pas`)
