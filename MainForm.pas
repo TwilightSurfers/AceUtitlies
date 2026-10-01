@@ -17,6 +17,10 @@ uses
   LConvEncoding, LazUTF8, LCLType,
   ImgList, LCLIntf, SynHighlighterMarkdown, LMessages;
 
+const
+  ACE_IPC_MAGIC = $41434531; // 'ACE1'
+  ACE_WINDOW_PROP = 'AceUtils_MainWindow';
+
 type
   PResultInfo = ^TResultInfo;
   TResultInfo = record
@@ -436,6 +440,12 @@ type
     procedure btnApplyRemapClick(Sender: TObject);
     procedure lvContextMenuSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure lvContextMenuCustomDrawItem(Sender: TCustomListView; Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure ListViewCustomDrawItem(Sender: TCustomListView; Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure ShellTreeViewCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode; State: TCustomDrawState; var DefaultDraw: Boolean);
+    procedure EnsureListViewHeaderSubclassed(ALV: TCustomListView; ASubclassId: UINT_PTR);
+    procedure RefreshListViewTheme(ALV: TCustomListView; ASubclassId: UINT_PTR);
+    procedure RefreshTreeViewTheme(ATV: TCustomTreeView);
     procedure lvContextMenuColumnClick(Sender: TObject; Column: TListColumn);
     procedure lvContextMenuCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
 
@@ -645,6 +655,7 @@ type
     FLastClipboardSeq: DWORD;
     FMemoryIdCounter: Integer;
     FNotesModified: Boolean;
+    FPendingOpenFiles: TStringList;
 
     {$IFDEF WINDOWS}
     function GetWinClipboardText(out AText: string; out AOpened: Boolean): Boolean;
@@ -665,6 +676,7 @@ type
     procedure SaveQuickNotes;
     function CountLines(const S: string): Integer;
     function MakeSnippet(const S: string): string;
+    procedure ProcessPendingOpenFiles(Data: PtrInt);
   public
     procedure AutoFitListViewColumns(ALV: TWinControl; AColumns: TListColumns; MaxColWidth: Integer = 450);
     procedure OpenFileInNotepad(const AFileName: string);
@@ -690,7 +702,33 @@ type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
 
 {$IFDEF WINDOWS}
+var
+  WM_ACEUTILS_RESTORE: UINT = 0;
+
 function GetClipboardSequenceNumber: DWORD; stdcall; external 'user32.dll';
+
+procedure EnableWindowMessagesForElevation(hWnd: HWND);
+type
+  TChangeWindowMessageFilterEx = function(hwnd: HWND; message: UINT; action: DWORD; pChangeFilterStruct: Pointer): BOOL; stdcall;
+var
+  hUser32: HMODULE;
+  ChangeFilterEx: TChangeWindowMessageFilterEx;
+const
+  MSGFLT_ALLOW = 1;
+begin
+  hUser32 := GetModuleHandle('user32.dll');
+  if hUser32 <> 0 then
+  begin
+    ChangeFilterEx := TChangeWindowMessageFilterEx(GetProcAddress(hUser32, 'ChangeWindowMessageFilterEx'));
+    if Assigned(ChangeFilterEx) then
+    begin
+      ChangeFilterEx(hWnd, WM_COPYDATA, MSGFLT_ALLOW, nil);
+      if WM_ACEUTILS_RESTORE <> 0 then
+        ChangeFilterEx(hWnd, WM_ACEUTILS_RESTORE, MSGFLT_ALLOW, nil);
+      ChangeFilterEx(hWnd, $0049 {WM_COPYGLOBALDATA}, MSGFLT_ALLOW, nil);
+    end;
+  end;
+end;
 {$ENDIF}
 
 type
@@ -737,9 +775,6 @@ begin
     FreeAndNil(APlugin);
   end;
 end;
-
-var
-  WM_ACEUTILS_RESTORE: UINT = 0;
 
 function CleanTabCaption(const ACap: string): string;
 begin
@@ -974,12 +1009,34 @@ begin
   SaveQuickNotes;
 end;
 
+type
+  TShellListViewCracker = class(TShellListView);
+
+{$IFDEF WINDOWS}
+const
+  SUBCLASS_ID_LVRESULTS = 101;
+  SUBCLASS_ID_SHELLEXPLORER = 102;
+  SUBCLASS_ID_LVMEMORY = 103;
+  SUBCLASS_ID_LVCONTEXT = 104;
+  SUBCLASS_ID_MAINFORM = 105;
+  HDM_GETITEM_W = $120B;
+
+function MainFormSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
+  uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall; forward;
+function ListViewHeaderSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
+  uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall; forward;
+{$ENDIF}
+
 procedure TfrmMain.FormCreate(Sender: TObject);
 var
   i: Integer;
 begin
+  FPendingOpenFiles := TStringList.Create;
   {$IFDEF WINDOWS}
   WM_ACEUTILS_RESTORE := RegisterWindowMessage('AceUtils_Restore_SingleInstance');
+  SetProp(Handle, PChar(ACE_WINDOW_PROP), 1);
+  EnableWindowMessagesForElevation(Handle);
+  SetWindowSubclass(Handle, @MainFormSubclassProc, SUBCLASS_ID_MAINFORM, DWORD_PTR(Self));
   {$ENDIF}
   FStopSearch := False;
   FSearching := False;
@@ -1109,6 +1166,8 @@ begin
 
   ShellListViewExplorer.OnFileAdded := @ShellListViewExplorerFileAdded;
 
+
+
   LoadAboutContent;
   UpdateKeyboardAndTimerStatus;
 
@@ -1128,28 +1187,50 @@ begin
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
+var
+  CleanArg: string;
 begin
   // Check command-line arguments
   if ParamCount >= 1 then
   begin
-    if SameText(ParamStr(1), '/register') or SameText(ParamStr(1), '-register') or SameText(ParamStr(1), '--register') then
+    CleanArg := Trim(ParamStr(1));
+    while (Length(CleanArg) > 0) and (CleanArg[1] in ['"', '''']) do
+      Delete(CleanArg, 1, 1);
+    while (Length(CleanArg) > 0) and (CleanArg[Length(CleanArg)] in ['"', '''']) do
+      Delete(CleanArg, Length(CleanArg), 1);
+    CleanArg := Trim(CleanArg);
+
+    if SameText(CleanArg, '/register') or SameText(CleanArg, '-register') or SameText(CleanArg, '--register') then
     begin
       RegisterFileAssociations(True);
       Application.Terminate;
       Exit;
     end
-    else if SameText(ParamStr(1), '/unregister') or SameText(ParamStr(1), '-unregister') or SameText(ParamStr(1), '--unregister') then
+    else if SameText(CleanArg, '/unregister') or SameText(CleanArg, '-unregister') or SameText(CleanArg, '--unregister') then
     begin
       RegisterFileAssociations(False);
       Application.Terminate;
       Exit;
     end
-    else if FileExists(ParamStr(1)) then
+    else
     begin
-      OpenFileInNotepad(ParamStr(1));
-      PageControl1.ActivePage := tabNotepad;
-      if SynEdit1.CanFocus then
-        SynEdit1.SetFocus;
+      if (CleanArg <> '') and (CleanArg[1] <> '/') and (CleanArg[1] <> '-') then
+        CleanArg := ExpandFileName(CleanArg);
+
+      if FileExists(CleanArg) then
+      begin
+        OpenFileInNotepad(CleanArg);
+        PageControl1.ActivePage := tabNotepad;
+        UpdateTabHighlight;
+        if SynEdit1.CanFocus then
+          SynEdit1.SetFocus;
+      end
+      else if DirectoryExists(CleanArg) then
+      begin
+        NavigateExplorerTo(CleanArg, True);
+        PageControl1.ActivePage := tabExplorer;
+        UpdateTabHighlight;
+      end;
     end;
   end;
 
@@ -1168,6 +1249,22 @@ end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
+  {$IFDEF WINDOWS}
+  if HandleAllocated then
+  begin
+    RemoveWindowSubclass(Handle, @MainFormSubclassProc, SUBCLASS_ID_MAINFORM);
+    RemoveProp(Handle, PChar(ACE_WINDOW_PROP));
+  end;
+  if lvResults.HandleAllocated then
+    RemoveWindowSubclass(lvResults.Handle, @ListViewHeaderSubclassProc, SUBCLASS_ID_LVRESULTS);
+  if ShellListViewExplorer.HandleAllocated then
+    RemoveWindowSubclass(ShellListViewExplorer.Handle, @ListViewHeaderSubclassProc, SUBCLASS_ID_SHELLEXPLORER);
+  if lvMemory.HandleAllocated then
+    RemoveWindowSubclass(lvMemory.Handle, @ListViewHeaderSubclassProc, SUBCLASS_ID_LVMEMORY);
+  if lvContextMenu.HandleAllocated then
+    RemoveWindowSubclass(lvContextMenu.Handle, @ListViewHeaderSubclassProc, SUBCLASS_ID_LVCONTEXT);
+  {$ENDIF}
+  FreeAndNil(FPendingOpenFiles);
   FreeAndNil(FExpHistory);
   SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
   SaveAllOptions;
@@ -1241,9 +1338,55 @@ procedure TfrmMain.WndProc(var Message: TLMessage);
 {$IFDEF WINDOWS}
 var
   FWI: FLASHWINFO;
+  PCDS: PCopyDataStruct;
+  RecvStr: string;
 {$ENDIF}
 begin
 {$IFDEF WINDOWS}
+  if Message.Msg = WM_COPYDATA then
+  begin
+    PCDS := PCopyDataStruct(Message.lParam);
+    if (PCDS <> nil) and (PCDS^.dwData = ACE_IPC_MAGIC) and
+       (PCDS^.cbData > 0) and (PCDS^.lpData <> nil) then
+    begin
+      SetLength(RecvStr, PCDS^.cbData div SizeOf(Char));
+      Move(PCDS^.lpData^, RecvStr[1], PCDS^.cbData);
+      RecvStr := PChar(RecvStr);
+      RecvStr := Trim(RecvStr);
+      while (Length(RecvStr) > 0) and (RecvStr[1] in ['"', '''']) do
+        Delete(RecvStr, 1, 1);
+      while (Length(RecvStr) > 0) and (RecvStr[Length(RecvStr)] in ['"', '''']) do
+        Delete(RecvStr, Length(RecvStr), 1);
+      RecvStr := Trim(RecvStr);
+
+      if (RecvStr <> '') and (FPendingOpenFiles <> nil) then
+      begin
+        FPendingOpenFiles.Add(RecvStr);
+        Application.QueueAsyncCall(@ProcessPendingOpenFiles, 0);
+      end;
+
+      // Restore window even if minimized or hidden in the system tray
+      if not Visible then
+        Show;
+      if WindowState = wsMinimized then
+        WindowState := wsNormal;
+      Application.Restore;
+      Show;
+      WindowState := wsNormal;
+      BringToFront;
+
+      SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+      SetWindowPos(Handle, HWND_NOTOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+      SetForegroundWindow(Handle);
+      BringWindowToTop(Handle);
+
+      Message.Result := 1;
+      Exit;
+    end;
+  end;
+
   if (WM_ACEUTILS_RESTORE <> 0) and (Message.Msg = WM_ACEUTILS_RESTORE) then
   begin
     // Restore window even if minimized or hidden in the system tray
@@ -1278,6 +1421,42 @@ begin
   end;
 {$ENDIF}
   inherited WndProc(Message);
+end;
+
+procedure TfrmMain.ProcessPendingOpenFiles(Data: PtrInt);
+var
+  TargetFile: string;
+begin
+  while (FPendingOpenFiles <> nil) and (FPendingOpenFiles.Count > 0) do
+  begin
+    TargetFile := FPendingOpenFiles[0];
+    FPendingOpenFiles.Delete(0);
+
+    if SameText(TargetFile, '/register') or SameText(TargetFile, '-register') or SameText(TargetFile, '--register') then
+    begin
+      RegisterFileAssociations(True);
+      SetStatus(' File associations registered.');
+    end
+    else if SameText(TargetFile, '/unregister') or SameText(TargetFile, '-unregister') or SameText(TargetFile, '--unregister') then
+    begin
+      RegisterFileAssociations(False);
+      SetStatus(' File associations unregistered.');
+    end
+    else if FileExists(TargetFile) then
+    begin
+      OpenFileInNotepad(TargetFile);
+      PageControl1.ActivePage := tabNotepad;
+      UpdateTabHighlight;
+      if SynEdit1.CanFocus then
+        SynEdit1.SetFocus;
+    end
+    else if DirectoryExists(TargetFile) then
+    begin
+      NavigateExplorerTo(TargetFile, True);
+      PageControl1.ActivePage := tabExplorer;
+      UpdateTabHighlight;
+    end;
+  end;
 end;
 
 function TfrmMain.GetIniPath: string;
@@ -1807,6 +1986,227 @@ begin
       FlushMenus();
   end;
 end;
+
+procedure SafeAllowDarkModeForWindow(hwnd: HWND; ADark: Boolean);
+type
+  TAllowDarkModeForWindow = function(hwnd: HWND; allow: BOOL): BOOL; stdcall;
+var
+  hUx: HMODULE;
+  AllowDarkWnd: TAllowDarkModeForWindow;
+begin
+  if hwnd = 0 then Exit;
+  hUx := GetModuleHandle('uxtheme.dll');
+  if hUx = 0 then
+    hUx := LoadLibrary('uxtheme.dll');
+  if hUx <> 0 then
+  begin
+    AllowDarkWnd := TAllowDarkModeForWindow(GetProcAddress(hUx, MAKEINTRESOURCE(133)));
+    if Assigned(AllowDarkWnd) then
+      AllowDarkWnd(hwnd, ADark);
+  end;
+end;
+
+function MainFormSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
+  uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall;
+var
+  frm: TfrmMain;
+  PCDS: PCopyDataStruct;
+  RecvStr: string;
+  FWI: FLASHWINFO;
+begin
+  frm := TfrmMain(Pointer(dwRefData));
+  if frm <> nil then
+  begin
+    if uMsg = WM_COPYDATA then
+    begin
+      PCDS := PCopyDataStruct(Pointer(lParam));
+      if (PCDS <> nil) and (PCDS^.dwData = ACE_IPC_MAGIC) and
+         (PCDS^.cbData > 0) and (PCDS^.lpData <> nil) then
+      begin
+        SetLength(RecvStr, PCDS^.cbData div SizeOf(Char));
+        Move(PCDS^.lpData^, RecvStr[1], PCDS^.cbData);
+        RecvStr := PChar(RecvStr);
+        RecvStr := Trim(RecvStr);
+        while (Length(RecvStr) > 0) and (RecvStr[1] in ['"', '''']) do
+          Delete(RecvStr, 1, 1);
+        while (Length(RecvStr) > 0) and (RecvStr[Length(RecvStr)] in ['"', '''']) do
+          Delete(RecvStr, Length(RecvStr), 1);
+        RecvStr := Trim(RecvStr);
+
+        if (RecvStr <> '') and (frm.FPendingOpenFiles <> nil) then
+        begin
+          frm.FPendingOpenFiles.Add(RecvStr);
+          Application.QueueAsyncCall(@frm.ProcessPendingOpenFiles, 0);
+        end;
+
+        if not frm.Visible then
+          frm.Show;
+        if frm.WindowState = wsMinimized then
+          frm.WindowState := wsNormal;
+        Application.Restore;
+        frm.Show;
+        frm.WindowState := wsNormal;
+        frm.BringToFront;
+
+        SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+          SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+        SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+          SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+        SetForegroundWindow(hWnd);
+        BringWindowToTop(hWnd);
+
+        Result := 1;
+        Exit;
+      end;
+    end;
+
+    if (WM_ACEUTILS_RESTORE <> 0) and (uMsg = WM_ACEUTILS_RESTORE) then
+    begin
+      if not frm.Visible then
+        frm.Show;
+      if frm.WindowState = wsMinimized then
+        frm.WindowState := wsNormal;
+      Application.Restore;
+      frm.Show;
+      frm.WindowState := wsNormal;
+      frm.BringToFront;
+
+      SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+      SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW);
+      SetForegroundWindow(hWnd);
+      BringWindowToTop(hWnd);
+
+      FillChar(FWI, SizeOf(FWI), 0);
+      FWI.cbSize := SizeOf(FWI);
+      FWI.hwnd := hWnd;
+      FWI.dwFlags := FLASHW_ALL or FLASHW_TIMERNOFG;
+      FWI.uCount := 4;
+      FWI.dwTimeout := 0;
+      FlashWindowEx(@FWI);
+
+      Result := 1;
+      Exit;
+    end;
+  end;
+
+  Result := DefSubclassProc(hWnd, uMsg, wParam, lParam);
+end;
+
+function ListViewHeaderSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
+  uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall;
+var
+  pnmh: PNMHDR;
+  lpcd: PNMCUSTOMDRAW;
+  hHdr: HWND;
+  frm: TfrmMain;
+  HdItem: HDITEMW;
+  Buf: array[0..255] of WideChar;
+  hHeaderBrush, hBorderBrush: HBRUSH;
+  TextRc, LineRc: Windows.RECT;
+  DrawFlags: UINT;
+  hFont, OldFont: HGDIOBJ;
+begin
+  if uMsg = WM_NOTIFY then
+  begin
+    pnmh := PNMHDR(Pointer(lParam));
+    if (pnmh <> nil) and (Integer(pnmh^.code) = -12) then
+    begin
+      hHdr := ListView_GetHeader(hWnd);
+      if (hHdr <> 0) and (pnmh^.hwndFrom = hHdr) then
+      begin
+        frm := TfrmMain(Pointer(dwRefData));
+        if (frm <> nil) and frm.FDarkMode then
+        begin
+          lpcd := PNMCUSTOMDRAW(Pointer(lParam));
+          case lpcd^.dwDrawStage of
+            CDDS_PREPAINT:
+            begin
+              // Paint the entire header background to cover any empty space past the last column
+              hHeaderBrush := CreateSolidBrush($0024211E);
+              Windows.FillRect(lpcd^.hdc, lpcd^.rc, hHeaderBrush);
+              DeleteObject(hHeaderBrush);
+
+              // Bottom border line across whole header
+              LineRc := lpcd^.rc;
+              LineRc.Top := LineRc.Bottom - 1;
+              hBorderBrush := CreateSolidBrush($003C3834);
+              Windows.FillRect(lpcd^.hdc, LineRc, hBorderBrush);
+              DeleteObject(hBorderBrush);
+
+              Result := CDRF_NOTIFYITEMDRAW;
+              Exit;
+            end;
+            CDDS_ITEMPREPAINT:
+            begin
+              // Paint background accounting for hover/pressed states
+              if (lpcd^.uItemState and CDIS_SELECTED) <> 0 then
+                hHeaderBrush := CreateSolidBrush($001B1816)
+              else if (lpcd^.uItemState and CDIS_HOT) <> 0 then
+                hHeaderBrush := CreateSolidBrush($00322E2A)
+              else
+                hHeaderBrush := CreateSolidBrush($0025211E);
+
+              Windows.FillRect(lpcd^.hdc, lpcd^.rc, hHeaderBrush);
+              DeleteObject(hHeaderBrush);
+
+              // Subtle right separator line
+              LineRc := lpcd^.rc;
+              LineRc.Left := LineRc.Right - 1;
+              hBorderBrush := CreateSolidBrush($003C3834);
+              Windows.FillRect(lpcd^.hdc, LineRc, hBorderBrush);
+              // Bottom separator line
+              LineRc := lpcd^.rc;
+              LineRc.Top := LineRc.Bottom - 1;
+              Windows.FillRect(lpcd^.hdc, LineRc, hBorderBrush);
+              DeleteObject(hBorderBrush);
+
+              // Retrieve column text and format from header
+              FillChar(Buf, SizeOf(Buf), 0);
+              FillChar(HdItem, SizeOf(HdItem), 0);
+              HdItem.mask := HDI_TEXT or HDI_FORMAT;
+              HdItem.pszText := @Buf[0];
+              HdItem.cchTextMax := High(Buf);
+              Windows.SendMessageW(hHdr, HDM_GETITEM_W, PtrUInt(lpcd^.dwItemSpec), PtrInt(@HdItem));
+
+              SetBkMode(lpcd^.hdc, Windows.TRANSPARENT);
+              SetTextColor(lpcd^.hdc, $00F0F0F0); // Crisp light silver header title
+
+              hFont := HGDIOBJ(Pointer(SendMessage(hHdr, WM_GETFONT, 0, 0)));
+              if hFont <> 0 then
+                OldFont := SelectObject(lpcd^.hdc, hFont)
+              else
+                OldFont := SelectObject(lpcd^.hdc, GetStockObject(DEFAULT_GUI_FONT));
+
+              TextRc := lpcd^.rc;
+              Inc(TextRc.Left, 6);
+              Dec(TextRc.Right, 6);
+
+              DrawFlags := DT_VCENTER or DT_SINGLELINE or DT_END_ELLIPSIS;
+              if (HdItem.fmt and HDF_RIGHT) <> 0 then
+                DrawFlags := DrawFlags or DT_RIGHT
+              else if (HdItem.fmt and HDF_CENTER) <> 0 then
+                DrawFlags := DrawFlags or DT_CENTER
+              else
+                DrawFlags := DrawFlags or DT_LEFT;
+
+              DrawTextW(lpcd^.hdc, Buf, -1, @TextRc, DrawFlags);
+
+              if OldFont <> 0 then
+                SelectObject(lpcd^.hdc, OldFont);
+
+              Result := CDRF_SKIPDEFAULT;
+              Exit;
+            end;
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  Result := DefSubclassProc(hWnd, uMsg, wParam, lParam);
+end;
 {$ENDIF}
 
 procedure ApplyCheckBoxTheme(ACB: TCheckBox; ADark: Boolean; APanelColor, ATextColor: TColor);
@@ -2289,79 +2689,98 @@ begin
   ApplyCheckBoxTheme(cbMatchCase, ADark, PanelColor, TextColor);
   ApplyCheckBoxTheme(cbWholeWord, ADark, PanelColor, TextColor);
 
-  // TreeView & ListView
+  // TreeViews & ListViews
   ShellTreeView1.Color := EditBg;
   ShellTreeView1.Font.Color := TextColor;
-  lvResults.Color := EditBg;
-  lvResults.Font.Color := TextColor;
+  ShellTreeViewExplorer.Color := EditBg;
+  ShellTreeViewExplorer.Font.Color := TextColor;
 
-  {$IFDEF WINDOWS}
   if ADark then
   begin
-    if lvResults.HandleAllocated then
-    begin
-      SafeSetWindowTheme(lvResults.Handle, 'DarkMode_Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(lvResults.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
-    end;
-    if ShellListViewExplorer.HandleAllocated then
-    begin
-      SafeSetWindowTheme(ShellListViewExplorer.Handle, 'DarkMode_Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(ShellListViewExplorer.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
-    end;
-    if lvMemory.HandleAllocated then
-    begin
-      SafeSetWindowTheme(lvMemory.Handle, 'DarkMode_Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(lvMemory.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
-    end;
-    if lvContextMenu.HandleAllocated then
-    begin
-      SafeSetWindowTheme(lvContextMenu.Handle, 'DarkMode_Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(lvContextMenu.Handle, $101F, 0, 0)), 'DarkMode_ItemsView', nil);
-    end;
-    if ShellTreeView1.HandleAllocated then
-      SafeSetWindowTheme(ShellTreeView1.Handle, 'DarkMode_Explorer', nil);
-    if ShellTreeViewExplorer.HandleAllocated then
-      SafeSetWindowTheme(ShellTreeViewExplorer.Handle, 'DarkMode_Explorer', nil);
-    if cmbSyntax.HandleAllocated then
-      SafeSetWindowTheme(cmbSyntax.Handle, 'DarkMode_CFD', nil);
-    if cmbMemoryLimit.HandleAllocated then
-      SafeSetWindowTheme(cmbMemoryLimit.Handle, 'DarkMode_CFD', nil);
-    if PageControl1.HandleAllocated then
-      SafeSetWindowTheme(PageControl1.Handle, 'DarkMode_Explorer', nil);
+    ShellTreeView1.Options := ShellTreeView1.Options - [tvoThemedDraw];
+    ShellTreeViewExplorer.Options := ShellTreeViewExplorer.Options - [tvoThemedDraw];
+    ShellTreeView1.SelectionColor := $006B4D2B;
+    ShellTreeView1.SelectionFontColor := clWhite;
+    ShellTreeViewExplorer.SelectionColor := $006B4D2B;
+    ShellTreeViewExplorer.SelectionFontColor := clWhite;
+
+    ShellTreeView1.OnCustomDrawItem := @ShellTreeViewCustomDrawItem;
+    ShellTreeViewExplorer.OnCustomDrawItem := @ShellTreeViewCustomDrawItem;
   end
   else
   begin
-    if lvResults.HandleAllocated then
-    begin
-      SafeSetWindowTheme(lvResults.Handle, 'Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(lvResults.Handle, $101F, 0, 0)), 'Explorer', nil);
-    end;
-    if ShellListViewExplorer.HandleAllocated then
-    begin
-      SafeSetWindowTheme(ShellListViewExplorer.Handle, 'Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(ShellListViewExplorer.Handle, $101F, 0, 0)), 'Explorer', nil);
-    end;
-    if lvMemory.HandleAllocated then
-    begin
-      SafeSetWindowTheme(lvMemory.Handle, 'Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(lvMemory.Handle, $101F, 0, 0)), 'Explorer', nil);
-    end;
-    if lvContextMenu.HandleAllocated then
-    begin
-      SafeSetWindowTheme(lvContextMenu.Handle, 'Explorer', nil);
-      SafeSetWindowTheme(HWND(SendMessage(lvContextMenu.Handle, $101F, 0, 0)), 'Explorer', nil);
-    end;
-    if ShellTreeView1.HandleAllocated then
-      SafeSetWindowTheme(ShellTreeView1.Handle, 'Explorer', nil);
-    if ShellTreeViewExplorer.HandleAllocated then
-      SafeSetWindowTheme(ShellTreeViewExplorer.Handle, 'Explorer', nil);
-    if cmbSyntax.HandleAllocated then
-      SafeSetWindowTheme(cmbSyntax.Handle, nil, nil);
-    if cmbMemoryLimit.HandleAllocated then
-      SafeSetWindowTheme(cmbMemoryLimit.Handle, nil, nil);
-    if PageControl1.HandleAllocated then
-      SafeSetWindowTheme(PageControl1.Handle, nil, nil);
+    ShellTreeView1.Options := ShellTreeView1.Options + [tvoThemedDraw];
+    ShellTreeViewExplorer.Options := ShellTreeViewExplorer.Options + [tvoThemedDraw];
+    ShellTreeView1.SelectionColor := clHighlight;
+    ShellTreeView1.SelectionFontColor := clHighlightText;
+    ShellTreeViewExplorer.SelectionColor := clHighlight;
+    ShellTreeViewExplorer.SelectionFontColor := clHighlightText;
+
+    ShellTreeView1.OnCustomDrawItem := nil;
+    ShellTreeViewExplorer.OnCustomDrawItem := nil;
   end;
+
+  lvResults.Color := EditBg;
+  lvResults.Font.Color := TextColor;
+  ShellListViewExplorer.Color := EditBg;
+  ShellListViewExplorer.Font.Color := TextColor;
+  lvMemory.Color := EditBg;
+  lvMemory.Font.Color := TextColor;
+  lvContextMenu.Color := EditBg;
+  lvContextMenu.Font.Color := TextColor;
+
+  if ADark then
+  begin
+    lvResults.OnCustomDrawItem := @ListViewCustomDrawItem;
+    lvResults.OnCustomDrawSubItem := @ListViewCustomDrawSubItem;
+    TShellListViewCracker(ShellListViewExplorer).OnCustomDrawItem := @ListViewCustomDrawItem;
+    TShellListViewCracker(ShellListViewExplorer).OnCustomDrawSubItem := @ListViewCustomDrawSubItem;
+    lvMemory.OnCustomDrawItem := @ListViewCustomDrawItem;
+    lvMemory.OnCustomDrawSubItem := @ListViewCustomDrawSubItem;
+    lvContextMenu.OnCustomDrawItem := @lvContextMenuCustomDrawItem;
+    lvContextMenu.OnCustomDrawSubItem := @ListViewCustomDrawSubItem;
+  end
+  else
+  begin
+    lvResults.OnCustomDrawItem := nil;
+    lvResults.OnCustomDrawSubItem := nil;
+    TShellListViewCracker(ShellListViewExplorer).OnCustomDrawItem := nil;
+    TShellListViewCracker(ShellListViewExplorer).OnCustomDrawSubItem := nil;
+    lvMemory.OnCustomDrawItem := nil;
+    lvMemory.OnCustomDrawSubItem := nil;
+    lvContextMenu.OnCustomDrawItem := @lvContextMenuCustomDrawItem;
+    lvContextMenu.OnCustomDrawSubItem := nil;
+  end;
+
+  {$IFDEF WINDOWS}
+  RefreshListViewTheme(lvResults, SUBCLASS_ID_LVRESULTS);
+  RefreshListViewTheme(ShellListViewExplorer, SUBCLASS_ID_SHELLEXPLORER);
+  RefreshListViewTheme(lvMemory, SUBCLASS_ID_LVMEMORY);
+  RefreshListViewTheme(lvContextMenu, SUBCLASS_ID_LVCONTEXT);
+  RefreshTreeViewTheme(ShellTreeView1);
+  RefreshTreeViewTheme(ShellTreeViewExplorer);
+
+  if ShellListViewExplorer.HandleAllocated and (ShellListViewExplorer.Items.Count > 0) then
+  begin
+    ShellListViewExplorer.UpdateView;
+    EnsureExplorerSystemImageList;
+  end;
+
+  if cmbSyntax.HandleAllocated then
+    if ADark then
+      SafeSetWindowTheme(cmbSyntax.Handle, 'DarkMode_CFD', nil)
+    else
+      SafeSetWindowTheme(cmbSyntax.Handle, nil, nil);
+  if cmbMemoryLimit.HandleAllocated then
+    if ADark then
+      SafeSetWindowTheme(cmbMemoryLimit.Handle, 'DarkMode_CFD', nil)
+    else
+      SafeSetWindowTheme(cmbMemoryLimit.Handle, nil, nil);
+  if PageControl1.HandleAllocated then
+    if ADark then
+      SafeSetWindowTheme(PageControl1.Handle, 'DarkMode_Explorer', nil)
+    else
+      SafeSetWindowTheme(PageControl1.Handle, nil, nil);
   {$ENDIF}
 
   // SynEdit
@@ -3311,6 +3730,9 @@ begin
   end
   else if PageControl1.ActivePage = tabMemory then
   begin
+    {$IFDEF WINDOWS}
+    RefreshListViewTheme(lvMemory, SUBCLASS_ID_LVMEMORY);
+    {$ENDIF}
     CheckAndCollectClipboard;
     UpdateMemoryStatusUI;
     UpdateMemoryButtonStates;
@@ -3318,11 +3740,14 @@ begin
   {$IFDEF WINDOWS}
   if PageControl1.ActivePage = tabContextMenu then
   begin
+    RefreshListViewTheme(lvContextMenu, SUBCLASS_ID_LVCONTEXT);
     if lvContextMenu.Items.Count = 0 then
       ScanContextMenuEntries;
   end
   else if PageControl1.ActivePage = tabExplorer then
   begin
+    RefreshTreeViewTheme(ShellTreeViewExplorer);
+    RefreshListViewTheme(ShellListViewExplorer, SUBCLASS_ID_SHELLEXPLORER);
     EnsureExplorerSystemImageList;
     AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
     if cbExpPreviewAlways.Checked and (ShellListViewExplorer.Selected <> nil) then
@@ -3330,6 +3755,8 @@ begin
   end
   else if PageControl1.ActivePage = tabSearch then
   begin
+    RefreshTreeViewTheme(ShellTreeView1);
+    RefreshListViewTheme(lvResults, SUBCLASS_ID_LVRESULTS);
     AutoFitListViewColumns(lvResults, lvResults.Columns, 380);
   end;
   {$ENDIF}
@@ -3582,17 +4009,175 @@ begin
   end;
 end;
 
+procedure TfrmMain.ListViewCustomDrawItem(Sender: TCustomListView;
+  Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
+begin
+  if not FDarkMode then
+  begin
+    if (Sender = lvContextMenu) and (Item <> nil) and (Item.SubItems.Count >= 4) and (Pos('STALE', Item.SubItems[3]) > 0) then
+      Sender.Canvas.Font.Color := $000000C8;
+    DefaultDraw := True;
+    Exit;
+  end;
+
+  if (Sender = lvContextMenu) and (Item <> nil) and (Item.SubItems.Count >= 4) and (Pos('STALE', Item.SubItems[3]) > 0) then
+  begin
+    Sender.Canvas.Font.Color := $008080FF;
+    DefaultDraw := True;
+    Exit;
+  end;
+
+  if cdsSelected in State then
+  begin
+    Sender.Canvas.Brush.Color := $006B4D2B;
+    Sender.Canvas.Font.Color := clWhite;
+  end
+  else
+  begin
+    Sender.Canvas.Brush.Color := Sender.Color;
+    Sender.Canvas.Font.Color := $00F0F0F0;
+  end;
+  DefaultDraw := True;
+end;
+
+procedure TfrmMain.ListViewCustomDrawSubItem(Sender: TCustomListView;
+  Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
+begin
+  if not FDarkMode then
+  begin
+    DefaultDraw := True;
+    Exit;
+  end;
+
+  if (Sender = lvContextMenu) and (Item <> nil) and (Item.SubItems.Count >= 4) and (Pos('STALE', Item.SubItems[3]) > 0) then
+  begin
+    Sender.Canvas.Font.Color := $008080FF;
+    DefaultDraw := True;
+    Exit;
+  end;
+
+  if cdsSelected in State then
+  begin
+    Sender.Canvas.Brush.Color := $006B4D2B;
+    Sender.Canvas.Font.Color := clWhite;
+  end
+  else
+  begin
+    Sender.Canvas.Brush.Color := Sender.Color;
+    Sender.Canvas.Font.Color := $00D8D8D8;
+  end;
+  DefaultDraw := True;
+end;
+
+procedure TfrmMain.ShellTreeViewCustomDrawItem(Sender: TCustomTreeView;
+  Node: TTreeNode; State: TCustomDrawState; var DefaultDraw: Boolean);
+begin
+  if not FDarkMode then
+  begin
+    DefaultDraw := True;
+    Exit;
+  end;
+
+  if cdsSelected in State then
+  begin
+    Sender.Canvas.Brush.Color := $006B4D2B;
+    Sender.Canvas.Font.Color := clWhite;
+  end
+  else
+  begin
+    Sender.Canvas.Brush.Color := Sender.Color;
+    Sender.Canvas.Font.Color := $00F0F0F0;
+  end;
+  DefaultDraw := True;
+end;
+
+procedure TfrmMain.EnsureListViewHeaderSubclassed(ALV: TCustomListView; ASubclassId: UINT_PTR);
+{$IFDEF WINDOWS}
+begin
+  if (ALV <> nil) and ALV.HandleAllocated then
+    SetWindowSubclass(ALV.Handle, @ListViewHeaderSubclassProc, ASubclassId, DWORD_PTR(Self));
+end;
+{$ELSE}
+begin
+end;
+{$ENDIF}
+
+procedure TfrmMain.RefreshListViewTheme(ALV: TCustomListView; ASubclassId: UINT_PTR);
+{$IFDEF WINDOWS}
+var
+  hHdr: HWND;
+begin
+  if (ALV = nil) or (not ALV.HandleAllocated) then Exit;
+  hHdr := ListView_GetHeader(ALV.Handle);
+  SafeAllowDarkModeForWindow(ALV.Handle, FDarkMode);
+  if hHdr <> 0 then
+    SafeAllowDarkModeForWindow(hHdr, FDarkMode);
+  if FDarkMode then
+  begin
+    SafeSetWindowTheme(ALV.Handle, 'DarkMode_Explorer', nil);
+    if hHdr <> 0 then
+      SafeSetWindowTheme(hHdr, 'DarkMode_ItemsView', nil);
+    Windows.SendMessage(ALV.Handle, $1001 {LVM_SETBKCOLOR}, 0, ColorToRGB(ALV.Color));
+    Windows.SendMessage(ALV.Handle, $1026 {LVM_SETTEXTBKCOLOR}, 0, $FFFFFFFF {CLR_NONE});
+    Windows.SendMessage(ALV.Handle, $1024 {LVM_SETTEXTCOLOR}, 0, ColorToRGB(ALV.Font.Color));
+  end
+  else
+  begin
+    SafeSetWindowTheme(ALV.Handle, 'Explorer', nil);
+    if hHdr <> 0 then
+      SafeSetWindowTheme(hHdr, 'ItemsView', nil);
+    Windows.SendMessage(ALV.Handle, $1001 {LVM_SETBKCOLOR}, 0, ColorToRGB(clWindow));
+    Windows.SendMessage(ALV.Handle, $1026 {LVM_SETTEXTBKCOLOR}, 0, $FFFFFFFF {CLR_NONE});
+    Windows.SendMessage(ALV.Handle, $1024 {LVM_SETTEXTCOLOR}, 0, ColorToRGB(clWindowText));
+  end;
+
+  SetWindowPos(ALV.Handle, 0, 0, 0, 0, 0,
+    SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED);
+  Windows.SendMessage(ALV.Handle, $031A {WM_THEMECHANGED}, 0, 0);
+
+  if hHdr <> 0 then
+  begin
+    SetWindowPos(hHdr, 0, 0, 0, 0, 0,
+      SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED);
+    Windows.SendMessage(hHdr, $031A {WM_THEMECHANGED}, 0, 0);
+    InvalidateRect(hHdr, nil, True);
+  end;
+
+  EnsureListViewHeaderSubclassed(ALV, ASubclassId);
+  ALV.Invalidate;
+  ALV.Repaint;
+end;
+{$ELSE}
+begin
+end;
+{$ENDIF}
+
+procedure TfrmMain.RefreshTreeViewTheme(ATV: TCustomTreeView);
+{$IFDEF WINDOWS}
+begin
+  if (ATV = nil) or (not ATV.HandleAllocated) then Exit;
+  SafeAllowDarkModeForWindow(ATV.Handle, FDarkMode);
+  if FDarkMode then
+    SafeSetWindowTheme(ATV.Handle, 'DarkMode_Explorer', nil)
+  else
+    SafeSetWindowTheme(ATV.Handle, 'Explorer', nil);
+
+  SetWindowPos(ATV.Handle, 0, 0, 0, 0, 0,
+    SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED);
+  Windows.SendMessage(ATV.Handle, $031A {WM_THEMECHANGED}, 0, 0);
+
+  ATV.Invalidate;
+  ATV.Repaint;
+end;
+{$ELSE}
+begin
+end;
+{$ENDIF}
+
 procedure TfrmMain.lvContextMenuCustomDrawItem(Sender: TCustomListView;
   Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
 begin
-  if (Item <> nil) and (Item.SubItems.Count >= 4) and (Pos('STALE', Item.SubItems[3]) > 0) then
-  begin
-    if FDarkMode then
-      Sender.Canvas.Font.Color := $008080FF
-    else
-      Sender.Canvas.Font.Color := $000000C8;
-  end;
-  DefaultDraw := True;
+  ListViewCustomDrawItem(Sender, Item, State, DefaultDraw);
 end;
 
 procedure TfrmMain.lvContextMenuColumnClick(Sender: TObject; Column: TListColumn);
@@ -4254,6 +4839,7 @@ begin
     FCurrentFileName := AFileName;
     FIsModified := False;
     lblCurrentFile.Caption := ExtractFileName(AFileName) + ' (' + AFileName + ')';
+    Caption := 'Ace''s Utilities - ' + ExtractFileName(AFileName);
     PageControl1.ActivePage := tabNotepad;
     UpdateTabHighlight;
     UpdateNotepadStatus;
@@ -4280,6 +4866,7 @@ begin
       SynEdit1.Lines.SaveToFile(FCurrentFileName);
       FIsModified := False;
       lblCurrentFile.Caption := ExtractFileName(FCurrentFileName) + ' (' + FCurrentFileName + ')';
+      Caption := 'Ace''s Utilities - ' + ExtractFileName(FCurrentFileName);
       UpdateNotepadStatus;
       UpdateSaveButtonState;
       SetStatus(' File saved: ' + FCurrentFileName);
@@ -4520,6 +5107,7 @@ begin
   FCurrentFileName := '';
   FIsModified := False;
   lblCurrentFile.Caption := 'Untitled';
+  Caption := 'Ace''s Utilities';
   cmbSyntax.ItemIndex := 0;
   ApplySyntax(0);
   UpdateNotepadStatus;
@@ -4536,6 +5124,7 @@ begin
   FCurrentFileName := '';
   FIsModified := False;
   lblCurrentFile.Caption := 'Untitled';
+  Caption := 'Ace''s Utilities';
   cmbSyntax.ItemIndex := 0;
   ApplySyntax(0);
   UpdateNotepadStatus;
@@ -5038,9 +5627,15 @@ begin
   begin
     FIsModified := True;
     if FCurrentFileName <> '' then
-      lblCurrentFile.Caption := '*' + ExtractFileName(FCurrentFileName) + ' (' + FCurrentFileName + ')'
+    begin
+      lblCurrentFile.Caption := '*' + ExtractFileName(FCurrentFileName) + ' (' + FCurrentFileName + ')';
+      Caption := 'Ace''s Utilities - *' + ExtractFileName(FCurrentFileName);
+    end
     else
+    begin
       lblCurrentFile.Caption := '*Untitled';
+      Caption := 'Ace''s Utilities - *Untitled';
+    end;
   end;
   UpdateNotepadStatus;
   UpdateSaveButtonState;
@@ -6062,12 +6657,26 @@ begin
   mmoAboutFeatures.Lines.Add('   - Embedded persistent Quick Notes scratchpad automatically saved across sessions.');
   mmoAboutFeatures.Lines.Add('   - Right-click context menu for quick copy, transfer to Notepad, and pinning to notes.');
 
-  lblAboutTitle.Caption := 'Ace''s Utilities  v1.4.3';
+  lblAboutTitle.Caption := 'Ace''s Utilities  v1.4.5';
 
   mmoAboutBuildLog.Lines.Clear;
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.4.5] - 2026-10-01');
+  mmoAboutBuildLog.Lines.Add('  * Single-Instance External File Opening & IPC Fix: Resolved critical bug where opening an external file via Explorer ("Open in Ace...") while an instance was already running resulted in the secondary process exiting without triggering file opening.');
+  mmoAboutBuildLog.Lines.Add('  * Win32 WM_COPYDATA IPC Message Channel: Integrated robust inter-process communication using WM_COPYDATA and RegisterWindowMessage, transferring command-line arguments and file paths to the active instance.');
+  mmoAboutBuildLog.Lines.Add('  * Target Window Identification: Implemented AceUtils_MainWindow window property via SetProp to ensure the secondary process accurately targets TfrmMain rather than the internal Lazarus TApplication helper handle.');
+  mmoAboutBuildLog.Lines.Add('  * Asynchronous Document Dispatch: Queued incoming file opens via Application.QueueAsyncCall to prevent SendMessage IPC re-entrancy and safely handle modified-document save prompts.');
+  mmoAboutBuildLog.Lines.Add('  * Window Restoration & Focus Elevation: Added AllowSetForegroundWindow and window unhiding so the running instance cleanly restores from system tray or taskbar and activates immediately.');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.4.4] - 2026-09-18');
+  mmoAboutBuildLog.Lines.Add('  * File Explorer, Listings & Headers Dark Mode Contrast Fix: Resolved dark text issue across ShellTreeViewExplorer, ShellTreeView1, ShellListViewExplorer, lvResults, lvMemory, and lvContextMenu.');
+  mmoAboutBuildLog.Lines.Add('  * TreeView ThemedDraw Isolation: Excluded tvoThemedDraw in dark mode and implemented ShellTreeViewCustomDrawItem, eliminating Windows native black font drawing on folder trees.');
+  mmoAboutBuildLog.Lines.Add('  * ListView Full Item & SubItem Custom Draw: Implemented unified ListViewCustomDrawItem and ListViewCustomDrawSubItem for all listviews, ensuring item names, sizes, types, and timestamps render in high-contrast light silver ($00F0F0F0 / $00D8D8D8) with deep slate selection ($006B4D2B).');
+  mmoAboutBuildLog.Lines.Add('  * Win32 Header Control Subclassing: Subclassed parent ListView windows using SetWindowSubclass to intercept SysHeader32 NM_CUSTOMDRAW notifications (CDDS_ITEMPREPAINT), painting dark slate column headers ($0025211E) with crisp light silver titles ($00F0F0F0) and subtle column separators.');
+  mmoAboutBuildLog.Lines.Add('  * Dynamic Tab Activation Theme Refresh: Added RefreshListViewTheme and RefreshTreeViewTheme upon PageControl tab switching to ensure lazily-allocated controls immediately receive dark mode window themes and header subclasses.');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.4.3] - 2026-09-18');
   mmoAboutBuildLog.Lines.Add('  * SynEdit Dark Mode Gutter & Line Numbers Fix: Resolved bug where SynEdit gutter parts retained default clBtnFace background and rendered line numbers invisible in dark mode. Synchronized gutter background, line numbers, current-line highlight, separators, and code-folding parts across Notepad and Live Preview.');

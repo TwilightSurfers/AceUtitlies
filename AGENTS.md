@@ -127,12 +127,48 @@ Before considering any fix complete:
 
 ---
 
-## 7. Single Instance Enforcement & System Tray Wake-up
+## 7. Single Instance Enforcement, IPC File Launching & System Tray Wake-up
 
-To prevent duplicate processes and resource contention, Ace's Utilities strictly allows only one instance to run:
+To prevent duplicate processes, resource contention, and facilitate seamless external file opening (e.g., Windows Explorer "Open with Ace's Utilities" or file associations), Ace's Utilities strictly allows only one instance to run:
+
+### 1. Named Mutex & Process Termination
 - **Named Mutex**: `CreateMutex(nil, True, 'AceUtils_SingleInstance_Mutex')` in `AceUtils.lpr` checks for an existing instance before initializing LCL forms.
-- **Secondary Instance Termination**: If `GetLastError = ERROR_ALREADY_EXISTS`, the second process signals the running instance and exits immediately.
-- **System Tray Restoration & Window Flashing**: The second process posts a registered message (`RegisterWindowMessage('AceUtils_Restore_SingleInstance')`) and calls `ShowWindow(..., SW_RESTORE)` / `SetForegroundWindow`. When `TfrmMain.WndProc` receives this message, it calls `Show`, sets `WindowState := wsNormal`, brings the form to the front (unhiding it if minimized to the system tray), and calls `FlashWindowEx` to flash the window title bar and taskbar.
+- **Secondary Instance Handshake**: If `GetLastError = ERROR_ALREADY_EXISTS`, the second process transfers any command-line parameters (files or switches) to the running instance via `WM_COPYDATA`, restores and elevates the primary window, and terminates immediately.
+
+### 2. Window Identification & The `Application.Handle` Trap (CRITICAL)
+- **The Issue**: In Free Pascal / Lazarus LCL on Windows, `TApplication` creates an invisible top-level helper window (`Application.Handle`) with window class `'Window'` and title `'Ace''s Utilities'` (matching `Application.Title`). `TfrmMain` creates the actual visible form window also with class `'Window'` and title `'Ace''s Utilities'`.
+- **The Symptom**: Calling standard `FindWindow(nil, 'Ace''s Utilities')` frequently returns `Application.Handle` instead of `frmMain.Handle`. Because `Application.Handle` has 0 child controls and does not run form message handlers, any messages sent to it (`WM_COPYDATA` or `WM_ACEUTILS_RESTORE`) are ignored, causing secondary launches to do nothing.
+- **The Rule**:
+  1. Set a unique window property on `frmMain` in `FormCreate`:
+     ```pascal
+     SetProp(Handle, PChar(ACE_WINDOW_PROP), 1);
+     ```
+     and clean it up in `FormDestroy`:
+     ```pascal
+     RemoveProp(Handle, PChar(ACE_WINDOW_PROP));
+     ```
+  2. In `AceUtils.lpr`, use `EnumWindows` (`FindAceMainWindow`) to locate the window whose `GetProp(hWnd, 'AceUtils_MainWindow') <> 0`. Fall back to checking title and verifying child windows (`GetWindow(hWnd, GW_CHILD) <> 0`) to guarantee `frmMain` is accurately targeted.
+
+### 3. Lazarus LCL Win32 `WM_COPYDATA` Dropping Trap & Subclassing (CRITICAL)
+- **The Issue**: In Lazarus LCL's Win32 interface (`win32callback.inc` inside `RealWindowProc`), incoming Win32 messages are mapped to LCL messages (`LM_*`) using a `case Msg of` block. Because `WM_COPYDATA` is **not** present in `case Msg of`, the LCL message structure retains `LMessage.Msg = LM_NULL` (`0`). At line 2620, LCL executes `if Assigned(lWinControl) and (PLMsg^.Msg <> LM_NULL) then DeliverMessage(...)`. Consequently, standard `TForm.WndProc` **never receives `WM_COPYDATA`**—LCL drops it before it ever reaches form code.
+- **The Rule**:
+  1. Subclass `frmMain.Handle` directly using `SetWindowSubclass` (`comctl32.dll`) in `FormCreate`:
+     ```pascal
+     SetWindowSubclass(Handle, @MainFormSubclassProc, SUBCLASS_ID_MAINFORM, DWORD_PTR(Self));
+     ```
+  2. Intercept `WM_COPYDATA` and `WM_ACEUTILS_RESTORE` in `MainFormSubclassProc` directly from Windows, completely bypassing LCL message filtering.
+  3. Clean up with `RemoveWindowSubclass(Handle, @MainFormSubclassProc, SUBCLASS_ID_MAINFORM)` in `FormDestroy`.
+
+### 4. Asynchronous Document Dispatch & Re-Entrancy Prevention
+- When `MainFormSubclassProc` receives `WM_COPYDATA`:
+  1. Immediately copy string data from `PCopyDataStruct(lParam)^.lpData`.
+  2. Queue the file open using `Application.QueueAsyncCall(@ProcessPendingOpenFiles, 0)`.
+  3. Return `1` immediately so the secondary process's `SendMessageTimeout` finishes and the process exits in <1ms without delay.
+  4. Dispatching asynchronously ensures that if the currently open file has unsaved changes, `OpenFileInNotepad` -> `PromptSaveIfModified` modal dialogs execute safely in standard message pump context without re-entrancy or IPC deadlocks.
+
+### 5. Window Elevation & System Tray Restoration
+- **Elevation Filtering**: To allow non-elevated Explorer processes to communicate with an elevated Ace's Utilities instance without UIPI blocks, call `ChangeWindowMessageFilterEx(Handle, WM_COPYDATA, MSGFLT_ALLOW, nil)` and for `WM_ACEUTILS_RESTORE`.
+- **System Tray Restoration & Window Flashing**: Call `AllowSetForegroundWindow(ASFW_ANY)` before IPC. When messages arrive, `ShowWindow(Handle, SW_RESTORE)`, `Show`, and `WindowState := wsNormal` ensure the form cleanly unhides from the system tray and gains foreground focus. `FlashWindowEx` alerts the user if the application was minimized.
 
 ---
 
@@ -327,4 +363,62 @@ begin
   end;
   ```
   Ensure this is invoked for every `TSynEdit` control (`SynEdit1` in `MainForm` and `synPreview` in `PreviewForm`) in `ApplyTheme`.
+
+
+---
+
+## 12. Win32 Common Controls Dark Mode Invariants (`SysHeader32`, `SysListView32`, `SysTreeView32`)
+
+### 1. The Win32 `SysHeader32` Dark Mode Limitation & Subclassing (CRITICAL)
+- **The Issue**: On Windows, the native `SysHeader32` common control (the column titles in `TListView` report mode) does not natively support dark mode even when `AllowDarkModeForWindow` and `SetWindowTheme(hHdr, 'DarkMode_ItemsView', nil)` are called. Windows common controls draw header text in hardcoded black GDI system colors.
+- **The Solution**: Subclass the parent `TListView` window using `SetWindowSubclass`:
+  ```pascal
+  SetWindowSubclass(ALV.Handle, @ListViewHeaderSubclassProc, ASubclassId, DWORD_PTR(Self));
+  ```
+  In `ListViewHeaderSubclassProc`:
+  - Intercept `WM_NOTIFY` where `pnmh^.hwndFrom = ListView_GetHeader(hWnd)` and `Integer(pnmh^.code) = -12` (`NM_CUSTOMDRAW`).
+  - On `CDDS_PREPAINT`: Fill the entire header bounding rect with dark charcoal (`$0024211E`) to paint any empty space beyond the rightmost column, draw the bottom border line (`$003C3834`), and return `CDRF_NOTIFYITEMDRAW`.
+  - On `CDDS_ITEMPREPAINT`: Paint column background (`$0025211E`, or `$00322E2A` on hover, `$001B1816` on press), draw right separator line (`$003C3834`), query the column's Unicode title using `Windows.SendMessageW(hHdr, $120B {HDM_GETITEM_W}, PtrUInt(lpcd^.dwItemSpec), PtrInt(@HdItem))`, draw text in crisp light silver (`$00F0F0F0`) via `DrawTextW` with alignment flags, and return `CDRF_SKIPDEFAULT`.
+  - Clean up with `RemoveWindowSubclass(ALV.Handle, @ListViewHeaderSubclassProc, ASubclassId)` in `FormDestroy`.
+
+### 2. The `TCustomTreeView` `tvoThemedDraw` Black Font Trap (CRITICAL)
+- **The Issue**: In Lazarus LCL (`treeview.inc`), when `tvoThemedDraw in Options` is `True`, the treeview delegates node painting to Windows UxTheme `DrawThemeText(..., TVP_TREEITEM, ...)`. Under Win32 UxTheme, this call completely ignores `Font.Color` and draws black text onto dark backgrounds.
+- **The Rule**: In dark mode, always remove `tvoThemedDraw` from treeview options:
+  ```pascal
+  ShellTreeView.Options := ShellTreeView.Options - [tvoThemedDraw];
+  ShellTreeView.SelectionColor := $006B4D2B;
+  ShellTreeView.SelectionFontColor := clWhite;
+  ```
+  In light mode, restore `Options := Options + [tvoThemedDraw]`.
+  Implement `OnCustomDrawItem` to ensure node brush and font colors remain high-contrast in all selection and focus states.
+
+### 3. ListView Item & SubItem Custom Draw & Cracker Classes
+- **The Issue**: Without `OnCustomDrawItem` and `OnCustomDrawSubItem`, LCL Win32 `win32wscustomlistview.inc` skips `clrText` assignment, causing subitem text (size, type, date modified) to fall back to black system text.
+- **The Rule**:
+  1. Implement unified `ListViewCustomDrawItem` and `ListViewCustomDrawSubItem` setting `$00F0F0F0` for items and `$00D8D8D8` for subitems in dark mode.
+  2. For `TShellListView`, because `OnCustomDrawItem` and `OnCustomDrawSubItem` are protected in `TCustomListView` and not published in `TShellListView`, define a cracker class:
+     ```pascal
+     type
+       TShellListViewCracker = class(TShellListView);
+     ```
+     Cast and assign the custom draw handlers in `FormCreate`:
+     ```pascal
+     TShellListViewCracker(ShellListViewExplorer).OnCustomDrawItem := @ListViewCustomDrawItem;
+     TShellListViewCracker(ShellListViewExplorer).OnCustomDrawSubItem := @ListViewCustomDrawSubItem;
+     ```
+  3. Re-apply themes and subclasses upon tab switching in `PageControl1Change` to account for controls whose Win32 window handles were lazily allocated.
+
+### 4. Runtime Dark/Light Mode Switching Invariants (CRITICAL)
+- **The Issue**: When toggling between Dark Mode and Light Mode at runtime:
+  1. If `OnCustomDrawItem` / `OnCustomDrawSubItem` remain attached in Light Mode, LCL's `win32wscustomlistview.inc` unconditionally assigns `DrawInfo^.clrTextBk := ColorToRGB(ALV.Canvas.Brush.Color)`, which overrides Windows native Explorer selection and hover effects, causing opaque white/blue text blocks or stuck dark rectangles.
+  2. If custom draw handlers check `cdsFocused in State`, items retain dark selection styling even after losing selection or when focus moves.
+  3. `SysListView32` and `SysHeader32` cache internal `HTHEME` handles. Merely calling `SetWindowTheme` does not flush the cache, causing column headers or list items to stay dark or render with stale themes.
+  4. Non-transparent text backgrounds (`LVM_SETTEXTBKCOLOR`) draw solid rectangular boxes over selection highlights.
+- **The Rule**:
+  1. **Dynamic Wiring / Unwiring**: In `ApplyTheme`, assign custom draw handlers when `ADark = True`, and unhook them (`:= nil`) when `ADark = False` (except special status items like stale context menu verbs). In `ListViewCustomDrawItem`, guard immediately with `if not FDarkMode then begin DefaultDraw := True; Exit; end;`.
+  2. **Strict Selection Check**: Check `if cdsSelected in State then` strictly. Never include `cdsFocused in State` in selection styling.
+  3. **Transparent Text Background**: Always send `Windows.SendMessage(ALV.Handle, $1026 {LVM_SETTEXTBKCOLOR}, 0, $FFFFFFFF {CLR_NONE});` in both themes.
+  4. **Force Theme Cache Flush**: Always call `SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED)` and send `WM_THEMECHANGED` (`$031A`) to both the control and its header (`ListView_GetHeader`).
+  5. **Header Theme Reset**: In Light Mode, set header theme back to `'ItemsView'` (not non-existent `'Explorer'`), and list view theme to `'Explorer'`.
+  6. **Explorer List Refresh**: For `ShellListViewExplorer`, call `ShellListViewExplorer.UpdateView;` and `EnsureExplorerSystemImageList;` upon theme change to cleanly re-populate items and system shell icon caches.
 
