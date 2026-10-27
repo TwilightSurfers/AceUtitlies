@@ -336,6 +336,99 @@ type
     mmoAboutLicense: TMemo;
     tmrStatus: TTimer;
 
+    // Main Menu
+    MainMenu1: TMainMenu;
+    miFile: TMenuItem;
+    miFileNew: TMenuItem;
+    miFileOpen: TMenuItem;
+    miFileRecent: TMenuItem;
+    miFileSave: TMenuItem;
+    miFileSaveAs: TMenuItem;
+    miFileClose: TMenuItem;
+    miFileExit: TMenuItem;
+    miEdit: TMenuItem;
+    miEditUndo: TMenuItem;
+    miEditRedo: TMenuItem;
+    miEditCut: TMenuItem;
+    miEditCopy: TMenuItem;
+    miEditPaste: TMenuItem;
+    miEditSelectAll: TMenuItem;
+    miEditFind: TMenuItem;
+    miEditFindNext: TMenuItem;
+    miEditFindPrev: TMenuItem;
+    miEditReplace: TMenuItem;
+    miEditGoToLine: TMenuItem;
+    miEditWordWrap: TMenuItem;
+    miEditReplaceAITells: TMenuItem;
+    miEditFormat: TMenuItem;
+    miEditFormatNumbered: TMenuItem;
+    miEditFormatBullet: TMenuItem;
+    miEditFormatHTML: TMenuItem;
+    miEditFontColor: TMenuItem;
+    miView: TMenuItem;
+    miViewExplorer: TMenuItem;
+    miViewSearch: TMenuItem;
+    miViewNotepad: TMenuItem;
+    miViewMemory: TMenuItem;
+    miViewContextMenu: TMenuItem;
+    miViewAbout: TMenuItem;
+    miViewNextTab: TMenuItem;
+    miViewPrevTab: TMenuItem;
+    miViewPreview: TMenuItem;
+    miViewDarkMode: TMenuItem;
+    miViewTabStyle: TMenuItem;
+    miViewTabClassic: TMenuItem;
+    miViewTabFlat: TMenuItem;
+    miViewTabButtons: TMenuItem;
+    miViewTabDot: TMenuItem;
+    miViewTabTall: TMenuItem;
+    miGo: TMenuItem;
+    miGoBack: TMenuItem;
+    miGoForward: TMenuItem;
+    miGoUp: TMenuItem;
+    miGoRefresh: TMenuItem;
+    miGoAddress: TMenuItem;
+    miGoDefault: TMenuItem;
+    miGoDesktop: TMenuItem;
+    miGoDownloads: TMenuItem;
+    miGoDocuments: TMenuItem;
+    miGoPictures: TMenuItem;
+    miGoDriveC: TMenuItem;
+    miGoUserHome: TMenuItem;
+    miGoSortBy: TMenuItem;
+    miSortName: TMenuItem;
+    miSortType: TMenuItem;
+    miSortSize: TMenuItem;
+    miSortDate: TMenuItem;
+    miSortAscending: TMenuItem;
+    miSortDescending: TMenuItem;
+    miGoNewFolder: TMenuItem;
+    miGoSetDefault: TMenuItem;
+    miTools: TMenuItem;
+    miToolsFindFiles: TMenuItem;
+    miToolsStopSearch: TMenuItem;
+    miToolsAssociate: TMenuItem;
+    miToolsTakeover: TMenuItem;
+    miToolsRescan: TMenuItem;
+    miToolsRunInTray: TMenuItem;
+    miHelp: TMenuItem;
+    miHelpShortcuts: TMenuItem;
+    miHelpAbout: TMenuItem;
+    miMainSep1: TMenuItem;
+    miMainSep2: TMenuItem;
+    miMainSep3: TMenuItem;
+    miMainSep4: TMenuItem;
+    miMainSep5: TMenuItem;
+    miMainSep6: TMenuItem;
+    miMainSep7: TMenuItem;
+    miMainSep8: TMenuItem;
+    miMainSep9: TMenuItem;
+    miMainSep10: TMenuItem;
+    miMainSep11: TMenuItem;
+    miMainSep12: TMenuItem;
+    miMainSep13: TMenuItem;
+    miMainSep14: TMenuItem;
+
     // Form Events
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormCreate(Sender: TObject);
@@ -508,6 +601,41 @@ type
     procedure miMemClearAllClick(Sender: TObject);
     procedure tmrClipboardTimer(Sender: TObject);
 
+    // Main Menu Handlers
+    procedure miFileMenuClick(Sender: TObject);
+    procedure miEditMenuClick(Sender: TObject);
+    procedure miViewMenuClick(Sender: TObject);
+    procedure miGoMenuClick(Sender: TObject);
+    procedure miToolsMenuClick(Sender: TObject);
+    procedure miRecentFileClick(Sender: TObject);
+    procedure miRecentClearClick(Sender: TObject);
+    procedure miEditUndoClick(Sender: TObject);
+    procedure miEditRedoClick(Sender: TObject);
+    procedure miEditCutClick(Sender: TObject);
+    procedure miEditCopyClick(Sender: TObject);
+    procedure miEditPasteClick(Sender: TObject);
+    procedure miEditSelectAllClick(Sender: TObject);
+    procedure miEditFindClick(Sender: TObject);
+    procedure miEditFindPrevClick(Sender: TObject);
+    procedure miEditReplaceClick(Sender: TObject);
+    procedure miEditGoToLineClick(Sender: TObject);
+    procedure miEditWordWrapClick(Sender: TObject);
+    procedure miEditReplaceAITellsClick(Sender: TObject);
+    procedure miViewTabClick(Sender: TObject);
+    procedure miViewNextTabClick(Sender: TObject);
+    procedure miViewPrevTabClick(Sender: TObject);
+    procedure miViewPreviewClick(Sender: TObject);
+    procedure miGoRefreshClick(Sender: TObject);
+    procedure miGoAddressClick(Sender: TObject);
+    procedure miGoJumpClick(Sender: TObject);
+    procedure miSortByClick(Sender: TObject);
+    procedure miSortDirectionClick(Sender: TObject);
+    procedure miToolsFindFilesClick(Sender: TObject);
+    procedure miToolsRunInTrayClick(Sender: TObject);
+    procedure miHelpShortcutsClick(Sender: TObject);
+    procedure SearchFieldKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FindBarKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+
   private
     // Search Engine State
     FStopSearch: Boolean;
@@ -562,12 +690,8 @@ type
     procedure SetActivity(const AMsg: string);
     procedure SetCounts;
     procedure SetSearching(AValue: Boolean);
-    function MatchesParsedPattern(const AFileName: string; APatterns: TStrings; ACaseSensitive: Boolean): Boolean;
-    function MatchesPattern(const AFileName, APattern: string; ACaseSensitive: Boolean): Boolean;
-    function MatchWildcard(const AStr, APattern: string): Boolean;
     function FileContainsText(const AFilePath, AText: string; ACaseSensitive: Boolean): Boolean;
     function SafeFileDateToDateTime(ATime: LongInt): TDateTime;
-    function FormatFileSize(ASize: Int64; IsFolder: Boolean = False): string;
     function IsImageFile(const APath: string): Boolean;
     function IsTextFile(const APath: string): Boolean;
     function IsPreviewableFile(const APath: string): Boolean;
@@ -579,11 +703,7 @@ type
     // Notepad Helpers
     function SaveCurrentFile: Boolean;
     function PromptSaveIfModified: Boolean;
-    function StripListMarker(const S: string): string;
-    function FormatAsNumberedList(const AText: string; AIsHTML: Boolean): string;
-    function FormatAsBulletList(const AText: string; AIsHTML: Boolean): string;
     procedure ApplyListFormatting(ANumbered: Boolean);
-    function GetSuggestedFileName: string;
     procedure UpdateNotepadStatus;
     procedure UpdateSaveButtonState;
     procedure AutoDetectHighlighter(const AFileName: string);
@@ -638,6 +758,23 @@ type
     procedure SetTabStyle(AStyle: Integer);
     procedure UpdateTabOptionsMenu;
 
+  private
+    // Tab navigation, menus & recent files
+    FRecentFiles: TStringList;
+    procedure ActivateTab(ATab: TTabSheet);
+    procedure CycleTab(ADelta: Integer);
+    function TabForMenuItem(AItem: TObject): TTabSheet;
+    procedure RebuildRecentMenu;
+    procedure RememberRecentFile(const AFileName: string);
+    procedure ShowFindBar(AFocusReplace: Boolean);
+    procedure FindInEditor(ABackwards: Boolean);
+    procedure UpdateExplorerSortIndicators;
+    procedure SetExplorerSort(AColumn: Integer; AAscending: Boolean);
+    procedure SortExplorerList;
+    procedure DeferredExplorerSort(Data: PtrInt);
+    procedure ApplyMainMenuTheme(ADark: Boolean);
+    procedure MainMenuBarDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+
     procedure EnsureExplorerSystemImageList;
     procedure NavigateExplorerTo(const APath: string; AddToHistory: Boolean = True);
     procedure UpdateExplorerNavButtons;
@@ -660,7 +797,6 @@ type
     {$IFDEF WINDOWS}
     function GetWinClipboardText(out AText: string; out AOpened: Boolean): Boolean;
     {$ENDIF}
-    function CleanAITells(const AText: string): string;
     function CheckAndCollectClipboard: Boolean;
     procedure AddMemoryFragment(const AText: string);
     procedure DeleteMemoryFragmentInternal(AIndex: Integer);
@@ -693,10 +829,16 @@ uses
   {$IFDEF WINDOWS}
   Windows, ShellAPI, ShlObj, CommCtrl,
   {$ENDIF}
-  LResources, DateUtils, Math, PreviewForm, lazsynedittext;
+  LResources, DateUtils, Math, PreviewForm, lazsynedittext, AceCore, SynEditKeyCmds;
 
 const
   FILE_ATTRIBUTE_REPARSE_POINT = $00000400;
+
+  // Dark menu bar palette
+  DARK_MENUBAR_BG = $002D2925;      // same as HeaderBg
+  DARK_MENUBAR_HOT = $00473F38;
+  DARK_MENUBAR_TEXT = $00F0F0F0;
+  DARK_MENUBAR_DISABLED = $00909090;
 
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
@@ -704,6 +846,7 @@ type
 {$IFDEF WINDOWS}
 var
   WM_ACEUTILS_RESTORE: UINT = 0;
+  DarkMenuBarBrush: HBRUSH = 0;
 
 function GetClipboardSequenceNumber: DWORD; stdcall; external 'user32.dll';
 
@@ -782,6 +925,13 @@ begin
   Result := StringReplace(Result, '▶ ', '', [rfReplaceAll]);
   Result := StringReplace(Result, '■ ', '', [rfReplaceAll]);
   Result := Trim(Result);
+end;
+
+// Caption as stored in AceUtils.ini: indicator removed and '&&' (literal
+// ampersand in an LCL caption) folded back to '&'
+function TabSettingName(const ACap: string): string;
+begin
+  Result := StringReplace(CleanTabCaption(ACap), '&&', '&', [rfReplaceAll]);
 end;
 
 { ----------------------------------------------------------------------------
@@ -888,7 +1038,7 @@ begin
       // Active Tab (defaults to The Real Explorer on initial launch)
       ColorStr := Ini.ReadString('General', 'ActiveTab', 'The Real Explorer');
       for i := 0 to PageControl1.PageCount - 1 do
-        if CleanTabCaption(PageControl1.Pages[i].Caption) = CleanTabCaption(ColorStr) then
+        if SameText(TabSettingName(PageControl1.Pages[i].Caption), TabSettingName(ColorStr)) then
         begin
           PageControl1.ActivePageIndex := i;
           Break;
@@ -927,7 +1077,22 @@ begin
       if (FExpDefaultFolder = '') or (not DirectoryExists(FExpDefaultFolder)) then
         FExpDefaultFolder := GetUserDesktopPath;
       cbExpPreviewAlways.Checked := Ini.ReadBool('Explorer', 'PreviewAlways', False);
+      FExpSortColumn := Ini.ReadInteger('Explorer', 'SortColumn', EXP_COL_TYPE);
+      if (FExpSortColumn < EXP_COL_NAME) or (FExpSortColumn > EXP_COL_DATE) then
+        FExpSortColumn := EXP_COL_TYPE;
+      FExpSortAscending := Ini.ReadBool('Explorer', 'SortAscending', True);
+      UpdateExplorerSortIndicators;
       NavigateExplorerTo(FExpDefaultFolder);
+
+      // Recent Files (most recent first)
+      FRecentFiles.Clear;
+      for i := 1 to MAX_RECENT_FILES do
+      begin
+        ColorStr := Ini.ReadString('RecentFiles', 'File' + IntToStr(i), '');
+        if ColorStr <> '' then
+          FRecentFiles.Add(ColorStr);
+      end;
+      RebuildRecentMenu;
 
       // Memory & Notes Options
       FMemoryLimit := Ini.ReadInteger('Memory', 'ManagerLimit', 5);
@@ -967,6 +1132,7 @@ end;
 procedure TfrmMain.SaveAllOptions;
 var
   Ini: TIniFile;
+  i: Integer;
 begin
   if FLoadingSettings then Exit;
   Ini := TIniFile.Create(GetIniPath);
@@ -978,7 +1144,7 @@ begin
     Ini.WriteBool('General', 'HighlightActiveTab', FHighlightActiveTab);
     Ini.WriteBool('General', 'TallTabs', FTallTabs);
     if Assigned(PageControl1.ActivePage) then
-      Ini.WriteString('General', 'ActiveTab', CleanTabCaption(PageControl1.ActivePage.Caption));
+      Ini.WriteString('General', 'ActiveTab', TabSettingName(PageControl1.ActivePage.Caption));
 
     // Search Options
     Ini.WriteBool('Search', 'Subfolders', cbSubfolders.Checked);
@@ -1000,6 +1166,16 @@ begin
     // Explorer Options
     Ini.WriteString('Explorer', 'DefaultFolder', FExpDefaultFolder);
     Ini.WriteBool('Explorer', 'PreviewAlways', cbExpPreviewAlways.Checked);
+    Ini.WriteInteger('Explorer', 'SortColumn', FExpSortColumn);
+    Ini.WriteBool('Explorer', 'SortAscending', FExpSortAscending);
+
+    // Recent Files
+    if FRecentFiles <> nil then
+    begin
+      Ini.EraseSection('RecentFiles');
+      for i := 0 to FRecentFiles.Count - 1 do
+        Ini.WriteString('RecentFiles', 'File' + IntToStr(i + 1), FRecentFiles[i]);
+    end;
 
     // Memory & Notes Options
     Ini.WriteInteger('Memory', 'ManagerLimit', FMemoryLimit);
@@ -1019,11 +1195,14 @@ const
   SUBCLASS_ID_LVMEMORY = 103;
   SUBCLASS_ID_LVCONTEXT = 104;
   SUBCLASS_ID_MAINFORM = 105;
+  SUBCLASS_ID_STATUSBAR = 106;
   HDM_GETITEM_W = $120B;
 
 function MainFormSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
   uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall; forward;
 function ListViewHeaderSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
+  uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall; forward;
+function StatusBarGripSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
   uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall; forward;
 {$ENDIF}
 
@@ -1089,6 +1268,10 @@ begin
   SynEdit1.WantTabs := True;
   SynEdit1.TabWidth := 4;
   SynEdit1.Keystrokes.ResetDefaults;
+  // Windows convention: Ctrl+Y is Redo (SynEdit's default maps it to "delete line")
+  i := SynEdit1.Keystrokes.FindKeycode(VK_Y, [ssCtrl]);
+  if i >= 0 then
+    SynEdit1.Keystrokes[i].Command := ecRedo;
   SynEdit1.OnPaste := @SynEdit1Paste;
 
   // Default Search Status
@@ -1099,6 +1282,10 @@ begin
   for i := 0 to StatusBar1.Panels.Count - 1 do
     StatusBar1.Panels[i].Style := psOwnerDraw;
   StatusBar1.OnDrawPanel := @StatusBar1DrawPanel;
+  {$IFDEF WINDOWS}
+  // SysStatus32 paints its size grip with light theme colors; repaint it in dark mode
+  SetWindowSubclass(StatusBar1.Handle, @StatusBarGripSubclassProc, SUBCLASS_ID_STATUSBAR, DWORD_PTR(Self));
+  {$ENDIF}
   FormResize(Self);
   StatusBar1.Panels[0].Text := ' Ready. Enter pattern or select folder to search.';
   StatusBar1.Panels[1].Text := 'Files: 0';
@@ -1130,6 +1317,16 @@ begin
   tabExplorer.ImageIndex := 4;
   tabAbout.ImageIndex := 5;
 
+  // Tab order follows everyday use: browse, search, edit, then the utilities.
+  // Ctrl+1..Ctrl+6 and the View menu follow this same order.
+  tabExplorer.PageIndex := 0;
+  tabSearch.PageIndex := 1;
+  tabNotepad.PageIndex := 2;
+  tabMemory.PageIndex := 3;
+  tabContextMenu.PageIndex := 4;
+  tabAbout.PageIndex := 5;
+  FRecentFiles := TStringList.Create;
+
   // Initialize Memory & Notes state
   SetLength(FMemoryFragments, 0);
   FMemoryLimit := 5;
@@ -1144,7 +1341,8 @@ begin
   FExpHistory := TStringList.Create;
   FExpHistoryIndex := -1;
   FExpNavigating := False;
-  FExpSortColumn := -1;
+  // Sorted from the very first listing (overridden by the saved preference in LoadAllOptions)
+  FExpSortColumn := EXP_COL_TYPE;
   FExpSortAscending := True;
   FExpPreviewSyncing := False;
   FExpDefaultFolder := GetUserDesktopPath;
@@ -1166,7 +1364,31 @@ begin
 
   ShellListViewExplorer.OnFileAdded := @ShellListViewExplorerFileAdded;
 
+  // TShellListView.PopulateWithRoot ends with Sort, which is a no-op while
+  // SortType = stNone; that left folders and files in raw enumeration order.
+  // With a SortType set, every populate (navigate, refresh, rename, delete)
+  // runs through ShellListViewExplorerCompare. AutoSort stays off because the
+  // column-click handler owns the sort state.
+  TShellListViewCracker(ShellListViewExplorer).AutoSort := False;
+  ShellListViewExplorer.SortType := stText;
 
+  // Discoverable shortcuts on the Explorer toolbar
+  btnExpBack.Hint := 'Back (Alt+Left)';
+  btnExpForward.Hint := 'Forward (Alt+Right)';
+  btnExpUp.Hint := 'Up one level (Alt+Up / Backspace)';
+  btnExpRefresh.Hint := 'Refresh (F5)';
+  btnExpDefault.Hint := 'Default folder (Alt+Home)';
+  edtExpPath.Hint := 'Address bar (Ctrl+L) - paste a folder or file path and press Enter';
+  btnExpNewFolder.Hint := 'New folder (Ctrl+Shift+N)';
+  btnExpPreview.Hint := 'Toggle preview window (Ctrl+Shift+P)';
+  btnSearch.Hint := 'Start search (Enter in any search field, or F5)';
+  btnStop.Hint := 'Stop search (Esc)';
+  btnFindDialog.Hint := 'Find (Ctrl+F) / Replace (Ctrl+H)';
+  for i := 0 to pnlExplorerNav.ControlCount - 1 do
+    pnlExplorerNav.Controls[i].ShowHint := True;
+  btnSearch.ShowHint := True;
+  btnStop.ShowHint := True;
+  btnFindDialog.ShowHint := True;
 
   LoadAboutContent;
   UpdateKeyboardAndTimerStatus;
@@ -1193,12 +1415,7 @@ begin
   // Check command-line arguments
   if ParamCount >= 1 then
   begin
-    CleanArg := Trim(ParamStr(1));
-    while (Length(CleanArg) > 0) and (CleanArg[1] in ['"', '''']) do
-      Delete(CleanArg, 1, 1);
-    while (Length(CleanArg) > 0) and (CleanArg[Length(CleanArg)] in ['"', '''']) do
-      Delete(CleanArg, Length(CleanArg), 1);
-    CleanArg := Trim(CleanArg);
+    CleanArg := StripPathQuotes(ParamStr(1));
 
     if SameText(CleanArg, '/register') or SameText(CleanArg, '-register') or SameText(CleanArg, '--register') then
     begin
@@ -1220,16 +1437,11 @@ begin
       if FileExists(CleanArg) then
       begin
         OpenFileInNotepad(CleanArg);
-        PageControl1.ActivePage := tabNotepad;
-        UpdateTabHighlight;
-        if SynEdit1.CanFocus then
-          SynEdit1.SetFocus;
       end
       else if DirectoryExists(CleanArg) then
       begin
         NavigateExplorerTo(CleanArg, True);
-        PageControl1.ActivePage := tabExplorer;
-        UpdateTabHighlight;
+        ActivateTab(tabExplorer);
       end;
     end;
   end;
@@ -1245,6 +1457,14 @@ begin
   {$ENDIF}
 
   ApplyTheme(FDarkMode);
+  // Handles of the visible tab are created after OnShow; sort once they exist
+  Application.QueueAsyncCall(@DeferredExplorerSort, 0);
+end;
+
+procedure TfrmMain.DeferredExplorerSort(Data: PtrInt);
+begin
+  SortExplorerList;
+  AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -1263,11 +1483,21 @@ begin
     RemoveWindowSubclass(lvMemory.Handle, @ListViewHeaderSubclassProc, SUBCLASS_ID_LVMEMORY);
   if lvContextMenu.HandleAllocated then
     RemoveWindowSubclass(lvContextMenu.Handle, @ListViewHeaderSubclassProc, SUBCLASS_ID_LVCONTEXT);
+  if StatusBar1.HandleAllocated then
+    RemoveWindowSubclass(StatusBar1.Handle, @StatusBarGripSubclassProc, SUBCLASS_ID_STATUSBAR);
   {$ENDIF}
   FreeAndNil(FPendingOpenFiles);
   FreeAndNil(FExpHistory);
   SafelyFreeWrapPlugin(FWrapPlugin, SynEdit1);
   SaveAllOptions;
+  FreeAndNil(FRecentFiles);
+  {$IFDEF WINDOWS}
+  if DarkMenuBarBrush <> 0 then
+  begin
+    DeleteObject(DarkMenuBarBrush);
+    DarkMenuBarBrush := 0;
+  end;
+  {$ENDIF}
 end;
 
 procedure TfrmMain.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -1323,9 +1553,8 @@ procedure TfrmMain.miTrayNotepadClick(Sender: TObject);
 begin
   Show;
   WindowState := wsNormal;
-  PageControl1.ActivePage := tabNotepad;
-  UpdateTabHighlight;
   BringToFront;
+  ActivateTab(tabNotepad);
 end;
 
 procedure TfrmMain.miTrayExitClick(Sender: TObject);
@@ -1352,12 +1581,7 @@ begin
       SetLength(RecvStr, PCDS^.cbData div SizeOf(Char));
       Move(PCDS^.lpData^, RecvStr[1], PCDS^.cbData);
       RecvStr := PChar(RecvStr);
-      RecvStr := Trim(RecvStr);
-      while (Length(RecvStr) > 0) and (RecvStr[1] in ['"', '''']) do
-        Delete(RecvStr, 1, 1);
-      while (Length(RecvStr) > 0) and (RecvStr[Length(RecvStr)] in ['"', '''']) do
-        Delete(RecvStr, Length(RecvStr), 1);
-      RecvStr := Trim(RecvStr);
+      RecvStr := StripPathQuotes(RecvStr);
 
       if (RecvStr <> '') and (FPendingOpenFiles <> nil) then
       begin
@@ -1445,16 +1669,11 @@ begin
     else if FileExists(TargetFile) then
     begin
       OpenFileInNotepad(TargetFile);
-      PageControl1.ActivePage := tabNotepad;
-      UpdateTabHighlight;
-      if SynEdit1.CanFocus then
-        SynEdit1.SetFocus;
     end
     else if DirectoryExists(TargetFile) then
     begin
       NavigateExplorerTo(TargetFile, True);
-      PageControl1.ActivePage := tabExplorer;
-      UpdateTabHighlight;
+      ActivateTab(tabExplorer);
     end;
   end;
 end;
@@ -1826,6 +2045,16 @@ begin
     miTabHighlightDot.Checked := FHighlightActiveTab;
   if Assigned(miTabTallHeight) then
     miTabTallHeight.Checked := FTallTabs;
+
+  // Main menu mirror (View > Tab Style)
+  if Assigned(miViewTabClassic) then
+  begin
+    miViewTabClassic.Checked := (FTabStyle = 0);
+    miViewTabFlat.Checked := (FTabStyle = 2);
+    miViewTabButtons.Checked := (FTabStyle = 1);
+    miViewTabDot.Checked := FHighlightActiveTab;
+    miViewTabTall.Checked := FTallTabs;
+  end;
 end;
 
 procedure TfrmMain.btnTabStyleClick(Sender: TObject);
@@ -1841,9 +2070,9 @@ end;
 
 procedure TfrmMain.miTabStyleClick(Sender: TObject);
 begin
-  if Sender = miTabStyleButtons then
+  if (Sender = miTabStyleButtons) or (Sender = miViewTabButtons) then
     SetTabStyle(1)
-  else if Sender = miTabStyleFlat then
+  else if (Sender = miTabStyleFlat) or (Sender = miViewTabFlat) then
     SetTabStyle(2)
   else
     SetTabStyle(0);
@@ -2006,6 +2235,64 @@ begin
   end;
 end;
 
+{ Dark menu bar support.
+  LCL owner-draws the menu bar items (see TfrmMain.MainMenuBarDrawItem); the
+  bar background comes from MENUINFO.hbrBack, and Windows still paints a 1px
+  light line between the bar and the client area, which is covered in
+  WM_NCPAINT / WM_NCACTIVATE below. }
+type
+  TAceMenuInfo = record
+    cbSize: DWORD;
+    fMask: DWORD;
+    dwStyle: DWORD;
+    cyMax: UINT;
+    hbrBack: HBRUSH;
+    dwContextHelpID: DWORD;
+    dwMenuData: ULONG_PTR;
+  end;
+
+  TAceMenuBarInfo = record
+    cbSize: DWORD;
+    rcBar: Windows.RECT;
+    hMenu: HMENU;
+    hwndMenu: HWND;
+    fFlags: DWORD;
+  end;
+
+const
+  ACE_MIM_BACKGROUND = $00000002;
+  ACE_OBJID_MENU = LONG($FFFFFFFD);
+
+function AceSetMenuInfo(hMenu: HMENU; const lpcmi: TAceMenuInfo): BOOL; stdcall;
+  external 'user32.dll' name 'SetMenuInfo';
+function AceGetMenuBarInfo(hWnd: HWND; idObject, idItem: LONG; var pmbi: TAceMenuBarInfo): BOOL; stdcall;
+  external 'user32.dll' name 'GetMenuBarInfo';
+
+procedure PaintMenuBarBottomLine(hWnd: HWND);
+var
+  mbi: TAceMenuBarInfo;
+  rcClient, rcWindow, rcLine: Windows.RECT;
+  DC: HDC;
+begin
+  if DarkMenuBarBrush = 0 then Exit;
+  FillChar(mbi, SizeOf(mbi), 0);
+  mbi.cbSize := SizeOf(mbi);
+  if not AceGetMenuBarInfo(hWnd, ACE_OBJID_MENU, 0, mbi) then Exit;
+  GetClientRect(hWnd, rcClient);
+  MapWindowPoints(hWnd, 0, @rcClient, 2);
+  GetWindowRect(hWnd, rcWindow);
+  OffsetRect(rcClient, -rcWindow.Left, -rcWindow.Top);
+  rcLine := rcClient;
+  rcLine.Bottom := rcLine.Top;
+  rcLine.Top := rcLine.Top - 1;
+  DC := GetWindowDC(hWnd);
+  if DC <> 0 then
+  begin
+    FillRect(DC, rcLine, DarkMenuBarBrush);
+    ReleaseDC(hWnd, DC);
+  end;
+end;
+
 function MainFormSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
   uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall;
 var
@@ -2017,6 +2304,13 @@ begin
   frm := TfrmMain(Pointer(dwRefData));
   if frm <> nil then
   begin
+    if frm.FDarkMode and ((uMsg = WM_NCPAINT) or (uMsg = WM_NCACTIVATE)) then
+    begin
+      Result := DefSubclassProc(hWnd, uMsg, wParam, lParam);
+      PaintMenuBarBottomLine(hWnd);
+      Exit;
+    end;
+
     if uMsg = WM_COPYDATA then
     begin
       PCDS := PCopyDataStruct(Pointer(lParam));
@@ -2026,12 +2320,7 @@ begin
         SetLength(RecvStr, PCDS^.cbData div SizeOf(Char));
         Move(PCDS^.lpData^, RecvStr[1], PCDS^.cbData);
         RecvStr := PChar(RecvStr);
-        RecvStr := Trim(RecvStr);
-        while (Length(RecvStr) > 0) and (RecvStr[1] in ['"', '''']) do
-          Delete(RecvStr, 1, 1);
-        while (Length(RecvStr) > 0) and (RecvStr[Length(RecvStr)] in ['"', '''']) do
-          Delete(RecvStr, Length(RecvStr), 1);
-        RecvStr := Trim(RecvStr);
+        RecvStr := StripPathQuotes(RecvStr);
 
         if (RecvStr <> '') and (frm.FPendingOpenFiles <> nil) then
         begin
@@ -2092,6 +2381,58 @@ begin
   end;
 
   Result := DefSubclassProc(hWnd, uMsg, wParam, lParam);
+end;
+
+{ The native SysStatus32 size grip (bottom-right drag handle) is drawn with the
+  light theme no matter what SetWindowTheme / dark mode APIs are used. In dark
+  mode, let the control paint normally, then cover the grip square with the
+  status bar color and draw the classic dot triangle in a muted gray. Resizing
+  keeps working because the control's WM_NCHITTEST (HTBOTTOMRIGHT) is untouched. }
+function StatusBarGripSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
+  uISubClass: UINT_PTR; dwRefData: DWORD_PTR): LRESULT; stdcall;
+var
+  frm: TfrmMain;
+  rc, rGrip, rDot: Windows.RECT;
+  DC: HDC;
+  BgBrush, DotBrush: HBRUSH;
+  GripSize, DotSize, Pitch, Col, Row: Integer;
+begin
+  Result := DefSubclassProc(hWnd, uMsg, wParam, lParam);
+  frm := TfrmMain(Pointer(dwRefData));
+  if (uMsg <> WM_PAINT) or (frm = nil) or (not frm.FDarkMode) or
+     (not frm.StatusBar1.SizeGrip) or (frm.WindowState = wsMaximized) then
+    Exit;
+
+  GetClientRect(hWnd, rc);
+  GripSize := rc.Bottom - rc.Top;
+  if GripSize <= 0 then Exit;
+  rGrip := rc;
+  rGrip.Left := rc.Right - GripSize;
+
+  DC := GetDC(hWnd);
+  if DC = 0 then Exit;
+  BgBrush := CreateSolidBrush(ColorToRGB(frm.StatusBar1.Color));
+  DotBrush := CreateSolidBrush($00787878);
+  try
+    FillRect(DC, rGrip, BgBrush);
+    // Six dots in a bottom-right triangle, scaled with the bar height (DPI)
+    DotSize := Max(2, GripSize div 11);
+    Pitch := DotSize * 2;
+    for Row := 0 to 2 do
+      for Col := 0 to 2 do
+        if Col + Row >= 2 then
+        begin
+          rDot.Right := rc.Right - DotSize div 2 - (2 - Col) * Pitch;
+          rDot.Bottom := rc.Bottom - DotSize div 2 - (2 - Row) * Pitch;
+          rDot.Left := rDot.Right - DotSize;
+          rDot.Top := rDot.Bottom - DotSize;
+          FillRect(DC, rDot, DotBrush);
+        end;
+  finally
+    DeleteObject(DotBrush);
+    DeleteObject(BgBrush);
+    ReleaseDC(hWnd, DC);
+  end;
 end;
 
 function ListViewHeaderSubclassProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM;
@@ -2763,6 +3104,7 @@ begin
   if ShellListViewExplorer.HandleAllocated and (ShellListViewExplorer.Items.Count > 0) then
   begin
     ShellListViewExplorer.UpdateView;
+    SortExplorerList;
     EnsureExplorerSystemImageList;
   end;
 
@@ -2794,9 +3136,76 @@ begin
   ApplySynEditGutterTheme(SynEdit1, ADark, GutterBg);
 
   ApplyHighlighterTheme(ADark);
+  ApplyMainMenuTheme(ADark);
 
   if Assigned(frmPreview) then
     frmPreview.ApplyTheme(ADark);
+end;
+
+procedure TfrmMain.ApplyMainMenuTheme(ADark: Boolean);
+var
+  i: Integer;
+  {$IFDEF WINDOWS}
+  MI: TAceMenuInfo;
+  {$ENDIF}
+begin
+  if MainMenu1 = nil then Exit;
+
+  // Only the top-level bar items are custom drawn; dropdowns keep the
+  // native themed drawing (dark via SetPreferredAppMode in dark mode).
+  for i := 0 to MainMenu1.Items.Count - 1 do
+    if ADark then
+      MainMenu1.Items[i].OnDrawItem := @MainMenuBarDrawItem
+    else
+      MainMenu1.Items[i].OnDrawItem := nil;
+
+  {$IFDEF WINDOWS}
+  if ADark and (DarkMenuBarBrush = 0) then
+    DarkMenuBarBrush := CreateSolidBrush(DARK_MENUBAR_BG);
+  if HandleAllocated then
+  begin
+    FillChar(MI, SizeOf(MI), 0);
+    MI.cbSize := SizeOf(MI);
+    MI.fMask := ACE_MIM_BACKGROUND;
+    if ADark then
+      MI.hbrBack := DarkMenuBarBrush
+    else
+      MI.hbrBack := 0; // system default
+    AceSetMenuInfo(MainMenu1.Handle, MI);
+    DrawMenuBar(Handle);
+    // Repaint the non-client area so the line under the bar updates too
+    SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or
+      SWP_NOACTIVATE or SWP_FRAMECHANGED);
+  end;
+  {$ENDIF}
+end;
+
+procedure TfrmMain.MainMenuBarDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect;
+  AState: LCLType.TOwnerDrawState);
+const
+  DT_HIDEPREFIX_FLAG = $00100000;
+var
+  Cap: string;
+  Flags: Cardinal;
+begin
+  if (LCLType.odSelected in AState) or (LCLType.odHotLight in AState) then
+    ACanvas.Brush.Color := DARK_MENUBAR_HOT
+  else
+    ACanvas.Brush.Color := DARK_MENUBAR_BG;
+  ACanvas.FillRect(ARect);
+
+  ACanvas.Font.Assign(Screen.MenuFont);
+  if (LCLType.odDisabled in AState) or (LCLType.odGrayed in AState) or (LCLType.odInactive in AState) then
+    ACanvas.Font.Color := DARK_MENUBAR_DISABLED
+  else
+    ACanvas.Font.Color := DARK_MENUBAR_TEXT;
+  ACanvas.Brush.Style := bsClear;
+
+  Cap := TMenuItem(Sender).Caption;
+  Flags := DT_CENTER or DT_VCENTER or DT_SINGLELINE;
+  if LCLType.odNoAccel in AState then
+    Flags := Flags or DT_HIDEPREFIX_FLAG;
+  LCLIntf.DrawText(ACanvas.Handle, PChar(Cap), Length(Cap), ARect, Flags);
 end;
 
 function TfrmMain.ConvertToUTF8(const S: string): string;
@@ -3191,12 +3600,7 @@ begin
     Exit;
   end;
 
-  SearchPath := Trim(edtSearchPath.Text);
-  while (Length(SearchPath) > 0) and (SearchPath[1] in ['"', '''']) do
-    Delete(SearchPath, 1, 1);
-  while (Length(SearchPath) > 0) and (SearchPath[Length(SearchPath)] in ['"', '''']) do
-    Delete(SearchPath, Length(SearchPath), 1);
-  SearchPath := Trim(SearchPath);
+  SearchPath := StripPathQuotes(edtSearchPath.Text);
 
   if SearchPath = '' then
     SearchPath := FSelectedPath;
@@ -3328,7 +3732,7 @@ end;
 
 function TfrmMain.IsPreviewableFile(const APath: string): Boolean;
 begin
-  Result := IsImageFile(APath) or IsTextFile(APath);
+  Result := IsImageFile(APath) or IsTextFile(APath) or IsPdfFile(APath);
 end;
 
 procedure TfrmMain.TriggerFilePreview(Item: TListItem);
@@ -3420,7 +3824,7 @@ begin
     else if DirectoryExists(FullPath) then
     begin
       edtSearchPath.Text := FullPath;
-      PageControl1.ActivePage := tabSearch;
+      ActivateTab(tabSearch);
     end;
   end;
 end;
@@ -3551,12 +3955,11 @@ begin
         Exit;
       end;
       OpenFileInNotepad(FullPath);
-      PageControl1.ActivePage := tabNotepad;
     end
     else if DirectoryExists(FullPath) then
     begin
       edtSearchPath.Text := FullPath;
-      PageControl1.ActivePage := tabSearch;
+      ActivateTab(tabSearch);
     end;
   end;
 end;
@@ -3749,6 +4152,8 @@ begin
     RefreshTreeViewTheme(ShellTreeViewExplorer);
     RefreshListViewTheme(ShellListViewExplorer, SUBCLASS_ID_SHELLEXPLORER);
     EnsureExplorerSystemImageList;
+    // The list may have just been populated by its delayed first CreateHandle
+    SortExplorerList;
     AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
     if cbExpPreviewAlways.Checked and (ShellListViewExplorer.Selected <> nil) then
       PreviewExplorerFile(GetExplorerSelectedPath);
@@ -4429,9 +4834,8 @@ begin
   DirQueue := TStringList.Create;
   PatternList := TStringList.Create;
   try
-    PatternList.Delimiter := ';';
-    PatternList.StrictDelimiter := True;
-    PatternList.DelimitedText := APattern;
+    // Parsed (trimmed / lowercased) once so the traversal loop never allocates per pattern
+    ParseSearchPatterns(APattern, ACaseSensitive, PatternList);
 
     DirQueue.Add(APath);
     QueueIndex := 0;
@@ -4491,7 +4895,7 @@ begin
               // Check folder name if user requested folder inclusion
               if AIncludeFolders and (not HasContentFilter) then
               begin
-                if MatchesParsedPattern(SR.Name, PatternList, ACaseSensitive) then
+                if MatchesSearchPatterns(SR.Name, PatternList, ACaseSensitive) then
                 begin
                   AddResult(SR.Name, CurrentDir, 0, SafeFileDateToDateTime(SR.Time), 'Folder');
                   Inc(FFileCount);
@@ -4507,7 +4911,7 @@ begin
             else
             begin
               // File checks
-              NameMatches := MatchesParsedPattern(SR.Name, PatternList, ACaseSensitive);
+              NameMatches := MatchesSearchPatterns(SR.Name, PatternList, ACaseSensitive);
               if NameMatches then
               begin
                 if FStopSearch then Break;
@@ -4549,47 +4953,6 @@ begin
     Result := FileDateToDateTime(ATime);
   except
     Result := 0;
-  end;
-end;
-
-function TfrmMain.FormatFileSize(ASize: Int64; IsFolder: Boolean = False): string;
-var
-  Val: Double;
-begin
-  if IsFolder then
-  begin
-    Result := '';
-    Exit;
-  end;
-
-  if ASize <= 0 then
-  begin
-    Result := '0 KB';
-    Exit;
-  end;
-
-  if ASize < 1024 then
-  begin
-    Val := ASize / 1024.0;
-    Result := Format('%.2f KB', [Val]);
-  end
-  else if ASize < 100 * 1024 then
-  begin
-    Val := ASize / 1024.0;
-    if Val >= 10.0 then
-      Result := Format('%.1f KB', [Val])
-    else
-      Result := Format('%.2f KB', [Val]);
-  end
-  else if ASize < 1024 * 1024 * 1024 then
-  begin
-    Val := ASize / (1024.0 * 1024.0);
-    Result := Format('%.2f MB', [Val]);
-  end
-  else
-  begin
-    Val := ASize / (1024.0 * 1024.0 * 1024.0);
-    Result := Format('%.2f GB', [Val]);
   end;
 end;
 
@@ -4654,109 +5017,6 @@ begin
     Screen.Cursor := crHourGlass
   else
     Screen.Cursor := crDefault;
-end;
-
-function TfrmMain.MatchesParsedPattern(const AFileName: string;
-  APatterns: TStrings; ACaseSensitive: Boolean): Boolean;
-var
-  i: Integer;
-  FN, Pat: string;
-begin
-  Result := False;
-  if (APatterns = nil) or (APatterns.Count = 0) then Exit(True);
-
-  if ACaseSensitive then
-    FN := AFileName
-  else
-    FN := LowerCase(AFileName);
-
-  for i := 0 to APatterns.Count - 1 do
-  begin
-    if ACaseSensitive then
-      Pat := Trim(APatterns[i])
-    else
-      Pat := LowerCase(Trim(APatterns[i]));
-
-    if Pat = '' then Continue;
-
-    // Smart match: If no wildcards (* or ?) are used, treat as a "contains" substring search
-    if (Pos('*', Pat) = 0) and (Pos('?', Pat) = 0) then
-    begin
-      if Pos(Pat, FN) > 0 then
-      begin
-        Result := True;
-        Exit;
-      end;
-    end
-    else
-    begin
-      // Full wildcard match
-      if MatchWildcard(FN, Pat) then
-      begin
-        Result := True;
-        Exit;
-      end;
-    end;
-  end;
-end;
-
-function TfrmMain.MatchesPattern(const AFileName, APattern: string;
-  ACaseSensitive: Boolean): Boolean;
-var
-  Patterns: TStringList;
-begin
-  Patterns := TStringList.Create;
-  try
-    Patterns.Delimiter := ';';
-    Patterns.StrictDelimiter := True;
-    Patterns.DelimitedText := APattern;
-    Result := MatchesParsedPattern(AFileName, Patterns, ACaseSensitive);
-  finally
-    Patterns.Free;
-  end;
-end;
-
-function TfrmMain.MatchWildcard(const AStr, APattern: string): Boolean;
-var
-  SP, PP: Integer;
-  StarP, MatchP: Integer;
-begin
-  SP := 1;
-  PP := 1;
-  StarP := 0;
-  MatchP := 1;
-
-  while SP <= Length(AStr) do
-  begin
-    if (PP <= Length(APattern)) and
-       ((APattern[PP] = '?') or (APattern[PP] = AStr[SP])) then
-    begin
-      Inc(SP);
-      Inc(PP);
-    end
-    else if (PP <= Length(APattern)) and (APattern[PP] = '*') then
-    begin
-      StarP := PP;
-      MatchP := SP;
-      Inc(PP);
-    end
-    else if StarP > 0 then
-    begin
-      PP := StarP + 1;
-      Inc(MatchP);
-      SP := MatchP;
-    end
-    else
-    begin
-      Result := False;
-      Exit;
-    end;
-  end;
-
-  while (PP <= Length(APattern)) and (APattern[PP] = '*') do
-    Inc(PP);
-
-  Result := PP > Length(APattern);
 end;
 
 function TfrmMain.FileContainsText(const AFilePath, AText: string;
@@ -4840,8 +5100,8 @@ begin
     FIsModified := False;
     lblCurrentFile.Caption := ExtractFileName(AFileName) + ' (' + AFileName + ')';
     Caption := 'Ace''s Utilities - ' + ExtractFileName(AFileName);
-    PageControl1.ActivePage := tabNotepad;
-    UpdateTabHighlight;
+    RememberRecentFile(AFileName);
+    ActivateTab(tabNotepad);
     UpdateNotepadStatus;
     UpdateSaveButtonState;
     if SynEdit1.CanFocus then
@@ -5150,12 +5410,13 @@ begin
   if FCurrentFileName <> '' then
     SaveDialog1.FileName := FCurrentFileName
   else
-    SaveDialog1.FileName := GetSuggestedFileName;
+    SaveDialog1.FileName := SuggestFileName(SynEdit1.Lines);
 
   if SaveDialog1.Execute then
   begin
     FCurrentFileName := SaveDialog1.FileName;
-    SaveCurrentFile;
+    if SaveCurrentFile then
+      RememberRecentFile(FCurrentFileName);
     AutoDetectHighlighter(FCurrentFileName);
     UpdateSaveButtonState;
   end;
@@ -5187,30 +5448,6 @@ begin
   SaveAllOptions;
 end;
 
-function TfrmMain.CleanAITells(const AText: string): string;
-begin
-  Result := AText;
-  if Result = '' then Exit;
-
-  // Em-dash (— U+2014), En-dash (– U+2013), and Horizontal bar (― U+2015) to hyphens (-)
-  Result := StringReplace(Result, #$E2#$80#$94, '-', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$93, '-', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$95, '-', [rfReplaceAll]);
-
-  // Curly double quotes (“ ” U+201C, U+201D) and low double quote („ U+201E) to straight quotes (")
-  Result := StringReplace(Result, #$E2#$80#$9C, '"', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$9D, '"', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$9E, '"', [rfReplaceAll]);
-
-  // Curly single quotes / apostrophes (‘ ’ U+2018, U+2019), low quote (‚ U+201A),
-  // high reversed-9 quote (‛ U+201B), modifier letter apostrophe (ʼ U+02BC) to straight apostrophe (')
-  Result := StringReplace(Result, #$E2#$80#$98, '''', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$99, '''', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$9A, '''', [rfReplaceAll]);
-  Result := StringReplace(Result, #$E2#$80#$9B, '''', [rfReplaceAll]);
-  Result := StringReplace(Result, #$CA#$BC, '''', [rfReplaceAll]);
-end;
-
 procedure TfrmMain.cbReplaceAITellsClick(Sender: TObject);
 begin
   if FLoadingSettings then Exit;
@@ -5233,236 +5470,6 @@ begin
   end;
 
   SaveAllOptions;
-end;
-
-function TfrmMain.GetSuggestedFileName: string;
-var
-  i, LineIdx: Integer;
-  Candidate, RawLine, CleanChars: string;
-  C: Char;
-const
-  IllegalChars: set of Char = ['\', '/', ':', '*', '?', '"', '<', '>', '|'];
-begin
-  Candidate := '';
-  RawLine := '';
-
-  // Scan for the first non-empty line
-  for LineIdx := 0 to SynEdit1.Lines.Count - 1 do
-  begin
-    if Trim(SynEdit1.Lines[LineIdx]) <> '' then
-    begin
-      RawLine := SynEdit1.Lines[LineIdx];
-      Break;
-    end;
-  end;
-
-  if RawLine <> '' then
-  begin
-    CleanChars := '';
-    for i := 1 to Length(RawLine) do
-    begin
-      C := RawLine[i];
-      if (not (C in IllegalChars)) and (Ord(C) >= 32) then
-      begin
-        // Skip leading space or period
-        if (CleanChars = '') and (C in [' ', '.']) then
-          Continue;
-        CleanChars := CleanChars + C;
-      end;
-    end;
-
-    // Take up to 8 characters
-    Candidate := Copy(CleanChars, 1, 8);
-    Candidate := Trim(Candidate);
-
-    // Remove any trailing periods or spaces
-    while (Length(Candidate) > 0) and (Candidate[Length(Candidate)] in ['.', ' ']) do
-      Delete(Candidate, Length(Candidate), 1);
-  end;
-
-  if Candidate = '' then
-    Result := 'Untitled.txt'
-  else
-    Result := Candidate + '.txt';
-end;
-
-function TfrmMain.StripListMarker(const S: string): string;
-var
-  i, len: Integer;
-  LowerS: string;
-begin
-  Result := Trim(S);
-  if Result = '' then Exit;
-
-  // Check for HTML <li>...</li>
-  LowerS := LowerCase(Result);
-  if (Copy(LowerS, 1, 4) = '<li>') and (Copy(LowerS, Length(LowerS) - 4, 5) = '</li>') then
-  begin
-    Result := Copy(Result, 5, Length(Result) - 9);
-    Result := Trim(Result);
-  end;
-
-  // Check for leading markdown / text bullets: '-', '*', '+', followed by space
-  if (Length(Result) >= 2) and (Result[1] in ['-', '*', '+']) and (Result[2] = ' ') then
-  begin
-    Delete(Result, 1, 2);
-    Result := Trim(Result);
-    Exit;
-  end;
-
-  // UTF-8 Bullet '•' is 3 bytes: #$E2#$80#$A2
-  if (Length(Result) >= 3) and (Copy(Result, 1, 3) = #$E2#$80#$A2) then
-  begin
-    Delete(Result, 1, 3);
-    Result := Trim(Result);
-    if (Length(Result) > 0) and (Result[1] = ' ') then
-    begin
-      Delete(Result, 1, 1);
-      Result := Trim(Result);
-    end;
-    Exit;
-  end;
-
-  // Check for leading number like '1. ', '1) ', '12. '
-  len := Length(Result);
-  i := 1;
-  while (i <= len) and (Result[i] in ['0'..'9']) do
-    Inc(i);
-  if (i > 1) and (i <= len) and (Result[i] in ['.', ')', '-']) then
-  begin
-    Inc(i);
-    while (i <= len) and (Result[i] = ' ') do
-      Inc(i);
-    Result := Copy(Result, i, len - i + 1);
-  end;
-end;
-
-function TfrmMain.FormatAsNumberedList(const AText: string; AIsHTML: Boolean): string;
-var
-  Lines, OutLines: TStringList;
-  i, ItemNum: Integer;
-  CurLine, CleanItem, LowLine: string;
-  HasTrailingNL: Boolean;
-begin
-  if AText = '' then
-  begin
-    Result := '';
-    Exit;
-  end;
-
-  HasTrailingNL := (Length(AText) > 0) and ((AText[Length(AText)] = #10) or (AText[Length(AText)] = #13));
-  Lines := TStringList.Create;
-  OutLines := TStringList.Create;
-  try
-    Lines.Text := AText;
-    ItemNum := 1;
-
-    if AIsHTML then
-    begin
-      OutLines.Add('<ol>');
-      for i := 0 to Lines.Count - 1 do
-      begin
-        CurLine := Lines[i];
-        if Trim(CurLine) = '' then
-          Continue;
-        LowLine := LowerCase(Trim(CurLine));
-        if (LowLine = '<ol>') or (LowLine = '</ol>') or
-           (LowLine = '<ul>') or (LowLine = '</ul>') then
-          Continue;
-        CleanItem := StripListMarker(CurLine);
-        OutLines.Add('  <li>' + CleanItem + '</li>');
-      end;
-      OutLines.Add('</ol>');
-    end
-    else
-    begin
-      for i := 0 to Lines.Count - 1 do
-      begin
-        CurLine := Lines[i];
-        if Trim(CurLine) = '' then
-          OutLines.Add(CurLine)
-        else
-        begin
-          CleanItem := StripListMarker(CurLine);
-          OutLines.Add(IntToStr(ItemNum) + '. ' + CleanItem);
-          Inc(ItemNum);
-        end;
-      end;
-    end;
-
-    Result := OutLines.Text;
-    if (not HasTrailingNL) and (Length(Result) >= Length(LineEnding)) and
-       (Copy(Result, Length(Result) - Length(LineEnding) + 1, Length(LineEnding)) = LineEnding) then
-    begin
-      SetLength(Result, Length(Result) - Length(LineEnding));
-    end;
-  finally
-    Lines.Free;
-    OutLines.Free;
-  end;
-end;
-
-function TfrmMain.FormatAsBulletList(const AText: string; AIsHTML: Boolean): string;
-var
-  Lines, OutLines: TStringList;
-  i: Integer;
-  CurLine, CleanItem, LowLine: string;
-  HasTrailingNL: Boolean;
-begin
-  if AText = '' then
-  begin
-    Result := '';
-    Exit;
-  end;
-
-  HasTrailingNL := (Length(AText) > 0) and ((AText[Length(AText)] = #10) or (AText[Length(AText)] = #13));
-  Lines := TStringList.Create;
-  OutLines := TStringList.Create;
-  try
-    Lines.Text := AText;
-
-    if AIsHTML then
-    begin
-      OutLines.Add('<ul>');
-      for i := 0 to Lines.Count - 1 do
-      begin
-        CurLine := Lines[i];
-        if Trim(CurLine) = '' then
-          Continue;
-        LowLine := LowerCase(Trim(CurLine));
-        if (LowLine = '<ol>') or (LowLine = '</ol>') or
-           (LowLine = '<ul>') or (LowLine = '</ul>') then
-          Continue;
-        CleanItem := StripListMarker(CurLine);
-        OutLines.Add('  <li>' + CleanItem + '</li>');
-      end;
-      OutLines.Add('</ul>');
-    end
-    else
-    begin
-      for i := 0 to Lines.Count - 1 do
-      begin
-        CurLine := Lines[i];
-        if Trim(CurLine) = '' then
-          OutLines.Add(CurLine)
-        else
-        begin
-          CleanItem := StripListMarker(CurLine);
-          OutLines.Add('• ' + CleanItem);
-        end;
-      end;
-    end;
-
-    Result := OutLines.Text;
-    if (not HasTrailingNL) and (Length(Result) >= Length(LineEnding)) and
-       (Copy(Result, Length(Result) - Length(LineEnding) + 1, Length(LineEnding)) = LineEnding) then
-    begin
-      SetLength(Result, Length(Result) - Length(LineEnding));
-    end;
-  finally
-    Lines.Free;
-    OutLines.Free;
-  end;
 end;
 
 procedure TfrmMain.ApplyListFormatting(ANumbered: Boolean);
@@ -5568,23 +5575,62 @@ begin
 end;
 
 procedure TfrmMain.btnFindNextClick(Sender: TObject);
+begin
+  FindInEditor(False);
+end;
+
+procedure TfrmMain.FindInEditor(ABackwards: Boolean);
 var
   FindOpts: TSynSearchOptions;
 begin
-  if edtFindText.Text = '' then Exit;
+  // F3 / Shift+F3 with nothing to look for opens the find bar instead
+  if edtFindText.Text = '' then
+  begin
+    ShowFindBar(False);
+    Exit;
+  end;
+  if PageControl1.ActivePage <> tabNotepad then
+    ActivateTab(tabNotepad);
 
   FindOpts := [ssoFindContinue];
   if cbMatchCase.Checked then
     Include(FindOpts, ssoMatchCase);
   if cbWholeWord.Checked then
     Include(FindOpts, ssoWholeWord);
+  if ABackwards then
+    Include(FindOpts, ssoBackwards);
 
   if SynEdit1.SearchReplace(edtFindText.Text, '', FindOpts) = 0 then
   begin
-    // Wrap around search
+    // Wrap around: search again from the start (or the end when going backwards)
     Exclude(FindOpts, ssoFindContinue);
+    Include(FindOpts, ssoEntireScope);
     if SynEdit1.SearchReplace(edtFindText.Text, '', FindOpts) = 0 then
-      ShowMessage('Text "' + edtFindText.Text + '" not found.');
+      ShowMessage('Text "' + edtFindText.Text + '" not found.')
+    else
+      SetStatus(' Search wrapped around the document.');
+  end;
+end;
+
+procedure TfrmMain.ShowFindBar(AFocusReplace: Boolean);
+begin
+  if PageControl1.ActivePage <> tabNotepad then
+    ActivateTab(tabNotepad);
+  pnlFindReplace.Visible := True;
+  // Seed the search box with a single-line selection
+  if SynEdit1.SelAvail and (Pos(#10, SynEdit1.SelText) = 0) then
+    edtFindText.Text := SynEdit1.SelText;
+  if AFocusReplace and (edtFindText.Text <> '') then
+  begin
+    if edtReplaceText.CanFocus then
+      edtReplaceText.SetFocus;
+    edtReplaceText.SelectAll;
+  end
+  else
+  begin
+    if edtFindText.CanFocus then
+      edtFindText.SetFocus;
+    edtFindText.SelectAll;
   end;
 end;
 
@@ -5685,25 +5731,27 @@ begin
     end;
   end;
 
-  if (PageControl1 <> nil) and (PageControl1.ActivePage = tabNotepad) and
-     (ssCtrl in Shift) and not (ssAlt in Shift) then
+  // Esc: stop a running search, or close the Notepad find bar.
+  // (Not a menu shortcut: dialogs and in-place editors need Esc themselves.)
+  if (Key = VK_ESCAPE) and (Shift = []) then
   begin
-    if (ssShift in Shift) and (Key = VK_S) then
+    if FSearching then
     begin
-      btnSaveAsClick(nil);
+      btnStopClick(nil);
       Key := 0;
       Exit;
     end
-    else if (Key = VK_S) then
+    else if (PageControl1.ActivePage = tabNotepad) and pnlFindReplace.Visible then
     begin
-      if FCurrentFileName <> '' then
-        btnSaveFileClick(nil)
-      else
-        btnSaveAsClick(nil);
+      btnCloseFindClick(nil);
+      if SynEdit1.CanFocus then
+        SynEdit1.SetFocus;
       Key := 0;
       Exit;
     end;
   end;
+
+  // Save / Save As / tab switching etc. are MainMenu1 shortcuts (see miFileMenuClick)
 
   // Delphi tip: Never let Form-level KeyPreview interfere with typing in active editor/edit controls!
   if (ActiveControl = SynEdit1) or (ActiveControl is TCustomEdit) or (ActiveControl is TCustomMemo) then
@@ -6222,8 +6270,7 @@ begin
   else
     lblCurrentFile.Caption := '*Untitled Document';
 
-  PageControl1.ActivePage := tabNotepad;
-  UpdateTabHighlight;
+  ActivateTab(tabNotepad);
   UpdateNotepadStatus;
   UpdateSaveButtonState;
   SetStatus(' Memory fragment transferred to Notepad (marked unsaved)');
@@ -6438,11 +6485,16 @@ begin
 end;
 
 procedure TfrmMain.FormResize(Sender: TObject);
-const
-  RightPanelsWidth = 90 + 90 + 50 + 50 + 50 + 130 + 24; // 484
+var
+  i, RightPanelsWidth: Integer;
 begin
-  if (StatusBar1 <> nil) and (StatusBar1.Panels.Count > 0) then
-    StatusBar1.Panels[0].Width := Max(200, StatusBar1.ClientWidth - RightPanelsWidth);
+  if (StatusBar1 = nil) or (StatusBar1.Panels.Count = 0) then Exit;
+  // Sum the real (DPI-scaled) widths of the right-hand panels and reserve a
+  // square for the size grip, so the clock/INS panels stay on screen at any scaling
+  RightPanelsWidth := StatusBar1.ClientHeight;
+  for i := 1 to StatusBar1.Panels.Count - 1 do
+    Inc(RightPanelsWidth, StatusBar1.Panels[i].Width);
+  StatusBar1.Panels[0].Width := Max(Scale96ToForm(200), StatusBar1.ClientWidth - RightPanelsWidth);
 end;
 
 procedure TfrmMain.StatusBar1DrawPanel(StatusBar: TStatusBar; Panel: TStatusPanel; const Rect: TRect);
@@ -6623,15 +6675,17 @@ begin
   mmoAboutFeatures.Lines.Add('   - Full navigation history (Back/Forward/Up/Refresh) and quick jump chips for Desktop, Downloads, Docs, Pics, C:\, Home.');
   mmoAboutFeatures.Lines.Add('   - Configurable default start folder with 1-click Set Default.');
   mmoAboutFeatures.Lines.Add('   - Instant Preview toggle and comprehensive context menus.');
+  mmoAboutFeatures.Lines.Add('   - Always sorted: folders first, then by Type, Name, Size or Date (click a column or Go > Sort By; remembered).');
   mmoAboutFeatures.Lines.Add('');
   mmoAboutFeatures.Lines.Add('4. FLOATING LIVE PREVIEW:');
   mmoAboutFeatures.Lines.Add('   - Modeless floating preview window updating in real-time as results are clicked.');
   mmoAboutFeatures.Lines.Add('   - Image scaling preview (.png, .jpg, .bmp, .ico, .gif) with dimension readouts.');
   mmoAboutFeatures.Lines.Add('   - TSynEdit code preview with line numbers and syntax coloring.');
+  mmoAboutFeatures.Lines.Add('   - PDF preview powered by PDFium: multi-page, fit-to-window, Prev/Next, mouse wheel, PgUp/PgDn.');
   mmoAboutFeatures.Lines.Add('   - High-res shell icon rendering and 16-column Hex + ASCII byte peek.');
   mmoAboutFeatures.Lines.Add('');
   mmoAboutFeatures.Lines.Add('5. NOTEPAD REPLACEMENT:');
-  mmoAboutFeatures.Lines.Add('   - Tabbed editor powered by TSynEdit with dirty tracking.');
+  mmoAboutFeatures.Lines.Add('   - Editor powered by TSynEdit with dirty tracking and a Recent Files list.');
   mmoAboutFeatures.Lines.Add('   - Replace AI Tells option: automatically converts em-dashes to hyphens, curly quotes to straight quotes, and curly apostrophes to straight ones on open and paste.');
   mmoAboutFeatures.Lines.Add('   - Text Formatting: Numbered list and HTML list (<ol>, <ul>) support, applicable to selection or whole document.');
   mmoAboutFeatures.Lines.Add('   - Dedicated custom Markdown highlighter (headers, code blocks, lists, links).');
@@ -6656,13 +6710,32 @@ begin
   mmoAboutFeatures.Lines.Add('   - One-click Transfer to Notepad: inserts at caret or appends, and marks file as unsaved (*).');
   mmoAboutFeatures.Lines.Add('   - Embedded persistent Quick Notes scratchpad automatically saved across sessions.');
   mmoAboutFeatures.Lines.Add('   - Right-click context menu for quick copy, transfer to Notepad, and pinning to notes.');
+  mmoAboutFeatures.Lines.Add('');
+  mmoAboutFeatures.Lines.Add('9. MENU BAR & KEYBOARD:');
+  mmoAboutFeatures.Lines.Add('   - Full File / Edit / View / Go / Tools / Help menu bar (dark-mode aware).');
+  mmoAboutFeatures.Lines.Add('   - Ctrl+1..Ctrl+6 jump to tabs, Ctrl+Tab / Ctrl+Shift+Tab cycle them.');
+  mmoAboutFeatures.Lines.Add('   - Context-aware Ctrl+F, F5 and Ctrl+L; Explorer Alt+arrows; Notepad Ctrl+G, F3, Ctrl+H, Ctrl+W.');
+  mmoAboutFeatures.Lines.Add('   - Recent Files list (last 10) and Help > Keyboard Shortcuts (F1).');
 
-  lblAboutTitle.Caption := 'Ace''s Utilities  v1.4.5';
+  lblAboutTitle.Caption := 'Ace''s Utilities  v1.5.0';
 
   mmoAboutBuildLog.Lines.Clear;
   mmoAboutBuildLog.Lines.Add('================================================================');
   mmoAboutBuildLog.Lines.Add('ACE''S UTILITIES - BUILD HISTORY & CHANGELOG');
   mmoAboutBuildLog.Lines.Add('================================================================');
+  mmoAboutBuildLog.Lines.Add('');
+  mmoAboutBuildLog.Lines.Add('[v1.5.0] - 2026-10-26');
+  mmoAboutBuildLog.Lines.Add('  * Main Menu Bar: Added File / Edit / View / Go / Tools / Help menus that expose every tab and toolbar action, with a custom-drawn dark menu bar in Dark Mode. The old header strip (tray, association, dark mode and tab-style buttons) now lives in the menus.');
+  mmoAboutBuildLog.Lines.Add('  * Tab Hotkeys: Ctrl+1..Ctrl+6 open a tab directly, Ctrl+Tab / Ctrl+Shift+Tab cycle through tabs, and switching tabs puts keyboard focus in the main control of that tab.');
+  mmoAboutBuildLog.Lines.Add('  * Tab Order: Tabs now follow everyday use: The Real Explorer, File Search, Notepad, Memory & Notes, Context Menu, About.');
+  mmoAboutBuildLog.Lines.Add('  * PDF Preview: The floating preview renders PDF pages with PDFium (pdfium.dll), with page navigation (buttons, mouse wheel, PgUp/PgDn/Home/End) and a Windows thumbnail fallback.');
+  mmoAboutBuildLog.Lines.Add('  * Explorer Sorting Fix: The Real Explorer is now always sorted (folders first). TShellListView never applied its own sort because PopulateWithRoot sorts inside BeginUpdate; every repopulate is now followed by an explicit sort. Sort column and direction are remembered (default: Type).');
+  mmoAboutBuildLog.Lines.Add('  * Keyboard Workflow: Context-aware Ctrl+F (find in Notepad, search current folder from Explorer), F5 (refresh / run search), Ctrl+L (address bar), Alt+Left/Right/Up navigation, Ctrl+G go to line, F3 / Shift+F3 find next / previous with wrap-around, Ctrl+H replace, Ctrl+W close file, Esc stops a search or closes the find bar. Ctrl+Y is now Redo in Notepad.');
+  mmoAboutBuildLog.Lines.Add('  * Enter Key Fix: Enter in a search field starts the search; Enter in the Find bar finds (Shift+Enter backwards) instead of triggering a hidden File Search default button.');
+  mmoAboutBuildLog.Lines.Add('  * Recent Files: File > Open Recent keeps the last 10 opened or saved files.');
+  mmoAboutBuildLog.Lines.Add('  * Status Bar: The size grip (bottom-right drag handle) is now repainted dark in Dark Mode, and the right-hand status panels are sized from their real DPI-scaled widths so CAPS / NUM / INS / clock no longer get clipped at 125-150% display scaling.');
+  mmoAboutBuildLog.Lines.Add('  * Caption Fixes: Captions containing "&" (Memory & Notes, Quick Notes & Scratchpad, ...) no longer render as accelerator underscores.');
+  mmoAboutBuildLog.Lines.Add('  * Unit Tests: Search pattern, list formatting, sorting, tab cycling, recent files and PDF rendering logic moved to AceCore / AcePdf and covered by an fpcunit suite (tests\run-tests.ps1).');
   mmoAboutBuildLog.Lines.Add('');
   mmoAboutBuildLog.Lines.Add('[v1.4.5] - 2026-10-01');
   mmoAboutBuildLog.Lines.Add('  * Single-Instance External File Opening & IPC Fix: Resolved critical bug where opening an external file via Explorer ("Open in Ace...") while an instance was already running resulted in the secondary process exiting without triggering file opening.');
@@ -6924,12 +6997,7 @@ var
   CleanPath, TargetFile, TargetName: string;
   i: Integer;
 begin
-  CleanPath := Trim(APath);
-  while (Length(CleanPath) > 0) and (CleanPath[1] in ['"', '''']) do
-    Delete(CleanPath, 1, 1);
-  while (Length(CleanPath) > 0) and (CleanPath[Length(CleanPath)] in ['"', '''']) do
-    Delete(CleanPath, Length(CleanPath), 1);
-  CleanPath := Trim(CleanPath);
+  CleanPath := StripPathQuotes(APath);
 
   if CleanPath = '' then Exit;
 
@@ -6975,8 +7043,7 @@ begin
     UpdateExplorerNavButtons;
     SetStatus(' Explorer: ' + CleanPath);
 
-    if FExpSortColumn >= 0 then
-      ShellListViewExplorer.AlphaSort;
+    SortExplorerList;
 
     // If a target file was identified, select it in the explorer list and preview it
     if TargetFile <> '' then
@@ -7039,8 +7106,7 @@ begin
   CurPath := ShellListViewExplorer.Root;
   if not DirectoryExists(CurPath) then Exit;
   ShellListViewExplorer.UpdateView;
-  if FExpSortColumn >= 0 then
-    ShellListViewExplorer.AlphaSort;
+  SortExplorerList;
   AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
   SetStatus(' Refreshed: ' + CurPath);
 end;
@@ -7156,6 +7222,7 @@ begin
     if CreateDir(NewPath) then
     begin
       ShellListViewExplorer.UpdateView;
+      SortExplorerList;
       SetStatus(' Created folder: ' + NewPath);
     end
     else
@@ -7241,7 +7308,6 @@ begin
      (Ext = '.ini') or (Ext = '.cfg') or (Ext = '.yaml') or (Ext = '.yml') then
   begin
     OpenFileInNotepad(SelPath);
-    PageControl1.ActivePage := tabNotepad;
   end
   else
   begin
@@ -7329,7 +7395,6 @@ begin
   if (SelPath <> '') and FileExists(SelPath) then
   begin
     OpenFileInNotepad(SelPath);
-    PageControl1.ActivePage := tabNotepad;
   end;
 end;
 
@@ -7386,6 +7451,7 @@ begin
       if RenameFile(SelPath, NewPath) then
       begin
         ShellListViewExplorer.UpdateView;
+        SortExplorerList;
         SetStatus(' Renamed to: ' + NewPath);
       end
       else
@@ -7429,6 +7495,7 @@ begin
     DeleteFile(SelPath);
   {$ENDIF}
   ShellListViewExplorer.UpdateView;
+  SortExplorerList;
 end;
 
 procedure TfrmMain.ShellListViewExplorerFileAdded(Sender: TObject; Item: TListItem);
@@ -7476,20 +7543,11 @@ begin
   {$ENDIF}
 end;
 
-procedure TfrmMain.ShellListViewExplorerColumnClick(Sender: TObject; Column: TListColumn);
+procedure TfrmMain.UpdateExplorerSortIndicators;
 var
   i: Integer;
   BaseCaption: string;
 begin
-  if Column = nil then Exit;
-  if FExpSortColumn = Column.Index then
-    FExpSortAscending := not FExpSortAscending
-  else
-  begin
-    FExpSortColumn := Column.Index;
-    FExpSortAscending := True;
-  end;
-
   for i := 0 to ShellListViewExplorer.Columns.Count - 1 do
   begin
     BaseCaption := ShellListViewExplorer.Columns[i].Caption;
@@ -7504,94 +7562,627 @@ begin
     end;
     ShellListViewExplorer.Columns[i].Caption := BaseCaption;
   end;
+end;
 
-  ShellListViewExplorer.AlphaSort;
+procedure TfrmMain.SortExplorerList;
+begin
+  // LCL quirk: TShellListView.PopulateWithRoot calls Sort inside
+  // Items.BeginUpdate, and TCustomListView.BeginUpdate sets
+  // lffPreparingSorting, which makes that Sort a no-op. So every repopulate
+  // (Root change, UpdateView, first handle creation) must be followed by an
+  // explicit sort, which runs through ShellListViewExplorerCompare.
+  if ShellListViewExplorer.Items.Count > 1 then
+    ShellListViewExplorer.AlphaSort;
+end;
+
+procedure TfrmMain.SetExplorerSort(AColumn: Integer; AAscending: Boolean);
+begin
+  if (AColumn < EXP_COL_NAME) or (AColumn > EXP_COL_DATE) then Exit;
+  FExpSortColumn := AColumn;
+  FExpSortAscending := AAscending;
+  UpdateExplorerSortIndicators;
+  SortExplorerList;
   AutoFitListViewColumns(ShellListViewExplorer, ShellListViewExplorer.Columns);
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.ShellListViewExplorerColumnClick(Sender: TObject; Column: TListColumn);
+begin
+  if Column = nil then Exit;
+  if FExpSortColumn = Column.Index then
+    SetExplorerSort(Column.Index, not FExpSortAscending)
+  else
+    // Like Windows Explorer: sizes and dates start largest / newest first
+    SetExplorerSort(Column.Index, not (Column.Index in [EXP_COL_SIZE, EXP_COL_DATE]));
 end;
 
 procedure TfrmMain.ShellListViewExplorerCompare(Sender: TObject; Item1, Item2: TListItem;
   Data: Integer; var Compare: Integer);
-var
-  IsFold1, IsFold2: Boolean;
-  Size1, Size2: Int64;
-  Time1, Time2: LongInt;
+
+  function EntryOf(AItem: TListItem): TExplorerEntry;
+  begin
+    Result.Name := AItem.Caption;
+    if AItem is TShellListItem then
+    begin
+      Result.IsFolder := TShellListItem(AItem).isFolder;
+      Result.Size := TShellListItem(AItem).FileInfo.Size;
+      Result.Time := TShellListItem(AItem).FileInfo.Time;
+    end
+    else
+    begin
+      Result.IsFolder := False;
+      Result.Size := 0;
+      Result.Time := 0;
+    end;
+  end;
+
 begin
   Compare := 0;
   if (Item1 = nil) or (Item2 = nil) then Exit;
+  Compare := CompareExplorerEntries(EntryOf(Item1), EntryOf(Item2), FExpSortColumn, FExpSortAscending);
+end;
 
-  if (Item1 is TShellListItem) then
-    IsFold1 := TShellListItem(Item1).isFolder
-  else
-    IsFold1 := False;
+{ ----------------------------------------------------------------------------
+  Main Menu, Tab Navigation & Keyboard Shortcuts
 
-  if (Item2 is TShellListItem) then
-    IsFold2 := TShellListItem(Item2).isFolder
-  else
-    IsFold2 := False;
+  Shortcut rules (see AGENTS.md section 2):
+  - Clipboard / undo / select-all keys (Ctrl+X/C/V/Z/Y/A) are NOT menu
+    shortcuts; native edits and SynEdit handle them. The Edit menu items act on
+    whichever control has focus when clicked.
+  - Every other shortcut lives on MainMenu1. Each top-level menu's OnClick
+    refreshes Enabled states, and LCL runs it before dispatching a shortcut,
+    so a shortcut that does not apply to the active tab is disabled and the
+    key falls through to the focused control instead of being swallowed.
+  ---------------------------------------------------------------------------- }
 
-  // Folders always grouped first!
-  if IsFold1 and (not IsFold2) then
+procedure TfrmMain.ActivateTab(ATab: TTabSheet);
+begin
+  if (ATab = nil) or (not ATab.TabVisible) then Exit;
+  if PageControl1.ActivePage <> ATab then
   begin
-    Compare := -1;
-    Exit;
-  end;
-  if (not IsFold1) and IsFold2 then
-  begin
-    Compare := 1;
-    Exit;
+    PageControl1.ActivePage := ATab;
+    // Programmatic page changes do not fire OnChange; run the same refresh path
+    PageControl1Change(PageControl1);
   end;
 
-  // Compare according to active column
-  case FExpSortColumn of
-    0: // Name
-    begin
-      Compare := CompareText(Item1.Caption, Item2.Caption);
-    end;
-    1: // Size
-    begin
-      if (Item1 is TShellListItem) and (Item2 is TShellListItem) then
-      begin
-        Size1 := TShellListItem(Item1).FileInfo.Size;
-        Size2 := TShellListItem(Item2).FileInfo.Size;
-        if Size1 < Size2 then Compare := -1
-        else if Size1 > Size2 then Compare := 1
-        else Compare := 0;
-      end
-      else if (Item1.SubItems.Count > 0) and (Item2.SubItems.Count > 0) then
-        Compare := CompareText(Item1.SubItems[0], Item2.SubItems[0])
-      else
-        Compare := 0;
-    end;
-    2: // Type
-    begin
-      if (Item1.SubItems.Count > 1) and (Item2.SubItems.Count > 1) then
-        Compare := CompareText(Item1.SubItems[1], Item2.SubItems[1])
-      else
-        Compare := 0;
-      if Compare = 0 then
-        Compare := CompareText(Item1.Caption, Item2.Caption);
-    end;
-    3: // Date Modified
-    begin
-      if (Item1 is TShellListItem) and (Item2 is TShellListItem) then
-      begin
-        Time1 := TShellListItem(Item1).FileInfo.Time;
-        Time2 := TShellListItem(Item2).FileInfo.Time;
-        if Time1 < Time2 then Compare := -1
-        else if Time1 > Time2 then Compare := 1
-        else Compare := 0;
-      end
-      else if (Item1.SubItems.Count > 2) and (Item2.SubItems.Count > 2) then
-        Compare := CompareText(Item1.SubItems[2], Item2.SubItems[2])
-      else
-        Compare := 0;
-    end
+  // Put the keyboard where it is most useful on each tab
+  if ATab = tabExplorer then
+  begin
+    if ShellListViewExplorer.CanFocus then
+      ShellListViewExplorer.SetFocus;
+  end
+  else if ATab = tabSearch then
+  begin
+    if edtPattern.CanFocus then
+      edtPattern.SetFocus;
+  end
+  else if ATab = tabNotepad then
+  begin
+    if SynEdit1.CanFocus then
+      SynEdit1.SetFocus;
+  end
+  else if ATab = tabMemory then
+  begin
+    if lvMemory.CanFocus then
+      lvMemory.SetFocus;
+  end
+  else if ATab = tabContextMenu then
+  begin
+    if lvContextMenu.CanFocus then
+      lvContextMenu.SetFocus;
+  end;
+end;
+
+procedure TfrmMain.CycleTab(ADelta: Integer);
+var
+  VisibleTabs: array of Boolean;
+  i, Idx: Integer;
+begin
+  SetLength(VisibleTabs, PageControl1.PageCount);
+  for i := 0 to PageControl1.PageCount - 1 do
+    VisibleTabs[i] := PageControl1.Pages[i].TabVisible;
+  Idx := CycleTabIndex(PageControl1.ActivePageIndex, ADelta, VisibleTabs);
+  if (Idx >= 0) and (Idx < PageControl1.PageCount) then
+    ActivateTab(PageControl1.Pages[Idx]);
+end;
+
+function TfrmMain.TabForMenuItem(AItem: TObject): TTabSheet;
+begin
+  if AItem = miViewExplorer then Result := tabExplorer
+  else if AItem = miViewSearch then Result := tabSearch
+  else if AItem = miViewNotepad then Result := tabNotepad
+  else if AItem = miViewMemory then Result := tabMemory
+  else if AItem = miViewContextMenu then Result := tabContextMenu
+  else if (AItem = miViewAbout) or (AItem = miHelpAbout) then Result := tabAbout
+  else Result := nil;
+end;
+
+procedure TfrmMain.miViewTabClick(Sender: TObject);
+begin
+  ActivateTab(TabForMenuItem(Sender));
+end;
+
+procedure TfrmMain.miViewNextTabClick(Sender: TObject);
+begin
+  CycleTab(1);
+end;
+
+procedure TfrmMain.miViewPrevTabClick(Sender: TObject);
+begin
+  CycleTab(-1);
+end;
+
+procedure TfrmMain.miViewMenuClick(Sender: TObject);
+begin
+  miViewExplorer.Checked := PageControl1.ActivePage = tabExplorer;
+  miViewSearch.Checked := PageControl1.ActivePage = tabSearch;
+  miViewNotepad.Checked := PageControl1.ActivePage = tabNotepad;
+  miViewMemory.Checked := PageControl1.ActivePage = tabMemory;
+  miViewContextMenu.Checked := PageControl1.ActivePage = tabContextMenu;
+  miViewAbout.Checked := PageControl1.ActivePage = tabAbout;
+  miViewContextMenu.Visible := tabContextMenu.TabVisible;
+  miViewDarkMode.Checked := FDarkMode;
+  miViewPreview.Checked := Assigned(frmPreview) and frmPreview.Visible;
+  UpdateTabOptionsMenu;
+end;
+
+procedure TfrmMain.miViewPreviewClick(Sender: TObject);
+begin
+  // Toggles the preview setting that belongs to the current tab
+  if PageControl1.ActivePage = tabExplorer then
+    cbExpPreviewAlways.Checked := not cbExpPreviewAlways.Checked
+  else if PageControl1.ActivePage = tabSearch then
+    cbEnablePreview.Checked := not cbEnablePreview.Checked
+  else if Assigned(frmPreview) and frmPreview.Visible then
+    frmPreview.Hide;
+end;
+
+{ File menu & Recent Files }
+
+procedure TfrmMain.miFileMenuClick(Sender: TObject);
+var
+  OnNotepad: Boolean;
+begin
+  OnNotepad := PageControl1.ActivePage = tabNotepad;
+  UpdateSaveButtonState;
+  miFileSave.Enabled := btnSaveFile.Enabled;
+  miFileSaveAs.Enabled := btnSaveAs.Enabled;
+  miFileClose.Enabled := OnNotepad and btnCloseFile.Enabled;
+  miFileRecent.Enabled := (FRecentFiles <> nil) and (FRecentFiles.Count > 0);
+end;
+
+procedure TfrmMain.RememberRecentFile(const AFileName: string);
+begin
+  if FRecentFiles = nil then Exit;
+  AddRecentFile(FRecentFiles, AFileName, MAX_RECENT_FILES);
+  RebuildRecentMenu;
+  SaveAllOptions;
+end;
+
+procedure TfrmMain.RebuildRecentMenu;
+var
+  i: Integer;
+  MI: TMenuItem;
+  Cap: string;
+begin
+  if (miFileRecent = nil) or (FRecentFiles = nil) then Exit;
+  miFileRecent.Clear;
+  for i := 0 to FRecentFiles.Count - 1 do
+  begin
+    MI := TMenuItem.Create(miFileRecent);
+    // "name  -  shortened folder"; &1..&9 then &0 as accelerators; '&' in paths must be doubled
+    Cap := ExtractFileName(FRecentFiles[i]) + '   ' + ShortenPath(ExtractFileDir(FRecentFiles[i]), 60);
+    Cap := StringReplace(Cap, '&', '&&', [rfReplaceAll]);
+    if i < 9 then
+      MI.Caption := '&' + IntToStr(i + 1) + '  ' + Cap
     else
-      Compare := CompareText(Item1.Caption, Item2.Caption);
+      MI.Caption := '&0  ' + Cap;
+    MI.Tag := i;
+    MI.OnClick := @miRecentFileClick;
+    miFileRecent.Add(MI);
+  end;
+  if FRecentFiles.Count > 0 then
+  begin
+    MI := TMenuItem.Create(miFileRecent);
+    MI.Caption := '-';
+    miFileRecent.Add(MI);
+    MI := TMenuItem.Create(miFileRecent);
+    MI.Caption := 'C&lear Recent Files';
+    MI.OnClick := @miRecentClearClick;
+    miFileRecent.Add(MI);
+  end;
+  miFileRecent.Enabled := FRecentFiles.Count > 0;
+end;
+
+procedure TfrmMain.miRecentFileClick(Sender: TObject);
+var
+  Idx: Integer;
+  FileName: string;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  Idx := TMenuItem(Sender).Tag;
+  if (Idx < 0) or (Idx >= FRecentFiles.Count) then Exit;
+  FileName := FRecentFiles[Idx];
+  if FileExists(FileName) then
+    OpenFileInNotepad(FileName)
+  else
+  begin
+    MessageDlg('Recent Files', 'The file no longer exists and will be removed from the list:' +
+      LineEnding + FileName, mtWarning, [mbOK], 0);
+    FRecentFiles.Delete(Idx);
+    RebuildRecentMenu;
+    SaveAllOptions;
+  end;
+end;
+
+procedure TfrmMain.miRecentClearClick(Sender: TObject);
+begin
+  FRecentFiles.Clear;
+  RebuildRecentMenu;
+  SaveAllOptions;
+end;
+
+{ Edit menu: clipboard items act on whichever control has focus }
+
+procedure TfrmMain.miEditMenuClick(Sender: TObject);
+var
+  Ctl: TWinControl;
+  IsSyn, IsEdit, HasSel, CanWrite, OnNotepad: Boolean;
+begin
+  Ctl := ActiveControl;
+  IsSyn := (Ctl = SynEdit1);
+  IsEdit := (not IsSyn) and (Ctl is TCustomEdit);
+  OnNotepad := PageControl1.ActivePage = tabNotepad;
+
+  if IsSyn then
+  begin
+    HasSel := SynEdit1.SelAvail;
+    CanWrite := not SynEdit1.ReadOnly;
+    miEditUndo.Enabled := SynEdit1.CanUndo;
+    miEditRedo.Enabled := SynEdit1.CanRedo;
+  end
+  else if IsEdit then
+  begin
+    HasSel := TCustomEdit(Ctl).SelLength > 0;
+    CanWrite := not TCustomEdit(Ctl).ReadOnly;
+    miEditUndo.Enabled := TCustomEdit(Ctl).CanUndo;
+    miEditRedo.Enabled := False;
+  end
+  else
+  begin
+    HasSel := False;
+    CanWrite := False;
+    miEditUndo.Enabled := False;
+    miEditRedo.Enabled := False;
   end;
 
-  if not FExpSortAscending then
-    Compare := -Compare;
+  miEditCut.Enabled := HasSel and CanWrite;
+  miEditCopy.Enabled := HasSel;
+  {$IFDEF WINDOWS}
+  miEditPaste.Enabled := CanWrite and (IsClipboardFormatAvailable(CF_UNICODETEXT) or IsClipboardFormatAvailable(CF_TEXT));
+  {$ELSE}
+  miEditPaste.Enabled := CanWrite and Clipboard.HasFormat(PredefinedClipboardFormat(pcfText));
+  {$ENDIF}
+  miEditSelectAll.Enabled := IsSyn or IsEdit;
+
+  // Ctrl+F is contextual and always available; the rest are Notepad-only
+  miEditFindNext.Enabled := OnNotepad;
+  miEditFindPrev.Enabled := OnNotepad;
+  miEditReplace.Enabled := OnNotepad;
+  miEditGoToLine.Enabled := OnNotepad;
+  miEditFormat.Enabled := OnNotepad;
+  miEditFontColor.Enabled := OnNotepad;
+  miEditWordWrap.Checked := cbWordWrap.Checked;
+  miEditReplaceAITells.Checked := cbReplaceAITells.Checked;
+  miEditFormatHTML.Checked := cbFormatHTML.Checked;
+  miEditFormatBullet.Visible := cbFormatHTML.Checked;
+end;
+
+procedure TfrmMain.miEditUndoClick(Sender: TObject);
+begin
+  if ActiveControl = SynEdit1 then
+    SynEdit1.Undo
+  else if ActiveControl is TCustomEdit then
+    TCustomEdit(ActiveControl).Undo;
+end;
+
+procedure TfrmMain.miEditRedoClick(Sender: TObject);
+begin
+  if ActiveControl = SynEdit1 then
+    SynEdit1.Redo;
+end;
+
+procedure TfrmMain.miEditCutClick(Sender: TObject);
+begin
+  if ActiveControl = SynEdit1 then
+    miCutClick(Sender)
+  else if ActiveControl is TCustomEdit then
+    TCustomEdit(ActiveControl).CutToClipboard;
+end;
+
+procedure TfrmMain.miEditCopyClick(Sender: TObject);
+begin
+  if ActiveControl = SynEdit1 then
+    miCopyClick(Sender)
+  else if ActiveControl is TCustomEdit then
+    TCustomEdit(ActiveControl).CopyToClipboard;
+end;
+
+procedure TfrmMain.miEditPasteClick(Sender: TObject);
+begin
+  if ActiveControl = SynEdit1 then
+    SynEdit1.PasteFromClipboard
+  else if ActiveControl is TCustomEdit then
+    TCustomEdit(ActiveControl).PasteFromClipboard;
+end;
+
+procedure TfrmMain.miEditSelectAllClick(Sender: TObject);
+begin
+  if ActiveControl = SynEdit1 then
+    SynEdit1.SelectAll
+  else if ActiveControl is TCustomEdit then
+    TCustomEdit(ActiveControl).SelectAll;
+end;
+
+procedure TfrmMain.miEditFindClick(Sender: TObject);
+begin
+  // Ctrl+F means "find" wherever you are
+  if PageControl1.ActivePage = tabNotepad then
+    ShowFindBar(False)
+  else if PageControl1.ActivePage = tabExplorer then
+    miToolsFindFilesClick(Sender) // search inside the folder being browsed
+  else
+  begin
+    ActivateTab(tabSearch);
+    edtPattern.SelectAll;
+  end;
+end;
+
+procedure TfrmMain.miEditFindPrevClick(Sender: TObject);
+begin
+  FindInEditor(True);
+end;
+
+procedure TfrmMain.miEditReplaceClick(Sender: TObject);
+begin
+  ShowFindBar(True);
+end;
+
+procedure TfrmMain.miEditGoToLineClick(Sender: TObject);
+var
+  S: string;
+  LineNo: Integer;
+begin
+  if PageControl1.ActivePage <> tabNotepad then
+    ActivateTab(tabNotepad);
+  S := IntToStr(SynEdit1.CaretY);
+  if not InputQuery('Go to Line', Format('Line number (1 - %d):', [Max(1, SynEdit1.Lines.Count)]), S) then
+    Exit;
+  LineNo := StrToIntDef(Trim(S), -1);
+  if (LineNo < 1) or (LineNo > Max(1, SynEdit1.Lines.Count)) then
+  begin
+    MessageDlg('Go to Line', 'Please enter a line number between 1 and ' +
+      IntToStr(Max(1, SynEdit1.Lines.Count)) + '.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+  SynEdit1.CaretXY := Classes.Point(1, LineNo);
+  SynEdit1.TopLine := Max(1, LineNo - SynEdit1.LinesInWindow div 2);
+  if SynEdit1.CanFocus then
+    SynEdit1.SetFocus;
+end;
+
+procedure TfrmMain.miEditWordWrapClick(Sender: TObject);
+begin
+  cbWordWrap.Checked := not cbWordWrap.Checked; // fires cbWordWrapClick
+end;
+
+procedure TfrmMain.miEditReplaceAITellsClick(Sender: TObject);
+begin
+  cbReplaceAITells.Checked := not cbReplaceAITells.Checked; // fires cbReplaceAITellsClick (confirms first)
+end;
+
+{ Go menu (The Real Explorer) }
+
+procedure TfrmMain.miGoMenuClick(Sender: TObject);
+var
+  OnExplorer: Boolean;
+begin
+  OnExplorer := PageControl1.ActivePage = tabExplorer;
+  UpdateExplorerNavButtons;
+  // Disabled items let Alt+arrows reach the focused control on other tabs
+  miGoBack.Enabled := OnExplorer and btnExpBack.Enabled;
+  miGoForward.Enabled := OnExplorer and btnExpForward.Enabled;
+  miGoUp.Enabled := OnExplorer;
+  miGoNewFolder.Enabled := OnExplorer;
+  miGoSetDefault.Enabled := OnExplorer;
+  miSortName.Checked := FExpSortColumn = EXP_COL_NAME;
+  miSortType.Checked := FExpSortColumn = EXP_COL_TYPE;
+  miSortSize.Checked := FExpSortColumn = EXP_COL_SIZE;
+  miSortDate.Checked := FExpSortColumn = EXP_COL_DATE;
+  miSortAscending.Checked := FExpSortAscending;
+  miSortDescending.Checked := not FExpSortAscending;
+end;
+
+procedure TfrmMain.miGoJumpClick(Sender: TObject);
+begin
+  ActivateTab(tabExplorer);
+  if Sender = miGoDefault then btnExpDefaultClick(Sender)
+  else if Sender = miGoDesktop then btnJumpDesktopClick(Sender)
+  else if Sender = miGoDownloads then btnJumpDownloadsClick(Sender)
+  else if Sender = miGoDocuments then btnJumpDocumentsClick(Sender)
+  else if Sender = miGoPictures then btnJumpPicturesClick(Sender)
+  else if Sender = miGoDriveC then btnJumpDriveCClick(Sender)
+  else if Sender = miGoUserHome then btnJumpUserHomeClick(Sender);
+end;
+
+procedure TfrmMain.miGoRefreshClick(Sender: TObject);
+begin
+  // F5 means "refresh / run" for the active tab
+  if PageControl1.ActivePage = tabExplorer then
+    btnExpRefreshClick(Sender)
+  else if PageControl1.ActivePage = tabSearch then
+  begin
+    if not FSearching then
+      btnSearchClick(Sender);
+  end
+  else if PageControl1.ActivePage = tabContextMenu then
+    btnRefreshContextMenuClick(Sender)
+  else if PageControl1.ActivePage = tabMemory then
+  begin
+    CheckAndCollectClipboard;
+    UpdateMemoryStatusUI;
+  end;
+end;
+
+procedure TfrmMain.miGoAddressClick(Sender: TObject);
+begin
+  if PageControl1.ActivePage = tabSearch then
+  begin
+    if edtSearchPath.CanFocus then
+      edtSearchPath.SetFocus;
+    edtSearchPath.SelectAll;
+  end
+  else
+  begin
+    ActivateTab(tabExplorer);
+    if edtExpPath.CanFocus then
+      edtExpPath.SetFocus;
+    edtExpPath.SelectAll;
+  end;
+end;
+
+procedure TfrmMain.miSortByClick(Sender: TObject);
+var
+  Col: Integer;
+begin
+  if Sender = miSortName then Col := EXP_COL_NAME
+  else if Sender = miSortSize then Col := EXP_COL_SIZE
+  else if Sender = miSortDate then Col := EXP_COL_DATE
+  else Col := EXP_COL_TYPE;
+  if Col = FExpSortColumn then Exit;
+  SetExplorerSort(Col, not (Col in [EXP_COL_SIZE, EXP_COL_DATE]));
+end;
+
+procedure TfrmMain.miSortDirectionClick(Sender: TObject);
+begin
+  SetExplorerSort(FExpSortColumn, Sender = miSortAscending);
+end;
+
+{ Tools & Help menus }
+
+procedure TfrmMain.miToolsMenuClick(Sender: TObject);
+begin
+  miToolsStopSearch.Enabled := FSearching;
+  miToolsRunInTray.Checked := cbRunInTray.Checked;
+  {$IFNDEF WINDOWS}
+  miToolsAssociate.Visible := False;
+  miToolsTakeover.Visible := False;
+  miToolsRescan.Visible := False;
+  {$ENDIF}
+end;
+
+procedure TfrmMain.miToolsFindFilesClick(Sender: TObject);
+var
+  Folder, SelPath: string;
+begin
+  Folder := '';
+  if PageControl1.ActivePage = tabExplorer then
+  begin
+    // A selected folder wins over the folder being browsed
+    SelPath := '';
+    if ShellListViewExplorer.Selected <> nil then
+      SelPath := ShellListViewExplorer.GetPathFromItem(ShellListViewExplorer.Selected);
+    if (SelPath <> '') and DirectoryExists(SelPath) then
+      Folder := SelPath
+    else
+      Folder := ShellListViewExplorer.Root;
+  end
+  else if (PageControl1.ActivePage = tabNotepad) and (FCurrentFileName <> '') then
+    Folder := ExtractFileDir(FCurrentFileName);
+
+  if (Folder <> '') and DirectoryExists(Folder) then
+  begin
+    edtSearchPath.Text := Folder;
+    FSelectedPath := Folder;
+  end;
+  ActivateTab(tabSearch);
+  edtPattern.SelectAll;
+  SetStatus(' Search in: ' + edtSearchPath.Text + '   (Enter to start, Esc to stop)');
+end;
+
+procedure TfrmMain.miToolsRunInTrayClick(Sender: TObject);
+begin
+  cbRunInTray.Checked := not cbRunInTray.Checked; // fires cbRunInTrayChange
+end;
+
+procedure TfrmMain.miHelpShortcutsClick(Sender: TObject);
+begin
+  MessageDlg('Keyboard Shortcuts',
+    'TABS' + LineEnding +
+    '  Ctrl+1 ... Ctrl+6        Explorer, Search, Notepad, Memory, Context Menu, About' + LineEnding +
+    '  Ctrl+Tab / Ctrl+Shift+Tab   Next / previous tab' + LineEnding +
+    LineEnding +
+    'FILE & NOTEPAD' + LineEnding +
+    '  Ctrl+N / Ctrl+O          New / open file' + LineEnding +
+    '  Ctrl+S / Ctrl+Shift+S    Save / save as' + LineEnding +
+    '  Ctrl+W                   Close file' + LineEnding +
+    '  Ctrl+F / Ctrl+H          Find / replace (Enter = next, Shift+Enter = previous, Esc = close)' + LineEnding +
+    '  F3 / Shift+F3            Find next / previous' + LineEnding +
+    '  Ctrl+G                   Go to line' + LineEnding +
+    '  Ctrl+Z / Ctrl+Y          Undo / redo' + LineEnding +
+    LineEnding +
+    'THE REAL EXPLORER' + LineEnding +
+    '  Alt+Left / Alt+Right     Back / forward' + LineEnding +
+    '  Alt+Up or Backspace      Up one level' + LineEnding +
+    '  Alt+Home                 Default folder' + LineEnding +
+    '  Ctrl+L                   Address bar' + LineEnding +
+    '  F5                       Refresh' + LineEnding +
+    '  Enter / F2 / Delete      Open / rename / recycle' + LineEnding +
+    '  Ctrl+Shift+N             New folder' + LineEnding +
+    LineEnding +
+    'SEARCH' + LineEnding +
+    '  Ctrl+F (from Explorer)   Search the current folder' + LineEnding +
+    '  Ctrl+Shift+F             Find files in the current folder' + LineEnding +
+    '  Enter or F5 / Esc        Start / stop search' + LineEnding +
+    LineEnding +
+    'VIEW' + LineEnding +
+    '  Ctrl+Shift+P             Toggle preview window (PDF: wheel / PgUp / PgDn)' + LineEnding +
+    '  Ctrl+Shift+D             Toggle dark mode' + LineEnding +
+    '  F1                       This list',
+    mtInformation, [mbOK], 0);
+end;
+
+{ Enter / Esc inside fields }
+
+procedure TfrmMain.SearchFieldKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if (Key = VK_RETURN) and (Shift = []) then
+  begin
+    Key := 0;
+    if not FSearching then
+      btnSearchClick(Sender);
+  end;
+end;
+
+procedure TfrmMain.FindBarKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  case Key of
+    VK_RETURN:
+      begin
+        Key := 0;
+        if Sender = edtReplaceText then
+          btnReplaceNextClick(Sender)
+        else
+          FindInEditor(ssShift in Shift);
+      end;
+    VK_ESCAPE:
+      begin
+        Key := 0;
+        btnCloseFindClick(Sender);
+        if SynEdit1.CanFocus then
+          SynEdit1.SetFocus;
+      end;
+  end;
 end;
 
 initialization

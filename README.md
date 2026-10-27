@@ -40,23 +40,26 @@ Tired of Windows Search indexing freezes, search loops, or failing to find files
 ### 📁 3. The Real Explorer
 Frustrated by modern Windows Explorer hiding folders or switching views? The Real Explorer provides a fast, permanent classic file manager:
 - **Folders First & Permanent Details View**: Reliable directory navigation where folders always stay grouped at the top and detailed columns (Name, Size, Modified, Type) stay fixed.
+- **Always Sorted, Your Way**: Listings open sorted by **Type** by default (folders first, then files grouped by extension). Click any column header or use **Go → Sort By** to sort by Name, Size, or Date Modified (sizes and dates start largest / newest first). Your choice is remembered, and the order holds after refresh, rename, delete, and new folder.
 - **Smart Address Bar**: Paste full file paths, filenames, or quoted paths (e.g. `"C:\Users\User\Desktop\unfollow-day1.md"` or `C:\file.txt`) directly into the path edit. The Explorer intelligently detects whether the input is a file or folder, navigates to the parent directory, auto-selects the file in the list, and opens it in the floating Live Preview window.
 - **Full Navigation Stack**: Back, Forward, Up, and Refresh buttons with dynamic history management.
 - **Quick Jump Chips**: One-click jump buttons for Desktop, Downloads, Documents, Pictures, Drive `C:\`, and User Home.
 - **Custom Default Startup Folder**: Set your favorite starting location (e.g., Desktop or Project root) with a single click of "Set Default".
 - **Floating Preview & Context Actions**: Dedicated Preview button, Recycle Bin deletion, in-place rename, and seamless "Open in Notepad" tab routing.
+- **Keyboard Navigation**: `Alt+Left` / `Alt+Right` back and forward, `Alt+Up` (or Backspace) up one level, `Alt+Home` default folder, `Ctrl+L` address bar, `F5` refresh, `Ctrl+Shift+N` new folder, and `Ctrl+F` to search the folder you are browsing.
 
 ### 👁️ 4. Floating Live File Preview Window
 Preview files dynamically on a single click without blocking the main search window:
 - **Modeless Floating Window**: Stays open side-by-side with your search list; click any result and the preview updates instantaneously.
 - **Image Previews**: Seamless native rendering for `.png`, `.jpg`, `.jpeg`, `.bmp`, `.ico`, and `.gif` with proportional scaling, dimension readouts (`Width x Height`), and file size.
+- **PDF Previews**: Full page rendering through [PDFium](https://pdfium.googlesource.com/pdfium/) (the engine inside Chrome). Pages fit the window and re-render on resize. Browse with **◀ Prev / Next ▶**, the mouse wheel, or `PgUp` / `PgDn` / `Home` / `End`. Password-protected or damaged PDFs show a clear message. Without `pdfium.dll`, the preview falls back to the Windows shell thumbnail of the first page when one is available. Files are read into memory, so a previewed PDF is never locked and can still be renamed or deleted.
 - **Syntax-Highlighted Code & Text Previews**: Read-only `TSynEdit` preview displaying the first 300 lines with line numbers and auto-detected syntax coloring for Pascal, Python, HTML/XML, CSS, JavaScript, JSON, SQL, Batch, INI, and Markdown.
 - **Binary & Document File Cards**: Displays the high-resolution Windows Shell icon (`SHGetFileInfo`), file metadata, and a 16-column Hex + ASCII byte peek of the file header.
 - **"Open in Editor" Quick Action**: One click jumps straight into the built-in Notepad editor tab.
 - **Enable / Disable Toggle**: Easily toggle live preview on or off with the search option checkbox.
 
 ### 📝 5. Windows 11 Notepad Replacement
-A complete, tabbed text and code editor powered by `TSynEdit`:
+A complete text and code editor powered by `TSynEdit`:
 - **File Management**: New, Open, Save, and Save As with dirty-tracking prompts so you never lose unsaved changes. Empty or blank files can also be created and saved directly.
 - **Multi-Language Syntax Highlighting**: Features 20 comprehensive syntax highlighters:
   - Pascal / Delphi / Free Pascal (`.pas`, `.pp`, `.lpr`, `.inc`, `.dpr`)
@@ -79,8 +82,9 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
   - Lazarus / Delphi Forms (`.lfm`, `.dfm`)
   - Gettext PO Catalogs (`.po`, `.pot`)
   - **Dedicated Custom Markdown Highlighter** (`.md`, `.markdown`, `.mdown`) with real-time styling for headers, code blocks, lists, blockquotes, links, and bold/italic markup.
-- **Full Keyboard & Editing Fidelity**: Standard Backspace, Delete, Word-Backspace (`Ctrl+Backspace`), Select All (`Ctrl+A`), Save (`Ctrl+S`), Save As (`Ctrl+Shift+S`), and modern cursor navigation with immediate focus transfer on tab navigation.
-- **Find & Replace Bar**: Sleek slide-down search bar with Find Next, Replace, Replace All, Case Sensitivity, and Whole Word matching.
+- **Full Keyboard & Editing Fidelity**: Standard Backspace, Delete, Word-Backspace (`Ctrl+Backspace`), Select All (`Ctrl+A`), Undo / Redo (`Ctrl+Z` / `Ctrl+Y`), New (`Ctrl+N`), Open (`Ctrl+O`), Save (`Ctrl+S`), Save As (`Ctrl+Shift+S`), Close (`Ctrl+W`), Go to Line (`Ctrl+G`), and modern cursor navigation with immediate focus transfer on tab navigation.
+- **Recent Files**: **File → Open Recent** keeps the last 10 files you opened or saved.
+- **Find & Replace Bar**: Sleek slide-down search bar (`Ctrl+F` / `Ctrl+H`) with Find Next, Replace, Replace All, Case Sensitivity, and Whole Word matching. `Enter` finds the next match, `Shift+Enter` the previous one, `F3` / `Shift+F3` repeat the search with wrap-around, and `Esc` closes the bar.
 - **Word Wrap & Formatting**: Toggle Word Wrap on and off on the fly.
 - **Text & HTML List Formatting**: Format lines instantly as numbered or bulleted lists via toolbar buttons or context menu (`Format`):
   - **Numbered List**: Prefixes lines as an ordered list (`1. Item`, `2. Item`), preserving blank lines and automatically stripping prior numbering/bullets so you can renumber or switch formats easily.
@@ -97,11 +101,11 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Dark Mode File Explorer, Results Lists & Grids**: Folder trees (`ShellTreeViewExplorer` and `ShellTreeView1`) isolate `tvoThemedDraw` to prevent native Windows black font painting. File listings and grids (`ShellListViewExplorer`, `lvResults`, `lvMemory`, and `lvContextMenu`) use full custom-drawn items and subitems with high-contrast light silver text (`$00F0F0F0` / `$00D8D8D8`) and deep slate row selections (`$006B4D2B`).
 - **Subclassed Dark Column Titles & Headers**: Parent ListView windows intercept Win32 `SysHeader32` `NM_CUSTOMDRAW` notifications, rendering dark slate headers (`$0025211E`) with crisp light silver column titles (`$00F0F0F0`) and subtle column separators.
 - **Full SynEdit Dark Gutter & Line Numbers**: Gutter backgrounds, line numbers, active line highlights, separators, and code-folding parts deeply integrate with the dark palette, delivering high contrast and crystal-clear line number visibility across both the Notepad editor and Live Preview without washed-out light gutter panels.
-- **Owner-Drawn Dark Status Bar**: High-contrast light text (`$00F0F0F0`) and active lock indicator styling (`$0050D0FF`) across all panels, eliminating native Windows `SysStatus32` black text on dark backgrounds.
-- **One-Click Toggle & Theme Cache Synchronization**: Switch seamlessly between Dark and Light mode anytime via the header toggle button. Dynamic custom-draw unhooking, `WM_THEMECHANGED` cache flushing, and transparent text backgrounds ensure zero stuck dark backgrounds or broken selection highlights when transitioning back to Light Mode.
+- **Owner-Drawn Dark Status Bar**: High-contrast light text (`$00F0F0F0`) and active lock indicator styling (`$0050D0FF`) across all panels, eliminating native Windows `SysStatus32` black text on dark backgrounds. The bottom-right size grip (drag handle) is repainted dark, and the right-hand panels (Files, Dirs, CAPS, NUM, INS, clock) size correctly at any display scaling.
+- **One-Click Toggle & Theme Cache Synchronization**: Switch seamlessly between Dark and Light mode anytime via **View → Dark Mode** (`Ctrl+Shift+D`). The menu bar itself is custom drawn in Dark Mode. Dynamic custom-draw unhooking, `WM_THEMECHANGED` cache flushing, and transparent text backgrounds ensure zero stuck dark backgrounds or broken selection highlights when transitioning back to Light Mode.
 
 ### 📥 7. System Tray Integration
-- **Run in System Tray**: Check the "Run in System Tray" option to keep Ace's Utilities running quietly in your Windows notification area.
+- **Run in System Tray**: Turn on **Tools → Run in System Tray** to keep Ace's Utilities running quietly in your Windows notification area.
 - **Minimize & Close to Tray**: Minimizing or closing the window cleanly hides it to the tray.
 - **Tray Context Menu**: Right-click the tray icon for quick actions:
   - *Open Ace's Utilities*
@@ -111,7 +115,7 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **Persistent Setting**: Preferences are saved across restarts in `AceUtils.ini`.
 
 ### 📑 8. Dynamic Tab Presentation & Styling
-- **Multiple Tab Presentation Modes**: Switch instantly between **Classic Tabs**, **Modern Flat Buttons**, and **Push Buttons** at runtime via the `Tab Style ▾` header dropdown menu.
+- **Multiple Tab Presentation Modes**: Switch instantly between **Classic Tabs**, **Modern Flat Buttons**, and **Push Buttons** at runtime via **View → Tab Style** (or right-click the tab strip).
 - **Active Tab Highlight Indicator**: Optional dot indicator (`●`) clearly identifies the currently active notebook page.
 - **Spacious / Modern Tab Height**: Toggle between compact standard tab sizing and modern 28px touch/desktop tabs.
 - **Instant Live Refresh**: Seamless Win32 window recreation ensures visual style changes render immediately without requiring an application restart.
@@ -126,6 +130,26 @@ A complete, tabbed text and code editor powered by `TSynEdit`:
 - **One-Click Transfer to Notepad**: Transfer any memory fragment or note directly into the Notepad tab (inserts at cursor, replaces selection, or appends). Automatically flags the document as **unsaved** (`*Filename.txt` or `*Untitled Document` and `Modified` status) so changes are never lost.
 - **Persistent Quick Notes Scratchpad**: A dedicated notes memo on the right side auto-saves directly to `AceUtils_Notes.txt` and reloads on startup.
 - **Rich Context Menu & Actions**: Right-click menu and toolbar buttons provide quick options to copy fragments back to the clipboard, append to Quick Notes, delete individual items, clear memory, or transfer to Notepad.
+
+---
+
+### ⌨️ 10. Menu Bar & Keyboard Shortcuts
+A full **File / Edit / View / Go / Tools / Help** menu bar exposes every action. Shortcuts are context-aware: anything that doesn't apply to the current tab is disabled, so the key falls through to the control you're typing in. **Help → Keyboard Shortcuts** (`F1`) lists them all.
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+1` … `Ctrl+6` | The Real Explorer, File Search, Notepad, Memory & Notes, Context Menu, About |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
+| `Ctrl+F` | Find in Notepad · search the current folder from The Real Explorer |
+| `Ctrl+Shift+F` | Find files in the current folder |
+| `F5` | Refresh Explorer · run the search · rescan context menu entries |
+| `Enter` / `Esc` | Start / stop a search (in any search field) |
+| `Ctrl+L` | Address bar |
+| `Alt+Left` / `Alt+Right` / `Alt+Up` | Back / forward / up one level |
+| `Ctrl+Shift+P` | Toggle the preview window for the current tab |
+| `Ctrl+Shift+D` | Toggle Dark Mode |
+
+Clipboard and undo keys (`Ctrl+X/C/V/Z/Y/A`) are deliberately **not** menu shortcuts. Native edit boxes and the editor handle them, so pasting into the Explorer address bar can never land in Notepad. The Edit menu's Cut / Copy / Paste items act on whichever control has focus.
 
 ---
 
@@ -178,18 +202,40 @@ You can also open `AceUtils.lpi` in the Lazarus IDE on Linux and press **F9** to
 ### Prerequisites
 1. **Lazarus IDE** (version 2.2+ or 3.0+ / 4.0+) with **Free Pascal Compiler (FPC 3.2.2+)**.
 2. **SynEdit Package**: Standard package bundled with Lazarus (located in `lazarus/components/synedit`).
+3. **PDFium (optional, for PDF previews)**: Run `powershell -ExecutionPolicy Bypass -File tools\fetch-pdfium.ps1`. It downloads a pinned, checksum-verified 32-bit `pdfium.dll` from [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) next to `AceUtils.exe`. Ship `pdfium.dll` alongside the executable. The app runs fine without it and simply falls back to thumbnails. License texts are in `third_party/pdfium/`. On Linux, install `libpdfium.so` next to the binary or on the library path.
 
 ### Compile via Command Line
 
-**Windows (PowerShell / Command Prompt):**
+**Windows (PowerShell), full clean release build:**
 ```powershell
-lazbuild AceUtils.lpi
+# 1. Remove stale root unit files (FPC would otherwise link old object code)
+Remove-Item -Force .\*.ppu, .\*.o -ErrorAction SilentlyContinue
+
+# 2. Clean rebuild (32-bit i386-win32 with the default Lazarus install)
+lazbuild -B AceUtils.lpi
+
+# 3. Keep the alternate executable name in sync
+Copy-Item -Force AceUtils.exe AceFileSearch.exe
+
+# 4. First time only: fetch pdfium.dll for PDF previews
+powershell -ExecutionPolicy Bypass -File tools\fetch-pdfium.ps1
 ```
+To distribute, ship `AceUtils.exe` (or `AceFileSearch.exe`), `pdfium.dll`, and `aceutils.ico` together. `AceUtils.ini` and `AceUtils_Notes.txt` are created next to the executable on first run.
 
 **Linux (Bash / Zsh):**
 ```bash
-lazbuild AceUtils.lpi
+lazbuild -B AceUtils.lpi
 ```
+
+### Run the Unit Tests
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1
+```
+
+On Linux run `lazbuild -B tests/AceTests.lpi && tests/bin/AceTests --all --format=plain`.
+
+The script builds `tests/AceTests.lpi` (an fpcunit console runner), copies `pdfium.dll` next to it, and runs every test. It covers search patterns, path cleanup, list formatting, Explorer sort order, tab cycling, recent files, and real PDF rendering (page count, sizes, pixels, error codes, no file locking). The exit code is non-zero on any failure.
 
 ### Compile via Lazarus IDE (Windows or Linux)
 1. Open Lazarus.

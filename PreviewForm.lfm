@@ -12,6 +12,7 @@ object frmPreview: TfrmPreview
   OnClose = FormClose
   OnCreate = FormCreate
   OnHide = FormHide
+  OnMouseWheel = FormMouseWheel
   OnWindowStateChange = FormWindowStateChange
   Position = poMainFormCenter
   LCLVersion = '3.6.0.0'
@@ -84,17 +85,21 @@ object frmPreview: TfrmPreview
       BevelOuter = bvNone
       ClientHeight = 556
       ClientWidth = 560
+      PopupMenu = popPreview
       TabOrder = 0
       Visible = False
       object imgPreview: TImage
         Left = 0
-        Height = 528
+        Height = 494
         Top = 0
         Width = 560
         Align = alClient
         Center = True
+        PopupMenu = popPreview
         Proportional = True
         Stretch = True
+        StretchOutEnabled = False
+        OnResize = imgPreviewResize
       end
       object lblImageDetails: TLabel
         Left = 0
@@ -105,6 +110,79 @@ object frmPreview: TfrmPreview
         Alignment = taCenter
         Caption = 'Image Details'
         Layout = tlCenter
+      end
+      object pnlPdfNav: TPanel
+        Left = 0
+        Height = 34
+        Top = 494
+        Width = 560
+        Align = alBottom
+        BevelOuter = bvNone
+        ClientHeight = 34
+        ClientWidth = 560
+        TabOrder = 0
+        Visible = False
+        object btnPdfFirst: TButton
+          Left = 8
+          Height = 26
+          Hint = 'First page (Home)'
+          Top = 4
+          Width = 34
+          Caption = '⏮'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 0
+          OnClick = btnPdfFirstClick
+          OnKeyDown = PdfNavKeyDown
+        end
+        object btnPdfPrev: TButton
+          Left = 46
+          Height = 26
+          Hint = 'Previous page (PgUp / mouse wheel)'
+          Top = 4
+          Width = 70
+          Caption = '◀ Prev'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 1
+          OnClick = btnPdfPrevClick
+          OnKeyDown = PdfNavKeyDown
+        end
+        object lblPdfPage: TLabel
+          Left = 124
+          Height = 15
+          Top = 9
+          Width = 100
+          Alignment = taCenter
+          AutoSize = False
+          Caption = 'Page 1 of 1'
+        end
+        object btnPdfNext: TButton
+          Left = 232
+          Height = 26
+          Hint = 'Next page (PgDn / mouse wheel)'
+          Top = 4
+          Width = 70
+          Caption = 'Next ▶'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 2
+          OnClick = btnPdfNextClick
+          OnKeyDown = PdfNavKeyDown
+        end
+        object btnPdfLast: TButton
+          Left = 306
+          Height = 26
+          Hint = 'Last page (End)'
+          Top = 4
+          Width = 34
+          Caption = '⏭'
+          ParentShowHint = False
+          ShowHint = True
+          TabOrder = 3
+          OnClick = btnPdfLastClick
+          OnKeyDown = PdfNavKeyDown
+        end
       end
     end
     object synPreview: TSynEdit
@@ -231,5 +309,12 @@ object frmPreview: TfrmPreview
       Caption = 'Select All'
       OnClick = miPrevSelectAllClick
     end
+  end
+  object tmrPdfResize: TTimer
+    Enabled = False
+    Interval = 120
+    OnTimer = tmrPdfResizeTimer
+    Left = 480
+    Top = 140
   end
 end

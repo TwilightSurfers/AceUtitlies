@@ -14,7 +14,7 @@ uses
   SynHighlighterDiff, SynHighlighterUnixShellScript, SynHighlighterPerl, SynHighlighterVB,
   SynHighlighterTeX, SynHighlighterLFM, SynHighlighterPo,
   SynGutter, SynGutterBase, SynGutterLineNumber, SynGutterCodeFolding,
-  SynHighlighterMarkdown, LConvEncoding, LMessages;
+  SynHighlighterMarkdown, LConvEncoding, LMessages, LCLType, AcePdf;
 
 type
 
@@ -31,6 +31,13 @@ type
     pnlImage: TPanel;
     imgPreview: TImage;
     lblImageDetails: TLabel;
+    pnlPdfNav: TPanel;
+    btnPdfFirst: TButton;
+    btnPdfPrev: TButton;
+    lblPdfPage: TLabel;
+    btnPdfNext: TButton;
+    btnPdfLast: TButton;
+    tmrPdfResize: TTimer;
 
     synPreview: TSynEdit;
 
@@ -62,6 +69,15 @@ type
     procedure miPrevCopyClick(Sender: TObject);
     procedure miPrevSelectAllClick(Sender: TObject);
     procedure popPreviewPopup(Sender: TObject);
+    procedure btnPdfFirstClick(Sender: TObject);
+    procedure btnPdfPrevClick(Sender: TObject);
+    procedure btnPdfNextClick(Sender: TObject);
+    procedure btnPdfLastClick(Sender: TObject);
+    procedure PdfNavKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer;
+      MousePos: TPoint; var Handled: Boolean);
+    procedure imgPreviewResize(Sender: TObject);
+    procedure tmrPdfResizeTimer(Sender: TObject);
 
   protected
     procedure WndProc(var Message: TLMessage); override;
@@ -92,6 +108,16 @@ type
     FHighlighterPo: TSynPoSyn;
     FHighlighterMarkdown: TSynMarkdownSyn;
 
+    // PDF preview state (document stays open while its pages are browsed)
+    FPdfDoc: TPdfDocument;
+    FPdfPage: Integer;
+    FPdfSizeStr: string;
+
+    procedure ShowPdf(const APath, AName, ASizeStr, ADateStr, ATypeStr: string; ASizeBytes: Int64);
+    procedure RenderPdfPage;
+    procedure GoToPdfPage(AIndex: Integer);
+    procedure ClosePdf;
+    procedure ShowImagePanel(AShowPdfNav: Boolean);
     procedure AutoDetectHighlighter(const AFileName: string);
     procedure ApplyHighlighterTheme(ADark: Boolean);
     function ConvertToUTF8(const S: string): string;
@@ -119,7 +145,7 @@ uses
   {$IFDEF WINDOWS}
   Windows, ShellAPI,
   {$ENDIF}
-  MainForm, lazsynedittext;
+  LCLIntf, MainForm, AceCore, lazsynedittext;
 
 type
   TDwmSetWindowAttribute = function(hwnd: HWND; dwAttribute: DWORD; pvAttribute: LPCVOID; cbAttribute: DWORD): HRESULT; stdcall;
@@ -171,6 +197,7 @@ end;
 
 destructor TfrmPreview.Destroy;
 begin
+  ClosePdf;
   SafelyFreeWrapPlugin(FWrapPlugin, synPreview);
   inherited Destroy;
 end;
@@ -226,6 +253,7 @@ end;
 procedure TfrmPreview.FormHide(Sender: TObject);
 begin
   FCurrentPath := '';
+  ClosePdf;
   if Assigned(frmMain) and Assigned(frmMain.cbExpPreviewAlways) then
     frmMain.cbExpPreviewAlways.Checked := False;
 end;
@@ -322,15 +350,20 @@ end;
 
 procedure TfrmPreview.btnOpenInNotepadClick(Sender: TObject);
 begin
-  if (FCurrentPath <> '') and FileExists(FCurrentPath) and IsTextFile(FCurrentPath) then
+  if (FCurrentPath = '') or (not FileExists(FCurrentPath)) then Exit;
+
+  // Non-text files (PDFs, images, binaries) open in their associated program
+  if not IsTextFile(FCurrentPath) then
   begin
-    if Assigned(frmMain) then
-    begin
-      frmMain.OpenFileInNotepad(FCurrentPath);
-      frmMain.PageControl1.ActivePage := frmMain.tabNotepad;
-      frmMain.BringToFront;
-      Close;
-    end;
+    miPrevOpenAssociatedClick(Sender);
+    Exit;
+  end;
+
+  if Assigned(frmMain) then
+  begin
+    frmMain.OpenFileInNotepad(FCurrentPath);
+    frmMain.BringToFront;
+    Close;
   end;
 end;
 
@@ -358,11 +391,12 @@ var
   HasPath, HasSel: Boolean;
 begin
   HasPath := (FCurrentPath <> '') and FileExists(FCurrentPath);
-  HasSel := (synPreview.SelText <> '');
+  // Only offer text actions while the text view is showing (avoids copying stale text)
+  HasSel := synPreview.Visible and (synPreview.SelText <> '');
   miPrevOpenAssociated.Enabled := HasPath;
   miPrevOpenNotepad.Enabled := HasPath and IsTextFile(FCurrentPath);
   miPrevCopy.Enabled := HasSel;
-  miPrevSelectAll.Enabled := (synPreview.Lines.Count > 0);
+  miPrevSelectAll.Enabled := synPreview.Visible and (synPreview.Lines.Count > 0);
 end;
 
 procedure TfrmPreview.miPrevOpenAssociatedClick(Sender: TObject);
@@ -580,6 +614,9 @@ begin
   pnlImage.Color := PanelColor;
   pnlImage.Font.Color := TextColor;
   ApplyPreviewLabelTheme(lblImageDetails, TextColor);
+  pnlPdfNav.Color := HeaderBg;
+  pnlPdfNav.Font.Color := TextColor;
+  ApplyPreviewLabelTheme(lblPdfPage, TextColor);
 
   pnlInfo.Color := PanelColor;
   pnlInfo.Font.Color := TextColor;
@@ -1135,9 +1172,16 @@ begin
     end;
   end;
 
-  // Only allow opening in Notepad if the file is text-based
-  btnOpenInNotepad.Visible := IsTextFile(APath);
+  // Text files open in the Notepad tab; everything else opens in its associated program
+  btnOpenInNotepad.Visible := FileExists(APath);
   btnOpenInNotepad.Enabled := btnOpenInNotepad.Visible;
+  if IsTextFile(APath) then
+    btnOpenInNotepad.Caption := 'Open in Editor'
+  else
+    btnOpenInNotepad.Caption := 'Open File';
+
+  // Release any previously open PDF before switching files
+  ClosePdf;
 
   if not FileExists(APath) then
   begin
@@ -1155,7 +1199,14 @@ begin
 
   Ext := LowerCase(ExtractFileExt(APath));
 
-  // 1. Image Preview
+  // 1. PDF Document Preview
+  if IsPdfFile(APath) then
+  begin
+    ShowPdf(APath, AName, ASizeStr, ADateStr, ATypeStr, ASizeBytes);
+    Exit;
+  end;
+
+  // 2. Image Preview
   if (Ext = '.png') or (Ext = '.jpg') or (Ext = '.jpeg') or (Ext = '.bmp') or
      (Ext = '.ico') or (Ext = '.gif') or (Ext = '.jfif') or (Ext = '.tif') or
      (Ext = '.tiff') or (Ext = '.xpm') then
@@ -1165,9 +1216,7 @@ begin
       imgPreview.Picture.LoadFromFile(APath);
       lblImageDetails.Caption := Format('%d x %d pixels | %s', [
         imgPreview.Picture.Width, imgPreview.Picture.Height, ASizeStr]);
-      pnlImage.Visible := True;
-      synPreview.Visible := False;
-      pnlInfo.Visible := False;
+      ShowImagePanel(False);
     except
       on E: Exception do
       begin
@@ -1178,7 +1227,7 @@ begin
     Exit;
   end;
 
-  // 2. Text, Code, Scripts, Markdown Preview
+  // 3. Text, Code, Scripts, Markdown Preview
   if IsTextFile(APath) then
   begin
     try
@@ -1194,8 +1243,216 @@ begin
     Exit;
   end;
 
-  // 3. Fallback for any unknown format
+  // 4. Fallback for any unknown format
   ShowInfoCard(APath, AName, ASizeStr, ADateStr, ATypeStr, ASizeBytes);
+end;
+
+{ ----------------------------------------------------------------------------
+  PDF Preview
+  ---------------------------------------------------------------------------- }
+
+procedure TfrmPreview.ShowImagePanel(AShowPdfNav: Boolean);
+begin
+  pnlInfo.Visible := False;
+  synPreview.Visible := False;
+  pnlPdfNav.Visible := AShowPdfNav;
+  pnlImage.Visible := True;
+end;
+
+procedure TfrmPreview.ShowPdf(const APath, AName, ASizeStr, ADateStr, ATypeStr: string; ASizeBytes: Int64);
+var
+  ErrMsg: string;
+  {$IFDEF WINDOWS}
+  Thumb: Graphics.TBitmap;
+  {$ENDIF}
+begin
+  ErrMsg := '';
+  FPdfSizeStr := ASizeStr;
+
+  // 1. Full multi-page rendering through PDFium
+  if PdfiumAvailable then
+  begin
+    try
+      FPdfDoc := TPdfDocument.Create(APath);
+      if FPdfDoc.PageCount < 1 then
+        raise EPdfError.CreateCode(PDF_ERR_PAGE, 'This PDF document has no pages.');
+      FPdfPage := 0;
+      imgPreview.Picture.Clear;
+      ShowImagePanel(True);
+      // Lay out the navigation bar first so the page renders at its final size
+      pnlImage.HandleNeeded;
+      pnlImage.ReAlign;
+      RenderPdfPage;
+      Exit;
+    except
+      on E: Exception do
+      begin
+        ClosePdf;
+        ErrMsg := E.Message;
+      end;
+    end;
+  end;
+
+  // 2. Library missing: first page via the Windows Shell thumbnail provider
+  {$IFDEF WINDOWS}
+  if ErrMsg = '' then
+  begin
+    Thumb := Graphics.TBitmap.Create;
+    try
+      if LoadShellThumbnail(APath, 1024, Thumb) then
+      begin
+        imgPreview.Picture.Assign(Thumb);
+        lblImageDetails.Caption := 'First page (Windows thumbnail) | ' + ASizeStr +
+          ' | add ' + PdfiumLibraryName + ' for multi-page preview';
+        ShowImagePanel(False);
+        Exit;
+      end;
+    finally
+      Thumb.Free;
+    end;
+  end;
+  {$ENDIF}
+
+  // 3. Info card explaining why the document could not be shown
+  ShowInfoCard(APath, AName, ASizeStr, ADateStr, ATypeStr, ASizeBytes);
+  if ErrMsg <> '' then
+    lblHexTitle.Caption := ErrMsg
+  else
+    lblHexTitle.Caption := 'PDF preview needs ' + PdfiumLibraryName +
+      ' next to AceUtils.exe (run tools\fetch-pdfium.ps1).';
+end;
+
+procedure TfrmPreview.RenderPdfPage;
+var
+  Bmp: Graphics.TBitmap;
+  PageW, PageH: Double;
+  MaxW, MaxH: Integer;
+begin
+  if FPdfDoc = nil then Exit;
+  tmrPdfResize.Enabled := False;
+
+  // Small margin so the white page stands out against the panel background
+  MaxW := imgPreview.Width - 12;
+  MaxH := imgPreview.Height - 12;
+  if MaxW < 64 then MaxW := 64;
+  if MaxH < 64 then MaxH := 64;
+
+  Bmp := Graphics.TBitmap.Create;
+  try
+    try
+      FPdfDoc.RenderPage(FPdfPage, Bmp, MaxW, MaxH);
+      imgPreview.Picture.Assign(Bmp);
+      FPdfDoc.GetPageSize(FPdfPage, PageW, PageH);
+      lblImageDetails.Caption := Format('PDF | %.0f x %.0f pt | %s',
+        [PageW, PageH, FPdfSizeStr]);
+    except
+      on E: Exception do
+        lblImageDetails.Caption := 'Could not render page: ' + E.Message;
+    end;
+  finally
+    Bmp.Free;
+  end;
+
+  lblPdfPage.Caption := Format('Page %d of %d', [FPdfPage + 1, FPdfDoc.PageCount]);
+  btnPdfFirst.Enabled := FPdfPage > 0;
+  btnPdfPrev.Enabled := FPdfPage > 0;
+  btnPdfNext.Enabled := FPdfPage < FPdfDoc.PageCount - 1;
+  btnPdfLast.Enabled := FPdfPage < FPdfDoc.PageCount - 1;
+end;
+
+procedure TfrmPreview.GoToPdfPage(AIndex: Integer);
+begin
+  if FPdfDoc = nil then Exit;
+  if AIndex < 0 then AIndex := 0;
+  if AIndex > FPdfDoc.PageCount - 1 then AIndex := FPdfDoc.PageCount - 1;
+  if AIndex = FPdfPage then Exit;
+  FPdfPage := AIndex;
+  RenderPdfPage;
+end;
+
+procedure TfrmPreview.ClosePdf;
+begin
+  if Assigned(tmrPdfResize) then
+    tmrPdfResize.Enabled := False;
+  FreeAndNil(FPdfDoc);
+  FPdfPage := 0;
+  if Assigned(pnlPdfNav) then
+    pnlPdfNav.Visible := False;
+end;
+
+procedure TfrmPreview.btnPdfFirstClick(Sender: TObject);
+begin
+  GoToPdfPage(0);
+end;
+
+procedure TfrmPreview.btnPdfPrevClick(Sender: TObject);
+begin
+  GoToPdfPage(FPdfPage - 1);
+end;
+
+procedure TfrmPreview.btnPdfNextClick(Sender: TObject);
+begin
+  GoToPdfPage(FPdfPage + 1);
+end;
+
+procedure TfrmPreview.btnPdfLastClick(Sender: TObject);
+begin
+  if FPdfDoc <> nil then
+    GoToPdfPage(FPdfDoc.PageCount - 1);
+end;
+
+procedure TfrmPreview.PdfNavKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if FPdfDoc = nil then Exit;
+  case Key of
+    VK_NEXT, VK_RIGHT, VK_DOWN:
+      begin
+        GoToPdfPage(FPdfPage + 1);
+        Key := 0;
+      end;
+    VK_PRIOR, VK_LEFT, VK_UP:
+      begin
+        GoToPdfPage(FPdfPage - 1);
+        Key := 0;
+      end;
+    VK_HOME:
+      begin
+        GoToPdfPage(0);
+        Key := 0;
+      end;
+    VK_END:
+      begin
+        GoToPdfPage(FPdfDoc.PageCount - 1);
+        Key := 0;
+      end;
+  end;
+end;
+
+procedure TfrmPreview.FormMouseWheel(Sender: TObject; Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
+begin
+  if (FPdfDoc = nil) or (not pnlImage.Visible) then Exit;
+  if WheelDelta < 0 then
+    GoToPdfPage(FPdfPage + 1)
+  else if WheelDelta > 0 then
+    GoToPdfPage(FPdfPage - 1);
+  Handled := True;
+end;
+
+procedure TfrmPreview.imgPreviewResize(Sender: TObject);
+begin
+  // Debounce: re-render once the user stops resizing instead of on every pixel
+  if FPdfDoc <> nil then
+  begin
+    tmrPdfResize.Enabled := False;
+    tmrPdfResize.Enabled := True;
+  end;
+end;
+
+procedure TfrmPreview.tmrPdfResizeTimer(Sender: TObject);
+begin
+  tmrPdfResize.Enabled := False;
+  RenderPdfPage;
 end;
 
 end.

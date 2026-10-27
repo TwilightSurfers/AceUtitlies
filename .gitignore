@@ -19,3 +19,9 @@ AceUtils_Notes.txt
 
 # IDE session
 *.lps
+
+# Unit test build output
+tests/bin/
+
+# PDFium runtime (fetched by tools/fetch-pdfium.ps1; license texts in third_party/pdfium/)
+pdfium.dll

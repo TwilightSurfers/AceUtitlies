@@ -7,6 +7,7 @@ object frmMain: TfrmMain
   ClientHeight = 650
   ClientWidth = 1050
   KeyPreview = True
+  Menu = MainMenu1
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
@@ -23,6 +24,7 @@ object frmMain: TfrmMain
     Width = 1050
     Align = alTop
     BevelOuter = bvNone
+    Visible = False
     ClientHeight = 36
     ClientWidth = 1050
     TabOrder = 0
@@ -118,6 +120,7 @@ object frmMain: TfrmMain
           Width = 160
           TabOrder = 0
           Text = '*.*'
+          OnKeyDown = SearchFieldKeyDown
         end
         object lblSearchIn: TLabel
           Left = 180
@@ -133,6 +136,7 @@ object frmMain: TfrmMain
           Width = 190
           TabOrder = 1
           Text = 'C:\'
+          OnKeyDown = SearchFieldKeyDown
         end
         object btnBrowse: TButton
           Left = 373
@@ -156,6 +160,7 @@ object frmMain: TfrmMain
           Top = 24
           Width = 160
           TabOrder = 3
+          OnKeyDown = SearchFieldKeyDown
         end
         object btnSearch: TButton
           Left = 580
@@ -163,7 +168,6 @@ object frmMain: TfrmMain
           Top = 22
           Width = 75
           Caption = 'Search'
-          Default = True
           TabOrder = 4
           OnClick = btnSearchClick
         end
@@ -573,6 +577,7 @@ object frmMain: TfrmMain
           Top = 6
           Width = 150
           TabOrder = 0
+          OnKeyDown = FindBarKeyDown
         end
         object btnFindNext: TButton
           Left = 194
@@ -596,6 +601,7 @@ object frmMain: TfrmMain
           Top = 6
           Width = 140
           TabOrder = 2
+          OnKeyDown = FindBarKeyDown
         end
         object btnReplaceNext: TButton
           Left = 462
@@ -750,7 +756,7 @@ object frmMain: TfrmMain
       end
     end
     object tabMemory: TTabSheet
-      Caption = 'Memory & Notes'
+      Caption = 'Memory && Notes'
       ClientHeight = 561
       ClientWidth = 1042
       ImageIndex = 2
@@ -1038,7 +1044,7 @@ object frmMain: TfrmMain
               Height = 15
               Top = 5
               Width = 155
-              Caption = 'Quick Notes & Scratchpad'
+              Caption = 'Quick Notes && Scratchpad'
               Font.Style = [fsBold]
               ParentFont = False
             end
@@ -1171,7 +1177,7 @@ object frmMain: TfrmMain
           Height = 28
           Top = 6
           Width = 210
-          Caption = 'Take Back .txt & .md Associations'
+          Caption = 'Take Back .txt && .md Associations'
           TabOrder = 3
           OnClick = btnTakeoverAssocClick
         end
@@ -1603,7 +1609,7 @@ object frmMain: TfrmMain
           Height = 15
           Top = 36
           Width = 550
-          Caption = 'A Windows application that actually searches Windows for files! Plus Notepad & Shell tools.'
+          Caption = 'A Windows application that actually searches Windows for files! Plus Notepad && Shell tools.'
           Font.Color = clGray
           ParentFont = False
         end
@@ -1943,7 +1949,7 @@ object frmMain: TfrmMain
         TabIndex = 0
         TabOrder = 2
         object tabAboutFeatures: TTabSheet
-          Caption = 'Features & Architecture'
+          Caption = 'Features && Architecture'
           ClientHeight = 368
           ClientWidth = 1034
           object mmoAboutFeatures: TMemo
@@ -1961,7 +1967,7 @@ object frmMain: TfrmMain
           end
         end
         object tabAboutBuildLog: TTabSheet
-          Caption = 'Build History & Changelog'
+          Caption = 'Build History && Changelog'
           ClientHeight = 368
           ClientWidth = 1034
           object mmoAboutBuildLog: TMemo
@@ -2344,5 +2350,397 @@ object frmMain: TfrmMain
     OnTimer = tmrClipboardTimer
     Left = 520
     Top = 8
+  end
+  object MainMenu1: TMainMenu
+    Left = 600
+    Top = 8
+    object miFile: TMenuItem
+      Caption = '&File'
+      OnClick = miFileMenuClick
+      object miFileNew: TMenuItem
+        Caption = '&New'
+        ShortCut = 16462
+        OnClick = btnNewFileClick
+      end
+      object miFileOpen: TMenuItem
+        Caption = '&Open...'
+        ShortCut = 16463
+        OnClick = btnOpenFileClick
+      end
+      object miFileRecent: TMenuItem
+        Caption = 'Open &Recent'
+      end
+      object miMainSep1: TMenuItem
+        Caption = '-'
+      end
+      object miFileSave: TMenuItem
+        Caption = '&Save'
+        ShortCut = 16467
+        OnClick = btnSaveFileClick
+      end
+      object miFileSaveAs: TMenuItem
+        Caption = 'Save &As...'
+        ShortCut = 24659
+        OnClick = btnSaveAsClick
+      end
+      object miFileClose: TMenuItem
+        Caption = '&Close File'
+        ShortCut = 16471
+        OnClick = btnCloseFileClick
+      end
+      object miMainSep2: TMenuItem
+        Caption = '-'
+      end
+      object miFileExit: TMenuItem
+        Caption = 'E&xit'
+        OnClick = miTrayExitClick
+      end
+    end
+    object miEdit: TMenuItem
+      Caption = '&Edit'
+      OnClick = miEditMenuClick
+      object miEditUndo: TMenuItem
+        Caption = '&Undo'
+        OnClick = miEditUndoClick
+      end
+      object miEditRedo: TMenuItem
+        Caption = '&Redo'
+        OnClick = miEditRedoClick
+      end
+      object miMainSep3: TMenuItem
+        Caption = '-'
+      end
+      object miEditCut: TMenuItem
+        Caption = 'Cu&t'
+        OnClick = miEditCutClick
+      end
+      object miEditCopy: TMenuItem
+        Caption = '&Copy'
+        OnClick = miEditCopyClick
+      end
+      object miEditPaste: TMenuItem
+        Caption = '&Paste'
+        OnClick = miEditPasteClick
+      end
+      object miEditSelectAll: TMenuItem
+        Caption = 'Select &All'
+        OnClick = miEditSelectAllClick
+      end
+      object miMainSep4: TMenuItem
+        Caption = '-'
+      end
+      object miEditFind: TMenuItem
+        Caption = '&Find...'
+        ShortCut = 16454
+        OnClick = miEditFindClick
+      end
+      object miEditFindNext: TMenuItem
+        Caption = 'Find &Next'
+        ShortCut = 114
+        OnClick = btnFindNextClick
+      end
+      object miEditFindPrev: TMenuItem
+        Caption = 'Find Pre&vious'
+        ShortCut = 8306
+        OnClick = miEditFindPrevClick
+      end
+      object miEditReplace: TMenuItem
+        Caption = 'R&eplace...'
+        ShortCut = 16456
+        OnClick = miEditReplaceClick
+      end
+      object miEditGoToLine: TMenuItem
+        Caption = '&Go to Line...'
+        ShortCut = 16455
+        OnClick = miEditGoToLineClick
+      end
+      object miMainSep5: TMenuItem
+        Caption = '-'
+      end
+      object miEditWordWrap: TMenuItem
+        Caption = '&Word Wrap'
+        OnClick = miEditWordWrapClick
+      end
+      object miEditReplaceAITells: TMenuItem
+        Caption = 'Replace AI &Tells on Open/Paste'
+        OnClick = miEditReplaceAITellsClick
+      end
+      object miEditFormat: TMenuItem
+        Caption = 'F&ormat'
+        object miEditFormatNumbered: TMenuItem
+          Caption = '&Numbered List'
+          OnClick = btnFormatNumberedClick
+        end
+        object miEditFormatBullet: TMenuItem
+          Caption = '&Bullet List'
+          OnClick = btnFormatBulletClick
+        end
+        object miMainSep6: TMenuItem
+          Caption = '-'
+        end
+        object miEditFormatHTML: TMenuItem
+          Caption = 'Use &HTML Tags'
+          OnClick = miFormatHTMLClick
+        end
+      end
+      object miEditFontColor: TMenuItem
+        Caption = 'Font &Color...'
+        OnClick = btnFontColorClick
+      end
+    end
+    object miView: TMenuItem
+      Caption = '&View'
+      OnClick = miViewMenuClick
+      object miViewExplorer: TMenuItem
+        Caption = 'The Real &Explorer'
+        ShortCut = 16433
+        OnClick = miViewTabClick
+      end
+      object miViewSearch: TMenuItem
+        Caption = 'File &Search'
+        ShortCut = 16434
+        OnClick = miViewTabClick
+      end
+      object miViewNotepad: TMenuItem
+        Caption = '&Notepad'
+        ShortCut = 16435
+        OnClick = miViewTabClick
+      end
+      object miViewMemory: TMenuItem
+        Caption = '&Memory && Notes'
+        ShortCut = 16436
+        OnClick = miViewTabClick
+      end
+      object miViewContextMenu: TMenuItem
+        Caption = '&Context Menu'
+        ShortCut = 16437
+        OnClick = miViewTabClick
+      end
+      object miViewAbout: TMenuItem
+        Caption = '&About'
+        ShortCut = 16438
+        OnClick = miViewTabClick
+      end
+      object miMainSep7: TMenuItem
+        Caption = '-'
+      end
+      object miViewNextTab: TMenuItem
+        Caption = 'Ne&xt Tab'
+        ShortCut = 16393
+        OnClick = miViewNextTabClick
+      end
+      object miViewPrevTab: TMenuItem
+        Caption = 'Pre&vious Tab'
+        ShortCut = 24585
+        OnClick = miViewPrevTabClick
+      end
+      object miMainSep8: TMenuItem
+        Caption = '-'
+      end
+      object miViewPreview: TMenuItem
+        Caption = '&Preview Window'
+        ShortCut = 24656
+        OnClick = miViewPreviewClick
+      end
+      object miViewDarkMode: TMenuItem
+        Caption = '&Dark Mode'
+        ShortCut = 24644
+        OnClick = btnToggleDarkModeClick
+      end
+      object miViewTabStyle: TMenuItem
+        Caption = '&Tab Style'
+        object miViewTabClassic: TMenuItem
+          Caption = '&Classic Tabs'
+          GroupIndex = 1
+          RadioItem = True
+          OnClick = miTabStyleClick
+        end
+        object miViewTabFlat: TMenuItem
+          Caption = '&Flat Buttons'
+          GroupIndex = 1
+          RadioItem = True
+          OnClick = miTabStyleClick
+        end
+        object miViewTabButtons: TMenuItem
+          Caption = '&Push Buttons'
+          GroupIndex = 1
+          RadioItem = True
+          OnClick = miTabStyleClick
+        end
+        object miMainSep9: TMenuItem
+          Caption = '-'
+        end
+        object miViewTabDot: TMenuItem
+          Caption = '&Highlight Active Tab'
+          OnClick = miTabHighlightDotClick
+        end
+        object miViewTabTall: TMenuItem
+          Caption = '&Tall Tabs'
+          OnClick = miTabTallHeightClick
+        end
+      end
+    end
+    object miGo: TMenuItem
+      Caption = '&Go'
+      OnClick = miGoMenuClick
+      object miGoBack: TMenuItem
+        Caption = '&Back'
+        ShortCut = 32805
+        OnClick = btnExpBackClick
+      end
+      object miGoForward: TMenuItem
+        Caption = '&Forward'
+        ShortCut = 32807
+        OnClick = btnExpForwardClick
+      end
+      object miGoUp: TMenuItem
+        Caption = '&Up One Level'
+        ShortCut = 32806
+        OnClick = btnExpUpClick
+      end
+      object miGoRefresh: TMenuItem
+        Caption = '&Refresh'
+        ShortCut = 116
+        OnClick = miGoRefreshClick
+      end
+      object miGoAddress: TMenuItem
+        Caption = '&Address Bar'
+        ShortCut = 16460
+        OnClick = miGoAddressClick
+      end
+      object miMainSep10: TMenuItem
+        Caption = '-'
+      end
+      object miGoDefault: TMenuItem
+        Caption = 'Default &Folder'
+        ShortCut = 32804
+        OnClick = miGoJumpClick
+      end
+      object miGoDesktop: TMenuItem
+        Caption = '&Desktop'
+        OnClick = miGoJumpClick
+      end
+      object miGoDownloads: TMenuItem
+        Caption = 'Do&wnloads'
+        OnClick = miGoJumpClick
+      end
+      object miGoDocuments: TMenuItem
+        Caption = 'Docu&ments'
+        OnClick = miGoJumpClick
+      end
+      object miGoPictures: TMenuItem
+        Caption = '&Pictures'
+        OnClick = miGoJumpClick
+      end
+      object miGoDriveC: TMenuItem
+        Caption = '&Local Disk (C:)'
+        OnClick = miGoJumpClick
+      end
+      object miGoUserHome: TMenuItem
+        Caption = 'User Pr&ofile'
+        OnClick = miGoJumpClick
+      end
+      object miMainSep11: TMenuItem
+        Caption = '-'
+      end
+      object miGoSortBy: TMenuItem
+        Caption = '&Sort By'
+        object miSortName: TMenuItem
+          Caption = '&Name'
+          GroupIndex = 2
+          RadioItem = True
+          OnClick = miSortByClick
+        end
+        object miSortType: TMenuItem
+          Caption = '&Type'
+          GroupIndex = 2
+          RadioItem = True
+          OnClick = miSortByClick
+        end
+        object miSortSize: TMenuItem
+          Caption = '&Size'
+          GroupIndex = 2
+          RadioItem = True
+          OnClick = miSortByClick
+        end
+        object miSortDate: TMenuItem
+          Caption = '&Date Modified'
+          GroupIndex = 2
+          RadioItem = True
+          OnClick = miSortByClick
+        end
+        object miMainSep12: TMenuItem
+          Caption = '-'
+        end
+        object miSortAscending: TMenuItem
+          Caption = '&Ascending'
+          GroupIndex = 3
+          RadioItem = True
+          OnClick = miSortDirectionClick
+        end
+        object miSortDescending: TMenuItem
+          Caption = 'D&escending'
+          GroupIndex = 3
+          RadioItem = True
+          OnClick = miSortDirectionClick
+        end
+      end
+      object miGoNewFolder: TMenuItem
+        Caption = '&New Folder...'
+        ShortCut = 24654
+        OnClick = btnExpNewFolderClick
+      end
+      object miGoSetDefault: TMenuItem
+        Caption = 'Set Current Folder as Defa&ult'
+        OnClick = btnExpSetDefaultClick
+      end
+    end
+    object miTools: TMenuItem
+      Caption = '&Tools'
+      OnClick = miToolsMenuClick
+      object miToolsFindFiles: TMenuItem
+        Caption = '&Find Files in Current Folder...'
+        ShortCut = 24646
+        OnClick = miToolsFindFilesClick
+      end
+      object miToolsStopSearch: TMenuItem
+        Caption = '&Stop Search'
+        OnClick = btnStopClick
+      end
+      object miMainSep13: TMenuItem
+        Caption = '-'
+      end
+      object miToolsAssociate: TMenuItem
+        Caption = '&Associate .txt / .md Files...'
+        OnClick = btnRegisterAssocClick
+      end
+      object miToolsTakeover: TMenuItem
+        Caption = '&Take Back Stolen File Associations'
+        OnClick = btnTakeoverAssocClick
+      end
+      object miToolsRescan: TMenuItem
+        Caption = '&Rescan Context Menu Entries'
+        OnClick = btnRefreshContextMenuClick
+      end
+      object miMainSep14: TMenuItem
+        Caption = '-'
+      end
+      object miToolsRunInTray: TMenuItem
+        Caption = 'Run in System &Tray'
+        OnClick = miToolsRunInTrayClick
+      end
+    end
+    object miHelp: TMenuItem
+      Caption = '&Help'
+      object miHelpShortcuts: TMenuItem
+        Caption = '&Keyboard Shortcuts'
+        ShortCut = 112
+        OnClick = miHelpShortcutsClick
+      end
+      object miHelpAbout: TMenuItem
+        Caption = '&About Ace''s Utilities'
+        OnClick = miViewTabClick
+      end
+    end
   end
 end

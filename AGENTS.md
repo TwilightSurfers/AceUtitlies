@@ -124,6 +124,7 @@ Before considering any fix complete:
 2. **CPU Verification**: Ensure CPU usage returns to 0% after actions (no runaway thread spinning on a core).
 3. **Quoted & Edge-Case Inputs**: Test paths with quotes (`"C:\..."`), double quotes (`""C:\...""`), single quotes, and trailing delimiters.
 4. **Git Tree Cleanliness**: Ensure no temporary test executables (`test_*.exe`), crash dumps (`*.dmp`), or stray `.o`/`.ppu` files remain untracked.
+5. **Unit Tests Pass**: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1` must print `ALL TESTS PASSED` (exit code 0). New UI-independent logic belongs in `AceCore.pas` (or `AcePdf.pas`) with tests in `tests/`, not inside `TfrmMain`.
 
 ---
 
@@ -207,17 +208,20 @@ In Delphi VCL, `TStatusBar.SimplePanel` defaults to `False`. In Lazarus LCL, how
 - **The Rule**:
   1. Always explicitly specify `SimplePanel = False` and `Align = alBottom` in the `.lfm`.
   2. Always enforce `StatusBar.SimplePanel := False;` in `FormCreate`.
-  3. Auto-fit Panel 0 dynamically on `FormResize`:
+  3. Auto-fit Panel 0 dynamically on `FormResize`, summing the **actual** widths of the other panels (LCL scales them for DPI; a hard-coded constant does not scale and clips CAPS/NUM/INS/clock at 125-150%) plus a square for the size grip:
      ```pascal
      procedure TfrmMain.FormResize(Sender: TObject);
-     const
-       RightPanelsWidth = 90 + 90 + 50 + 50 + 50 + 130 + 24;
+     var
+       i, RightPanelsWidth: Integer;
      begin
-       if (StatusBar1 <> nil) and (StatusBar1.Panels.Count > 0) then
-         StatusBar1.Panels[0].Width := Max(200, StatusBar1.ClientWidth - RightPanelsWidth);
+       if (StatusBar1 = nil) or (StatusBar1.Panels.Count = 0) then Exit;
+       RightPanelsWidth := StatusBar1.ClientHeight; // size grip square
+       for i := 1 to StatusBar1.Panels.Count - 1 do
+         Inc(RightPanelsWidth, StatusBar1.Panels[i].Width);
+       StatusBar1.Panels[0].Width := Max(Scale96ToForm(200), StatusBar1.ClientWidth - RightPanelsWidth);
      end;
      ```
-     This keeps the right-aligned status panels (Files, Dirs, CAPS, NUM, INS, Clock) cleanly docked to the right edge across all monitor resolutions and window sizes.
+     This keeps the right-aligned status panels (Files, Dirs, CAPS, NUM, INS, Clock) cleanly docked to the right edge across all monitor resolutions, scaling factors, and window sizes.
 
 ### Native Win32 `SysStatus32` Text Color Limitation & `psOwnerDraw` (CRITICAL)
 - **The Issue**: On Windows, the underlying `SysStatus32` common control draws panel text using the GDI system color `COLOR_BTNTEXT` (hardcoded black). Standard `TStatusBar.Font.Color` assignments are completely ignored by `SysStatus32` when non-owner-drawn. When the status bar background is set to a dark color (e.g., `HeaderBg`), the text renders black on dark gray, making it unreadable.
@@ -225,6 +229,10 @@ In Delphi VCL, `TStatusBar.SimplePanel` defaults to `False`. In Lazarus LCL, how
   1. Set `Style = psOwnerDraw` on each panel in both `.lfm` and `FormCreate`.
   2. Implement an `OnDrawPanel` event handler (`StatusBar1DrawPanel`) to paint the panel background (`StatusBar.Canvas.Brush.Color := StatusBar.Color; StatusBar.Canvas.FillRect(Rect);`) and draw the text using `StatusBar.Canvas.Font` with explicit high-contrast colors (`$00F0F0F0` for general text, counts, and clock in dark mode; `$0050D0FF` for active lock indicators).
   3. Use `StatusBar.Canvas.Brush.Style := bsClear;` and `StatusBar.Canvas.TextRect(...)` with alignment calculations to render clean, vertically centered, and clipped text across all resolutions.
+
+### The Size Grip Ignores Dark Mode
+- **The Issue**: `SysStatus32` paints its size grip (the bottom-right drag dots) with the light theme after the owner-drawn panels; no `SetWindowTheme` / dark-mode API changes it.
+- **The Rule**: `StatusBar1` is subclassed (`StatusBarGripSubclassProc`, `SUBCLASS_ID_STATUSBAR`). After `DefSubclassProc` handles `WM_PAINT`, in dark mode (and not maximized) it fills the right-hand square with the status bar color and draws a dot triangle. The native `WM_NCHITTEST` is left alone so dragging still resizes the window. Remove the subclass in `FormDestroy`.
 
 
 ---
@@ -422,3 +430,56 @@ begin
   5. **Header Theme Reset**: In Light Mode, set header theme back to `'ItemsView'` (not non-existent `'Explorer'`), and list view theme to `'Explorer'`.
   6. **Explorer List Refresh**: For `ShellListViewExplorer`, call `ShellListViewExplorer.UpdateView;` and `EnsureExplorerSystemImageList;` upon theme change to cleanly re-populate items and system shell icon caches.
 
+
+---
+
+## 13. Main Menu (`MainMenu1`) Shortcut Invariants (`MainForm.lfm` / `MainForm.pas`)
+
+### 1. Clipboard Keys Stay Unbound (extends section 2)
+`TMainMenu` shortcuts are form-global exactly like popup shortcuts. **Never** assign `Ctrl+X/C/V/Z/Y/A` (or `Del`) to any menu item. The Edit menu's Cut/Copy/Paste/Undo/Select All items have no `ShortCut` and act on `ActiveControl` when clicked (`TCustomEdit` or `SynEdit1`).
+
+### 2. Contextual Enabling Happens in the Top-Level `OnClick`
+`TMenu.IsShortcut` (`menu.inc`) calls `Click` on every **parent** item before checking the target item's `Enabled`. Each top-level menu (`miFileMenuClick`, `miEditMenuClick`, `miGoMenuClick`, ...) therefore refreshes `Enabled`/`Checked` state, and those handlers run before shortcut dispatch.
+- A **disabled** item does not consume its key (`FShortcutHandled := False`), so the key reaches the focused control. Use this for tab-specific shortcuts (e.g. `Alt+Left` is disabled outside The Real Explorer).
+- Keep `Esc` out of the menu (dialogs and in-place editors need it); it is handled in `FormKeyDown` before the typing guard.
+
+### 3. Programmatic Tab Switches Go Through `ActivateTab`
+`PageControl1.ActivePage := X` does **not** fire `OnChange`, which skips the highlight, theme refresh, focus, and Explorer sort. Always call `ActivateTab(tabX)`. Tab order is set in `FormCreate` via `PageIndex` (Explorer, Search, Notepad, Memory, Context Menu, About); `Ctrl+1..6` map to tab sheets, not to positions.
+
+### 4. Dark Menu Bar
+LCL owner-draws menu bar items, so the UAH (`WM_UAHDRAWMENUITEM`) technique does not apply. In dark mode `ApplyMainMenuTheme` assigns `MainMenuBarDrawItem` to the **top-level items only**, sets the bar brush with `SetMenuInfo(MIM_BACKGROUND)`, and `MainFormSubclassProc` paints over the 1px light line under the bar on `WM_NCPAINT` / `WM_NCACTIVATE`.
+
+### 5. Ampersands in LFM Captions
+`TLabel`, `TTabSheet`, `TButton`, and `TMenuItem` treat `&` as an accelerator prefix (`"Memory & Notes"` renders as `Memory _Notes`). Write `&&` in captions. Persisted tab names use `TabSettingName` to fold `&&` back to `&`.
+
+---
+
+## 14. The Real Explorer Sorting (`TShellListView` LCL Quirk) (CRITICAL)
+
+- **The Issue**: `TCustomShellListView.PopulateWithRoot` calls `Sort` *inside* `Items.BeginUpdate`, and `TCustomListView.BeginUpdate` sets `lffPreparingSorting`, which makes `SortWithParams` exit immediately. `EndUpdate` never re-sorts. Every repopulate (`Root` change, `UpdateView`, the delayed populate in `CreateHandle`) therefore shows raw filesystem enumeration order: folders and files mixed.
+- **The Rule**:
+  1. `ShellListViewExplorer.SortType := stText` and `AutoSort := False` (via `TShellListViewCracker`) in `FormCreate`.
+  2. Follow **every** `ShellListViewExplorer.UpdateView` / `Root :=` with `SortExplorerList` (an explicit `AlphaSort` that runs `ShellListViewExplorerCompare`).
+  3. `PageControl1Change` (Explorer tab) and a `QueueAsyncCall` after `FormShow` also call it, covering the first lazy handle creation.
+  4. Ordering logic lives in `AceCore.CompareExplorerEntries` (folders always first; ties fall back to name). DOS timestamps compare as `LongWord`.
+
+---
+
+## 15. PDF Preview via PDFium (`AcePdf.pas`) (CRITICAL)
+
+1. **Calling Convention is `cdecl`**: `fpdfview.h` only uses `__stdcall` when `FPDFSDK_EXPORTS` is defined. The pdfium-binaries x86 DLL exports undecorated **cdecl** symbols. Declaring them `stdcall` corrupts the stack and crashes inside `FPDF_RenderPageBitmap`.
+2. **Mask FPU Exceptions Around Every Native Call**: FPC unmasks FPU exceptions; PDFium (C++) expects them masked. Without masking, the process dies with `STATUS_FLOAT_MULTIPLE_TRAPS` (`0xC00002B5`). Wrap calls in `EnterNativeCall` / `LeaveNativeCall`, which also clear pending flags before restoring the mask.
+3. **Load From Memory**: Use `FPDF_LoadMemDocument` with a `TMemoryStream` that outlives the document handle. PDFium then never holds a file handle, so a previewed PDF can still be renamed or recycled.
+4. **`TLazIntfImage.DataDescription` Is a Record Property**: `Img.DataDescription.Init_...()` initializes a temporary copy. Build a local `TRawImageDescription`, assign it, then `CreateData`.
+5. **Distribution**: `pdfium.dll` (32-bit, matching `i386-win32`) sits next to `AceUtils.exe` and is fetched by `tools\fetch-pdfium.ps1` (pinned release + SHA-256). It is git-ignored; license texts live in `third_party/pdfium/`. The app must keep working when the DLL is missing (`PdfiumAvailable = False` → shell thumbnail → info card).
+
+---
+
+## 16. `Windows` Unit Shadowing in Implementation Sections
+
+Units listed in an `implementation` `uses` clause take precedence over interface units, and `Windows` redefines several LCL names:
+- `TBitmap` (a GDI record) → write `Graphics.TBitmap`.
+- `TOwnerDrawState` and `odSelected` / `odHotLight` / ... → write `LCLType.TOwnerDrawState`, `LCLType.odSelected`.
+- `Point` (the `POINT` record type, so `Point(1, 2)` is a syntax error) → write `Classes.Point(1, 2)`.
+- `LoadLibrary` → write `dynlibs.LoadLibrary` when loading by `string`.
+- Don't name locals after form properties (`Visible`, `Caption`, ...): FPC reports "Duplicate identifier".
